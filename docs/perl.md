@@ -1,6 +1,6 @@
 # Perl style
 
-Covers Perl scripts (`.pl`) and modules (`.pm`) in the corpus.  The corpus has a small but consistent set of Perl files in `corpus/doi/perl-bashbrew/`.
+Covers Perl scripts (`.pl`) and modules (`.pm`) in the corpus.  The corpus has a small but consistent set of Perl files in [`doi/perl-bashbrew`](https://github.com/docker-library/perl-bashbrew/tree/2ab6f478d8cf809b67ebd21930e84c51ad61dc7b).
 
 ## Shebang
 
@@ -10,7 +10,7 @@ Covers Perl scripts (`.pl`) and modules (`.pm`) in the corpus.  The corpus has a
 
 Same pattern as [bash.md](bash.md) — always `env`-based, never a direct `/usr/bin/perl` path.
 
-Corpus ref: `corpus/doi/perl-bashbrew/bin/put-multiarch.pl:1`.
+Corpus ref: [`doi/perl-bashbrew/bin/put-multiarch.pl#L1`](https://github.com/docker-library/perl-bashbrew/blob/2ab6f478d8cf809b67ebd21930e84c51ad61dc7b/bin/put-multiarch.pl#L1).
 
 ## Module imports
 
@@ -40,7 +40,7 @@ use Getopt::Long;
 use Mojo::Promise;
 ```
 
-Corpus refs: `corpus/doi/perl-bashbrew/bin/put-multiarch.pl:2-11`, `corpus/doi/perl-bashbrew/lib/Bashbrew.pm:2-6`.
+Corpus refs: [`doi/perl-bashbrew/bin/put-multiarch.pl#L2-L11`](https://github.com/docker-library/perl-bashbrew/blob/2ab6f478d8cf809b67ebd21930e84c51ad61dc7b/bin/put-multiarch.pl#L2-L11), [`doi/perl-bashbrew/lib/Bashbrew.pm#L2-L6`](https://github.com/docker-library/perl-bashbrew/blob/2ab6f478d8cf809b67ebd21930e84c51ad61dc7b/lib/Bashbrew.pm#L2-L6).
 
 ## Indentation
 
@@ -73,7 +73,7 @@ sub bashbrew (@) {
 
 Opening brace `{` always on the same line as `sub`.
 
-Corpus refs: `corpus/doi/perl-bashbrew/lib/Bashbrew.pm:13`, `corpus/doi/perl-bashbrew/lib/Bashbrew.pm:48`, `corpus/doi/perl-bashbrew/bin/put-multiarch.pl:32`.
+Corpus refs: [`doi/perl-bashbrew/lib/Bashbrew.pm#L13`](https://github.com/docker-library/perl-bashbrew/blob/2ab6f478d8cf809b67ebd21930e84c51ad61dc7b/lib/Bashbrew.pm#L13), [`doi/perl-bashbrew/lib/Bashbrew.pm#L48`](https://github.com/docker-library/perl-bashbrew/blob/2ab6f478d8cf809b67ebd21930e84c51ad61dc7b/lib/Bashbrew.pm#L48), [`doi/perl-bashbrew/bin/put-multiarch.pl#L32`](https://github.com/docker-library/perl-bashbrew/blob/2ab6f478d8cf809b67ebd21930e84c51ad61dc7b/bin/put-multiarch.pl#L32).
 
 ## `if` / `elsif` / `else`
 
@@ -106,7 +106,7 @@ if ($arch =~ m{
 
 The `m{}` delimiter (braces) is used instead of `m//` when the pattern contains `/`.  Comments inside `/x` patterns explain what each group matches.
 
-Corpus ref: `corpus/doi/perl-bashbrew/lib/Bashbrew.pm:14-20`.
+Corpus ref: [`doi/perl-bashbrew/lib/Bashbrew.pm#L14-L20`](https://github.com/docker-library/perl-bashbrew/blob/2ab6f478d8cf809b67ebd21930e84c51ad61dc7b/lib/Bashbrew.pm#L14-L20).
 
 ## `defined-or` (`//=`, `//`)
 
@@ -118,7 +118,7 @@ $os //= 'linux';
 
 `//` (defined-or) is preferred over `||` when the distinction between defined and truthy matters.
 
-Corpus ref: `corpus/doi/perl-bashbrew/lib/Bashbrew.pm:22`.
+Corpus ref: [`doi/perl-bashbrew/lib/Bashbrew.pm#L22`](https://github.com/docker-library/perl-bashbrew/blob/2ab6f478d8cf809b67ebd21930e84c51ad61dc7b/lib/Bashbrew.pm#L22).
 
 ## `die` for errors
 
@@ -131,7 +131,7 @@ die "failed to run 'bashbrew': $!";
 
 Error messages are lowercase, no trailing newline (Perl adds `at file line N` automatically).
 
-Corpus refs: `corpus/doi/perl-bashbrew/lib/Bashbrew.pm:39`, `corpus/doi/perl-bashbrew/lib/Bashbrew.pm:49`.
+Corpus refs: [`doi/perl-bashbrew/lib/Bashbrew.pm#L39`](https://github.com/docker-library/perl-bashbrew/blob/2ab6f478d8cf809b67ebd21930e84c51ad61dc7b/lib/Bashbrew.pm#L39), [`doi/perl-bashbrew/lib/Bashbrew.pm#L49`](https://github.com/docker-library/perl-bashbrew/blob/2ab6f478d8cf809b67ebd21930e84c51ad61dc7b/lib/Bashbrew.pm#L49).
 
 ## `return` from subroutines
 
@@ -155,7 +155,7 @@ Every `.pm` file ends with `1;`:
 1;
 ```
 
-Corpus ref: `corpus/doi/perl-bashbrew/lib/Bashbrew.pm:57`.
+Corpus ref: [`doi/perl-bashbrew/lib/Bashbrew.pm#L57`](https://github.com/docker-library/perl-bashbrew/blob/2ab6f478d8cf809b67ebd21930e84c51ad61dc7b/lib/Bashbrew.pm#L57).
 
 ## `@EXPORT_OK` and `use Exporter`
 
@@ -169,7 +169,7 @@ our @EXPORT_OK = qw(
 
 `qw()` is used for the export list.  Each symbol is on its own line when the list has more than one element, tab-indented.
 
-Corpus ref: `corpus/doi/perl-bashbrew/lib/Bashbrew.pm:6-10`.
+Corpus ref: [`doi/perl-bashbrew/lib/Bashbrew.pm#L6-L10`](https://github.com/docker-library/perl-bashbrew/blob/2ab6f478d8cf809b67ebd21930e84c51ad61dc7b/lib/Bashbrew.pm#L6-L10).
 
 ## Comments
 
@@ -182,7 +182,7 @@ TODO comments follow the same pattern as in other languages:
 # TODO make this promise-based and non-blocking?
 ```
 
-Corpus ref: `corpus/doi/perl-bashbrew/lib/Bashbrew.pm:12`, `corpus/doi/perl-bashbrew/lib/Bashbrew.pm:42-46`.
+Corpus ref: [`doi/perl-bashbrew/lib/Bashbrew.pm#L12`](https://github.com/docker-library/perl-bashbrew/blob/2ab6f478d8cf809b67ebd21930e84c51ad61dc7b/lib/Bashbrew.pm#L12), [`doi/perl-bashbrew/lib/Bashbrew.pm#L42-L46`](https://github.com/docker-library/perl-bashbrew/blob/2ab6f478d8cf809b67ebd21930e84c51ad61dc7b/lib/Bashbrew.pm#L42-L46).
 
 ## Promise-based async (Mojo::Promise)
 
@@ -196,7 +196,7 @@ return $ua->get_manifest_p($archRef)->then(sub ($manifestData = undef) {
 
 The sub keyword starts the callback, with signatures for parameters.  The default value `= undef` pattern is used for optional parameters.
 
-Corpus ref: `corpus/doi/perl-bashbrew/bin/put-multiarch.pl:33`.
+Corpus ref: [`doi/perl-bashbrew/bin/put-multiarch.pl#L33`](https://github.com/docker-library/perl-bashbrew/blob/2ab6f478d8cf809b67ebd21930e84c51ad61dc7b/bin/put-multiarch.pl#L33).
 
 ## Notable omissions
 

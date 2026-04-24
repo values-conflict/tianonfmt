@@ -68,8 +68,8 @@ func Format(src string, lang syntax.LangVariant, jqFmt func(expr string, inline 
 //   - Argument-list continuation lines (no "; \" suffix): same indent as
 //     the command they belong to + 1 extra tab
 //   - Standalone comment lines ("#..."): 0 tabs (column 0)
-//     (corpus/tianon-dockerfiles/steam/Dockerfile.template:7)
-//     (corpus/tianon-dockerfiles/tailscale/Dockerfile:23)
+//     (https://github.com/tianon/dockerfiles/blob/2118a1979eff7545e06570d1eefc6434d691e68d/steam/Dockerfile.template#L7)
+//     (https://github.com/tianon/dockerfiles/blob/2118a1979eff7545e06570d1eefc6434d691e68d/tailscale/Dockerfile#L23)
 //   - Blank continuation lines (lone "\"): preserved as-is
 //
 // jqFmt, if non-nil, is called to reformat jq expressions found inside the
@@ -199,8 +199,8 @@ func endsBlock(line string) bool {
 //   - Value flags (--arg, --argjson, etc.) consume their NAME and VALUE args
 //
 // Corpus refs:
-//   - corpus/tianon-dockerfiles/buildkit/versions.sh:62 single-line
-//   - corpus/tianon-dockerfiles/buildkit/versions.sh:67-70 multi-line
+//   - https://github.com/tianon/dockerfiles/blob/2118a1979eff7545e06570d1eefc6434d691e68d/buildkit/versions.sh#L62 single-line
+//   - https://github.com/tianon/dockerfiles/blob/2118a1979eff7545e06570d1eefc6434d691e68d/buildkit/versions.sh#L67-L70 multi-line
 func formatJQInAST(f *syntax.File, jqFmt func(expr string, inline bool) string) {
 	syntax.Walk(f, func(n syntax.Node) bool {
 		ce, ok := n.(*syntax.CallExpr)
@@ -305,7 +305,7 @@ func reformatSglQuoted(sgl *syntax.SglQuoted, jqFmt func(expr string, inline boo
 	// Multi-line: extract the content lines, strip their common indent,
 	// format as jq, re-add the indent.
 	//
-	// The structure (from corpus/tianon-dockerfiles/buildkit/versions.sh:67-70):
+	// The structure (from https://github.com/tianon/dockerfiles/blob/2118a1979eff7545e06570d1eefc6434d691e68d/buildkit/versions.sh#L67-L70):
 	//   '
 	//   \t\tEXPR_LINE_1
 	//   \t\t| EXPR_LINE_2

@@ -1,6 +1,6 @@
 // Package template handles Tianon's jq-template Dockerfile format.
 //
-// The format is defined by corpus/doi/bashbrew/scripts/jq-template.awk:
+// The format is defined by https://github.com/docker-library/bashbrew/blob/d662ff01570964b5f648df009c9269f388285692/scripts/jq-template.awk:
 //
 //   - Plain text lines are passed through as Dockerfile content.
 //   - {{ expr }}  — a jq expression whose output is inserted inline.

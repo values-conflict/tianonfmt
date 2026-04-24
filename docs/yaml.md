@@ -40,7 +40,7 @@ jobs:
 
 Not all files have all sections, but when they appear, this is the order.
 
-Corpus refs: `corpus/actions/.github/workflows/checkout.yml`, `corpus/tianon-dockerfiles/.github/workflows/ci.yml`.
+Corpus refs: [`actions/.github/workflows/checkout.yml`](https://github.com/tianon/actions/blob/c109aa98a82622edf55e0e6380a1672368930b30/.github/workflows/checkout.yml), [`tianon-dockerfiles/.github/workflows/ci.yml`](https://github.com/tianon/dockerfiles/blob/2118a1979eff7545e06570d1eefc6434d691e68d/.github/workflows/ci.yml).
 
 ## `defaults.run.shell`
 
@@ -56,7 +56,7 @@ The value is single-quoted.  The `-x` flag (trace execution) is included — thi
 
 The `{0}` placeholder is GitHub Actions syntax for the script file path.
 
-Corpus refs: `corpus/actions/.github/workflows/checkout.yml:10-12`, `corpus/tianon-dockerfiles/.github/workflows/ci.yml:14-16`.
+Corpus refs: [`actions/.github/workflows/checkout.yml#L10-L12`](https://github.com/tianon/actions/blob/c109aa98a82622edf55e0e6380a1672368930b30/.github/workflows/checkout.yml#L10-L12), [`tianon-dockerfiles/.github/workflows/ci.yml#L14-L16`](https://github.com/tianon/dockerfiles/blob/2118a1979eff7545e06570d1eefc6434d691e68d/.github/workflows/ci.yml#L14-L16).
 
 ## `on:` triggers
 
@@ -72,7 +72,7 @@ on:
 ```
 
 - `pull_request:` and `push:` without sub-keys are fine as-is (empty mapping)
-- `schedule:` uses a single-item list with `cron:` (no quotes around the cron expression)
+- `schedule:` uses a single-item list with `cron:` (no quotes around the cron expression); the minute and hour values are deliberately off-round-numbers (e.g. `13 15` rather than `0 0`) to avoid the thundering-herd effect of every repository's scheduled job firing simultaneously, and sometimes chosen to land during the workday when the job result calls for human attention
 - `workflow_dispatch:` allows manual triggering — almost always included
 
 When `push:` has a `branches-ignore:` filter, the branches are listed in block sequence:
@@ -85,7 +85,7 @@ on:
       - update/*
 ```
 
-Corpus refs: `corpus/actions/.github/workflows/checkout.yml:3-8`, `corpus/tianon-dockerfiles/.github/workflows/ci.yml:3-10`.
+Corpus refs: [`actions/.github/workflows/checkout.yml#L3-L8`](https://github.com/tianon/actions/blob/c109aa98a82622edf55e0e6380a1672368930b30/.github/workflows/checkout.yml#L3-L8), [`tianon-dockerfiles/.github/workflows/ci.yml#L3-L10`](https://github.com/tianon/dockerfiles/blob/2118a1979eff7545e06570d1eefc6434d691e68d/.github/workflows/ci.yml#L3-L10).
 
 ## `concurrency`
 
@@ -225,7 +225,7 @@ jq invocations inside workflow shell steps follow [jq-sh.md](jq-sh.md) conventio
 
 The `EOF-$RANDOM-$RANDOM-$RANDOM` delimiter pattern is used for multi-line output values to avoid delimiter collision.
 
-Corpus ref: `corpus/tianon-dockerfiles/.github/workflows/update.yml:29-48`.
+Corpus ref: [`tianon-dockerfiles/.github/workflows/update.yml#L29-L48`](https://github.com/tianon/dockerfiles/blob/2118a1979eff7545e06570d1eefc6434d691e68d/.github/workflows/update.yml#L29-L48).
 
 ## `with:` — action inputs
 
@@ -350,7 +350,7 @@ IDs are kebab-case, matching the step's logical purpose.
 - `.yaml` extension — always `.yml`
 - Folded block scalar `>` for any `run:` content
 - `true` / `false` for booleans as strings (never `'true'` or `"true"`)
-- Flow sequences `[item1, item2]` — always block style
+- Flow sequences `[item1, item2]` — always block style in GitHub Actions workflows; Docker Compose files in the corpus do use flow sequences, reflecting that format's different conventions
 - Anchors and aliases (`&anchor`, `*alias`) — not used
 - `null` values — absent keys are omitted rather than set to null
 - Tab indentation — YAML requires spaces; 2 spaces specifically

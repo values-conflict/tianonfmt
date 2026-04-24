@@ -325,7 +325,7 @@ type ObjectField struct {
 // This mirrors gofmt's rule: if any element in a list has a comment, the list
 // goes multi-line.
 //
-// Corpus ref: corpus/debian-bin/jq/deb822.jq — the comment
+// Corpus ref: https://github.com/tianon/debian-bin/blob/d508ea34f15e88b8ac63d71ffb1938fccbc21206/jq/deb822.jq — the comment
 // "# inject a synthetic blank line…" trails the "" literal inside foreach's
 // generator, forcing that comma sequence to be multi-line.
 type CommentedExpr struct {

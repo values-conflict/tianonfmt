@@ -6,7 +6,7 @@ Covers `.jq` source files used as libraries or standalone programs.  For jq expr
 
 **Hard tabs, one per nesting level.**  No spaces are ever used for indentation inside jq files.
 
-Corpus refs: `corpus/debian-bin/jq/deb822.jq`, `corpus/debian-bin/jq/dpkg-version.jq`, `corpus/tianon-dockerfiles/scratch/multiarch.jq`.
+Corpus refs: [`debian-bin/jq/deb822.jq`](https://github.com/tianon/debian-bin/blob/d508ea34f15e88b8ac63d71ffb1938fccbc21206/jq/deb822.jq), [`debian-bin/jq/dpkg-version.jq`](https://github.com/tianon/debian-bin/blob/d508ea34f15e88b8ac63d71ffb1938fccbc21206/jq/dpkg-version.jq), [`tianon-dockerfiles/scratch/multiarch.jq`](https://github.com/tianon/dockerfiles/blob/2118a1979eff7545e06570d1eefc6434d691e68d/scratch/multiarch.jq).
 
 ## Pipe `|` placement
 
@@ -22,7 +22,7 @@ del(.out)
 
 Short pipe chains that fit on a single line stay inline: `startswith("#") | not`.
 
-Corpus refs: `corpus/debian-bin/jq/deb822.jq:23-34`, `corpus/debian-bin/jq/dpkg-version.jq:32-52`.
+Corpus refs: [`debian-bin/jq/deb822.jq#L23-L34`](https://github.com/tianon/debian-bin/blob/d508ea34f15e88b8ac63d71ffb1938fccbc21206/jq/deb822.jq#L23-L34), [`debian-bin/jq/dpkg-version.jq#L32-L52`](https://github.com/tianon/debian-bin/blob/d508ea34f15e88b8ac63d71ffb1938fccbc21206/jq/dpkg-version.jq#L32-L52).
 
 ## Comma `,` placement
 
@@ -38,7 +38,7 @@ foreach (
 
 Short comma sequences that fit on one line stay inline: `"linux", "windows", "freebsd"`.
 
-Corpus ref: `corpus/tianon-dockerfiles/scratch/multiarch.jq:6-20`.
+Corpus ref: [`tianon-dockerfiles/scratch/multiarch.jq#L6-L20`](https://github.com/tianon/dockerfiles/blob/2118a1979eff7545e06570d1eefc6434d691e68d/scratch/multiarch.jq#L6-L20).
 
 ## `def` — function definitions
 
@@ -81,11 +81,11 @@ def _trimend: until(endswith(" ") or endswith("\t") | not; .[:-1]);
 
 When the body is long or complex, local defs also use the multi-line form.
 
-Corpus refs: `corpus/debian-bin/jq/deb822.jq:7-39`, `corpus/debian-bin/jq/dpkg-version.jq:21-29`, `corpus/debian-bin/jq/deb822.jq:21-22`.
+Corpus refs: [`debian-bin/jq/deb822.jq#L7-L39`](https://github.com/tianon/debian-bin/blob/d508ea34f15e88b8ac63d71ffb1938fccbc21206/jq/deb822.jq#L7-L39), [`debian-bin/jq/dpkg-version.jq#L21-L29`](https://github.com/tianon/debian-bin/blob/d508ea34f15e88b8ac63d71ffb1938fccbc21206/jq/dpkg-version.jq#L21-L29), [`debian-bin/jq/deb822.jq#L21-L22`](https://github.com/tianon/debian-bin/blob/d508ea34f15e88b8ac63d71ffb1938fccbc21206/jq/deb822.jq#L21-L22).
 
 ## `if` / `then` / `elif` / `else` / `end`
 
-**Inline form** when the entire expression (condition + both branches) fits within ~60 characters:
+**Inline form** when the entire expression (condition + both branches) is short and simple enough to read comfortably on one line.  There is no hard rule — it is vibes-based ("the numbers got too big") — but corpus analysis shows the threshold is approximately 60 characters.  Note that this is not *only* about length: a short expression that is hard to parse at a glance still gets multi-line treatment.  This "short and clear enough to inline" heuristic applies consistently across jq, shell, Dockerfile `RUN` blocks, and everywhere else.
 
 ```jq
 if index(":") then . else "0:" + . end
@@ -112,7 +112,7 @@ if .epoch then
 else "" end
 ```
 
-Corpus refs: `corpus/debian-bin/jq/dpkg-version.jq:22-29`, `corpus/debian-bin/jq/deb822.jq:18-35`.
+Corpus refs: [`debian-bin/jq/dpkg-version.jq#L22-L29`](https://github.com/tianon/debian-bin/blob/d508ea34f15e88b8ac63d71ffb1938fccbc21206/jq/dpkg-version.jq#L22-L29), [`debian-bin/jq/deb822.jq#L18-L35`](https://github.com/tianon/debian-bin/blob/d508ea34f15e88b8ac63d71ffb1938fccbc21206/jq/deb822.jq#L18-L35).
 
 ## `reduce` and `foreach`
 
@@ -146,7 +146,7 @@ The **short extract** pattern (when the extract expression is ≤50 chars and co
 	; if .out then .out else empty end)
 ```
 
-Corpus refs: `corpus/debian-bin/jq/deb822.jq:8-38`, `corpus/tianon-dockerfiles/scratch/multiarch.jq:67-68`.
+Corpus refs: [`debian-bin/jq/deb822.jq#L8-L38`](https://github.com/tianon/debian-bin/blob/d508ea34f15e88b8ac63d71ffb1938fccbc21206/jq/deb822.jq#L8-L38), [`tianon-dockerfiles/scratch/multiarch.jq#L67-L68`](https://github.com/tianon/dockerfiles/blob/2118a1979eff7545e06570d1eefc6434d691e68d/scratch/multiarch.jq#L67-L68).
 
 ## `try` / `catch`
 
@@ -162,7 +162,7 @@ With a catch handler:
 try tonumber catch error("failed: \(.)")
 ```
 
-Corpus ref: `corpus/debian-bin/jq/dpkg-version.jq:38`.
+Corpus ref: [`debian-bin/jq/dpkg-version.jq#L38`](https://github.com/tianon/debian-bin/blob/d508ea34f15e88b8ac63d71ffb1938fccbc21206/jq/dpkg-version.jq#L38).
 
 ## Object literals
 
@@ -195,7 +195,7 @@ Object key syntax:
 - **Computed keys** with `(expr)`: `{ (env.key): value }`
 - **Variable shorthand** `{ $foo }` for `{ foo: $foo }` — seen in test data
 
-Corpus refs: `corpus/tianon-dockerfiles/scratch/multiarch.jq:5-16`, `corpus/debian-bin/jq/deb822.jq:19`.
+Corpus refs: [`tianon-dockerfiles/scratch/multiarch.jq#L5-L16`](https://github.com/tianon/dockerfiles/blob/2118a1979eff7545e06570d1eefc6434d691e68d/scratch/multiarch.jq#L5-L16), [`debian-bin/jq/deb822.jq#L19`](https://github.com/tianon/debian-bin/blob/d508ea34f15e88b8ac63d71ffb1938fccbc21206/jq/deb822.jq#L19).
 
 ## Array literals
 
@@ -220,7 +220,7 @@ The **trailing-comma hack** using `empty` as a "null" last element appears often
 ]
 ```
 
-Corpus ref: `corpus/meta-scripts/oci.jq`.
+Corpus ref: [`meta-scripts/oci.jq`](https://github.com/docker-library/meta-scripts/blob/205031aee2fdfbbd449038afd58f0f0a6915c217/oci.jq).
 
 ## Arithmetic chains (multi-line `+`, etc.)
 
@@ -236,7 +236,7 @@ else "" end
 else "" end
 ```
 
-Corpus ref: `corpus/debian-bin/jq/dpkg-version.jq:22-28`.
+Corpus ref: [`debian-bin/jq/dpkg-version.jq#L22-L28`](https://github.com/tianon/debian-bin/blob/d508ea34f15e88b8ac63d71ffb1938fccbc21206/jq/dpkg-version.jq#L22-L28).
 
 ## Alternative operator `//`
 
@@ -248,7 +248,7 @@ When breaking a `//` alternative across lines, the `//` leads the continuation:
 // error("parent \(.key) missing ref")
 ```
 
-Corpus ref: `corpus/meta-scripts/meta.jq:39-41`.
+Corpus ref: [`meta-scripts/meta.jq#L39-L41`](https://github.com/docker-library/meta-scripts/blob/205031aee2fdfbbd449038afd58f0f0a6915c217/meta.jq#L39-L41).
 
 ## Comments
 
@@ -267,7 +267,7 @@ TODO comments appear frequently and are concrete:
 
 Comment blocks at the top of `.jq` files describe the module's purpose, expected input, and output format.
 
-Corpus ref: `corpus/debian-bin/jq/deb822.jq:1-6`.
+Corpus ref: [`debian-bin/jq/deb822.jq#L1-L6`](https://github.com/tianon/debian-bin/blob/d508ea34f15e88b8ac63d71ffb1938fccbc21206/jq/deb822.jq#L1-L6).
 
 ## `include` and `import`
 
@@ -280,7 +280,7 @@ def needs_build:
 	...
 ```
 
-Corpus ref: `corpus/meta-scripts/meta.jq:1-3`.
+Corpus ref: [`meta-scripts/meta.jq#L1-L3`](https://github.com/docker-library/meta-scripts/blob/205031aee2fdfbbd449038afd58f0f0a6915c217/meta.jq#L1-L3).
 
 ## String interpolation
 
@@ -315,7 +315,7 @@ Things Tianon **never** does in standalone `.jq` files:
 - `function` keyword (not valid jq, but worth noting for clarity)
 - Semi-colons at the end of `def` bodies on the same line as the body when the body is multi-line
 - `if` without `end` (the `end` is never omitted, even when following `else`)
-- `reduce`/`foreach` written on a single line (always multi-line)
+- `reduce`/`foreach` written on a single line when the expression is non-trivial — short expressions that fit comfortably on one line do appear: `reduce .[] as $a ([]; if IN(.[]; $a) then . else . += [$a] end)`
 - Empty `{}` or `[]` with spaces inside: `{ }`, `[ ]` — uses `{}`, `[]`
 - `null` in place of `empty` for "nothing" in generators — `empty` is preferred
 - `not` written as `== false` (always `| not`)

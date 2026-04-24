@@ -6,18 +6,18 @@ package jq
 //
 //   - Indentation: 1 hard tab per level
 //   - Pipe |: emitted at the START of the next line
-//     (corpus/debian-bin/jq/deb822.jq:23-34)
+//     (https://github.com/tianon/debian-bin/blob/d508ea34f15e88b8ac63d71ffb1938fccbc21206/jq/deb822.jq#L23-L34)
 //   - Comma ,: emitted at the END of the line
-//     (corpus/tianon-dockerfiles/scratch/multiarch.jq:6-20)
+//     (https://github.com/tianon/dockerfiles/blob/2118a1979eff7545e06570d1eefc6434d691e68d/scratch/multiarch.jq#L6-L20)
 //   - Arithmetic ops (+, -, etc.): lead the continuation line when broken
-//     (corpus/debian-bin/jq/dpkg-version.jq:22-28)
+//     (https://github.com/tianon/debian-bin/blob/d508ea34f15e88b8ac63d71ffb1938fccbc21206/jq/dpkg-version.jq#L22-L28)
 //   - def body: indented 1 tab; closing ; at the def's own indentation
-//     (corpus/debian-bin/jq/deb822.jq:7-39)
+//     (https://github.com/tianon/debian-bin/blob/d508ea34f15e88b8ac63d71ffb1938fccbc21206/jq/deb822.jq#L7-L39)
 //   - if/then/else/end: inline when everything fits <= shortThreshold
-//     (corpus/debian-bin/jq/dpkg-version.jq:22-29 multi, :35 inline)
+//     (https://github.com/tianon/debian-bin/blob/d508ea34f15e88b8ac63d71ffb1938fccbc21206/jq/dpkg-version.jq#L22-L29 multi, :35 inline)
 //   - foreach/reduce: always multi-line
 //   - Object literals: multi-line with { key: val, } per line
-//     (corpus/tianon-dockerfiles/scratch/multiarch.jq:5-16)
+//     (https://github.com/tianon/dockerfiles/blob/2118a1979eff7545e06570d1eefc6434d691e68d/scratch/multiarch.jq#L5-L16)
 //   - COMMENT RULE: trailing comments force multi-line on the enclosing
 //     comma/pipe sequence; leading comments are emitted before their node.
 //     (gofmt rule; corpus ref: deb822.jq "# inject a synthetic blank line…")
@@ -208,7 +208,7 @@ func (p *printer) comments(cs []*Comment) {
 
 // localFuncDef formats a local function definition scoped to REST.
 // Short bodies stay on one line; long bodies use multi-line form.
-// Style ref: corpus/debian-bin/jq/deb822.jq:21-22
+// Style ref: https://github.com/tianon/debian-bin/blob/d508ea34f15e88b8ac63d71ffb1938fccbc21206/jq/deb822.jq#L21-L22
 func (p *printer) localFuncDef(v *LocalFuncDef) {
 	var sig strings.Builder
 	sig.WriteString("def ")
@@ -247,7 +247,7 @@ func (p *printer) localFuncDef(v *LocalFuncDef) {
 }
 
 // funcDef formats a top-level def: always multi-line body.
-// Style ref: corpus/debian-bin/jq/deb822.jq:7-39
+// Style ref: https://github.com/tianon/debian-bin/blob/d508ea34f15e88b8ac63d71ffb1938fccbc21206/jq/deb822.jq#L7-L39
 func (p *printer) funcDef(fd *FuncDef) {
 	p.write("def ")
 	p.write(fd.Name)
@@ -428,7 +428,7 @@ func (p *printer) commentedExpr(v *CommentedExpr) {
 // pipeChain formats a | chain.
 // | at the START of continuation lines; forced multi-line if any part has a
 // trailing comment (gofmt rule).
-// Style ref: corpus/debian-bin/jq/deb822.jq:23-34
+// Style ref: https://github.com/tianon/debian-bin/blob/d508ea34f15e88b8ac63d71ffb1938fccbc21206/jq/deb822.jq#L23-L34
 func (p *printer) pipeChain(v *Pipe) {
 	parts := flattenPipe(v)
 
@@ -499,7 +499,7 @@ func flattenPipe(v *Pipe) []Node {
 
 // commaExpr formats a , generator chain.
 // , at END of line; forced multi-line if any part has a trailing comment.
-// Style ref: corpus/tianon-dockerfiles/scratch/multiarch.jq:6-20
+// Style ref: https://github.com/tianon/dockerfiles/blob/2118a1979eff7545e06570d1eefc6434d691e68d/scratch/multiarch.jq#L6-L20
 func (p *printer) commaExpr(v *Comma) {
 	parts := flattenComma(v)
 
@@ -552,7 +552,7 @@ func flattenComma(v *Comma) []Node {
 }
 
 // asExpr formats: expr as $pat\n| body
-// Style ref: corpus/debian-bin/jq/deb822.jq:24
+// Style ref: https://github.com/tianon/debian-bin/blob/d508ea34f15e88b8ac63d71ffb1938fccbc21206/jq/deb822.jq#L24
 func (p *printer) asExpr(v *AsExpr) {
 	p.node(v.Expr)
 	p.write(" as ")
@@ -565,7 +565,7 @@ func (p *printer) asExpr(v *AsExpr) {
 // binOp formats a binary expression.
 // For chained arithmetic/logical ops that exceed threshold, each operand starts
 // on a new line with the operator leading.
-// Style ref: corpus/debian-bin/jq/dpkg-version.jq:22-28
+// Style ref: https://github.com/tianon/debian-bin/blob/d508ea34f15e88b8ac63d71ffb1938fccbc21206/jq/dpkg-version.jq#L22-L28
 func (p *printer) binOp(v *BinOp) {
 	if v.Op == "neg" {
 		p.write("-")
@@ -680,7 +680,7 @@ func (p *printer) ifExpr(v *IfExpr) {
 }
 
 // reduceExpr: always multi-line.
-// Style ref: corpus/tianon-dockerfiles/scratch/multiarch.jq:67-68
+// Style ref: https://github.com/tianon/dockerfiles/blob/2118a1979eff7545e06570d1eefc6434d691e68d/scratch/multiarch.jq#L67-L68
 func (p *printer) reduceExpr(v *ReduceExpr) {
 	p.write("reduce ")
 	p.node(v.Expr)
@@ -700,7 +700,7 @@ func (p *printer) reduceExpr(v *ReduceExpr) {
 }
 
 // foreachExpr: always multi-line.
-// Style ref: corpus/debian-bin/jq/deb822.jq:8-38
+// Style ref: https://github.com/tianon/debian-bin/blob/d508ea34f15e88b8ac63d71ffb1938fccbc21206/jq/deb822.jq#L8-L38
 func (p *printer) foreachExpr(v *ForeachExpr) {
 	p.write("foreach ")
 	p.node(v.Expr)
@@ -870,7 +870,7 @@ func (p *printer) arrayExpr(v *Array) {
 }
 
 // objectExpr: multi-line with trailing commas.
-// Style ref: corpus/tianon-dockerfiles/scratch/multiarch.jq:5-16
+// Style ref: https://github.com/tianon/dockerfiles/blob/2118a1979eff7545e06570d1eefc6434d691e68d/scratch/multiarch.jq#L5-L16
 func (p *printer) objectExpr(v *Object) {
 	if len(v.Fields) == 0 {
 		p.write("{}")

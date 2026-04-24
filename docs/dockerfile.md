@@ -25,7 +25,7 @@ ENV WGETRC /.wgetrc
 RUN echo 'hsts=0' >> "$WGETRC"
 ```
 
-Corpus refs: `corpus/debuerreotype/Dockerfile`, `corpus/tianon-dockerfiles/steam/Dockerfile`.
+Corpus refs: [`debuerreotype/Dockerfile`](https://github.com/debuerreotype/debuerreotype/blob/3c3272fa743e0257ae64081987c500c2923ea963/Dockerfile), [`tianon-dockerfiles/steam/Dockerfile`](https://github.com/tianon/dockerfiles/blob/2118a1979eff7545e06570d1eefc6434d691e68d/steam/Dockerfile).
 
 ## Generated file header
 
@@ -41,7 +41,7 @@ Dockerfiles generated from templates always start with this exact comment block:
 
 Hand-authored Dockerfiles may start with a comment block explaining usage or bootstrapping instructions, but the generated-warning format above is reserved for generated files.
 
-Corpus ref: `corpus/docker-qemu/10.1/Dockerfile:1-5`.
+Corpus ref: [`docker-qemu/10.1/Dockerfile#L1-L5`](https://github.com/tianon/docker-qemu/blob/3ce36843e253ddb7f63a39a6d0a27a7a46762e8b/10.1/Dockerfile#L1-L5).
 
 ## `FROM`
 
@@ -76,7 +76,7 @@ ENV QEMU_KEYS \
 		ABCDEF...
 ```
 
-Corpus refs: `corpus/tianon-dockerfiles/steam/Dockerfile:19-20`, `corpus/docker-qemu/10.1/Dockerfile:69-72`.
+Corpus refs: [`tianon-dockerfiles/steam/Dockerfile#L19-L20`](https://github.com/tianon/dockerfiles/blob/2118a1979eff7545e06570d1eefc6434d691e68d/steam/Dockerfile#L19-L20), [`docker-qemu/10.1/Dockerfile#L69-L72`](https://github.com/tianon/docker-qemu/blob/3ce36843e253ddb7f63a39a6d0a27a7a46762e8b/10.1/Dockerfile#L69-L72).
 
 ## `RUN` — general structure
 
@@ -91,7 +91,7 @@ RUN set -eux; \
 
 Some simpler scripts use `set -ex` (without `-u`).  In Dockerfiles specifically — unlike standalone shell scripts — `set -eux` is the norm, not `set -Eeuo pipefail`, because Docker's default shell is `/bin/sh` (not bash), and `-E`, `-o pipefail` are bash-specific.
 
-Corpus refs: `corpus/debuerreotype/Dockerfile:14`, `corpus/tianon-dockerfiles/steam/Dockerfile:3`.
+Corpus refs: [`debuerreotype/Dockerfile#L14`](https://github.com/debuerreotype/debuerreotype/blob/3c3272fa743e0257ae64081987c500c2923ea963/Dockerfile#L14), [`tianon-dockerfiles/steam/Dockerfile#L3`](https://github.com/tianon/dockerfiles/blob/2118a1979eff7545e06570d1eefc6434d691e68d/steam/Dockerfile#L3).
 
 ## RUN — continuation line indentation
 
@@ -119,11 +119,11 @@ Argument lists for commands like `apt-get install` are indented with **two tabs*
 
 The semicolon-backslash `;  \` that closes an argument list is at **one tab** (back to the continuation level), with the `;` immediately after `\` (no space between).
 
-Corpus refs: `corpus/tianon-dockerfiles/steam/Dockerfile:3-16`, `corpus/debuerreotype/Dockerfile:14-29`.
+Corpus refs: [`tianon-dockerfiles/steam/Dockerfile#L3-L16`](https://github.com/tianon/dockerfiles/blob/2118a1979eff7545e06570d1eefc6434d691e68d/steam/Dockerfile#L3-L16), [`debuerreotype/Dockerfile#L14-L29`](https://github.com/debuerreotype/debuerreotype/blob/3c3272fa743e0257ae64081987c500c2923ea963/Dockerfile#L14-L29).
 
 ## RUN shell style
 
-The shell code inside `RUN` instructions is **POSIX sh**, not Bash.  Bash-specific features (`[[ ]]`, arrays, `$'...'`, process substitution, etc.) do not appear inside Dockerfiles.
+The shell code inside `RUN` instructions is **POSIX sh**, not Bash — Docker's default `/bin/sh` is BusyBox `sh` on Alpine and `dash` on Debian-based images.  Bash-specific features (`[[ ]]`, arrays, `$'...'`, process substitution, here-strings `<<<`, etc.) do not appear inside Dockerfiles unless Bash has been explicitly installed and invoked with `SHELL ["/bin/bash", "-c"]`.  See [bash.md §POSIX compatibility as a design goal](bash.md#posix-compatibility-as-a-design-goal) for the broader context of how this shapes the shell style.
 
 The POSIX sh style conventions that apply:
 - `if condition; then ... fi` — `then` on same line
@@ -152,7 +152,7 @@ RUN set -eux; \
 
 This is a deliberate style choice: inline comments are not part of the shell code, so they don't carry indentation.
 
-Corpus refs: `corpus/tianon-dockerfiles/steam/Dockerfile:6-14`, `corpus/debuerreotype/Dockerfile:23-24`.
+Corpus refs: [`tianon-dockerfiles/steam/Dockerfile#L6-L14`](https://github.com/tianon/dockerfiles/blob/2118a1979eff7545e06570d1eefc6434d691e68d/steam/Dockerfile#L6-L14), [`debuerreotype/Dockerfile#L23-L24`](https://github.com/debuerreotype/debuerreotype/blob/3c3272fa743e0257ae64081987c500c2923ea963/Dockerfile#L23-L24).
 
 ## RUN — blank continuation lines
 
@@ -169,7 +169,7 @@ RUN set -eux; \
 
 These blank separators group logically related commands.
 
-Corpus ref: `corpus/docker-qemu/10.1/Dockerfile:228-247`.
+Corpus ref: [`docker-qemu/10.1/Dockerfile#L228-L247`](https://github.com/tianon/docker-qemu/blob/3ce36843e253ddb7f63a39a6d0a27a7a46762e8b/10.1/Dockerfile#L228-L247).
 
 ## `COPY`
 
@@ -209,7 +209,7 @@ WORKDIR /tmp
 
 Multiple `EXPOSE` instructions are used (one port per line) rather than grouping them.
 
-Corpus ref: `corpus/docker-qemu/10.1/Dockerfile:251-255`.
+Corpus ref: [`docker-qemu/10.1/Dockerfile#L251-L255`](https://github.com/tianon/docker-qemu/blob/3ce36843e253ddb7f63a39a6d0a27a7a46762e8b/10.1/Dockerfile#L251-L255).
 
 ## Parser directives
 

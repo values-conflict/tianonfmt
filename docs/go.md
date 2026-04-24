@@ -22,7 +22,7 @@ import (
 
 `gofmt` (and `goimports`) enforce this two-group style automatically.  A third group for internal packages sometimes appears when internal packages are distinct from third-party ones, but this is not consistently observed in the corpus.
 
-Corpus ref: `corpus/meta-scripts/registry/lookup.go:3-10`.
+Corpus ref: [`meta-scripts/registry/lookup.go#L3-L10`](https://github.com/docker-library/meta-scripts/blob/205031aee2fdfbbd449038afd58f0f0a6915c217/registry/lookup.go#L3-L10).
 
 ## Comments
 
@@ -33,7 +33,7 @@ Corpus ref: `corpus/meta-scripts/registry/lookup.go:3-10`.
 func Lookup(ctx context.Context, ref Reference, opts *LookupOptions) (ociregistry.BlobReader, error) {
 ```
 
-Corpus ref: `corpus/meta-scripts/registry/lookup.go:31-32`.
+Corpus ref: [`meta-scripts/registry/lookup.go#L31-L32`](https://github.com/docker-library/meta-scripts/blob/205031aee2fdfbbd449038afd58f0f0a6915c217/registry/lookup.go#L31-L32).
 
 **Unexported functions and types** may or may not have doc comments.  When they do, the same style applies.
 
@@ -44,7 +44,7 @@ Corpus ref: `corpus/meta-scripts/registry/lookup.go:31-32`.
 // TODO (also, if the provided Reference includes a Digest...)
 ```
 
-Corpus ref: `corpus/meta-scripts/registry/lookup.go:27-28`.
+Corpus ref: [`meta-scripts/registry/lookup.go#L27-L28`](https://github.com/docker-library/meta-scripts/blob/205031aee2fdfbbd449038afd58f0f0a6915c217/registry/lookup.go#L27-L28).
 
 ## Struct field alignment
 
@@ -61,7 +61,7 @@ type ManifestChildren struct {
 
 Note that `Config` has an extra space before `*ocispec.Descriptor` to align the type with `Layers`.  `gofmt` does not enforce this alignment for struct fields (only for `const` and `var` blocks), so this is a manual style choice.
 
-Corpus ref: `corpus/meta-scripts/registry/manifest-children.go:9-18`.
+Corpus ref: [`meta-scripts/registry/manifest-children.go#L9-L18`](https://github.com/docker-library/meta-scripts/blob/205031aee2fdfbbd449038afd58f0f0a6915c217/registry/manifest-children.go#L9-L18).
 
 ## `const` blocks
 
@@ -96,7 +96,7 @@ Config *ocispec.Descriptor `json:"config"` // have to turn this into a pointer s
 
 This is documented explicitly in the comment.  The zero value of a non-pointer type would be ambiguous.
 
-Corpus ref: `corpus/meta-scripts/registry/manifest-children.go:16`.
+Corpus ref: [`meta-scripts/registry/manifest-children.go#L16`](https://github.com/docker-library/meta-scripts/blob/205031aee2fdfbbd449038afd58f0f0a6915c217/registry/manifest-children.go#L16).
 
 ## Error handling
 
@@ -113,7 +113,7 @@ Error messages are lowercase (Go convention: error strings should not be capital
 
 The format of error strings: `"context: description"` — the context identifies the operation, then a colon, then what failed.
 
-Corpus ref: `corpus/meta-scripts/registry/lookup.go:33-36`.
+Corpus ref: [`meta-scripts/registry/lookup.go#L33-L36`](https://github.com/docker-library/meta-scripts/blob/205031aee2fdfbbd449038afd58f0f0a6915c217/registry/lookup.go#L33-L36).
 
 ## Variable declaration style
 
@@ -127,7 +127,7 @@ var (
 )
 ```
 
-Corpus ref: `corpus/meta-scripts/registry/lookup.go:43-46`.
+Corpus ref: [`meta-scripts/registry/lookup.go#L43-L46`](https://github.com/docker-library/meta-scripts/blob/205031aee2fdfbbd449038afd58f0f0a6915c217/registry/lookup.go#L43-L46).
 
 ## Package-level documentation
 

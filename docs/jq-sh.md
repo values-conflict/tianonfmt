@@ -21,7 +21,7 @@ jq <<<"$json" -r '.commit // .version'
 jq <<<"$json" -S .
 ```
 
-Corpus refs: `corpus/tianon-dockerfiles/buildkit/versions.sh:62`, `corpus/tianon-dockerfiles/steam/versions.sh:18`, `corpus/docker-qemu/versions.sh:52`.
+Corpus refs: [`tianon-dockerfiles/buildkit/versions.sh#L62`](https://github.com/tianon/dockerfiles/blob/2118a1979eff7545e06570d1eefc6434d691e68d/buildkit/versions.sh#L62), [`tianon-dockerfiles/steam/versions.sh#L18`](https://github.com/tianon/dockerfiles/blob/2118a1979eff7545e06570d1eefc6434d691e68d/steam/versions.sh#L18), [`docker-qemu/versions.sh#L52`](https://github.com/tianon/docker-qemu/blob/3ce36843e253ddb7f63a39a6d0a27a7a46762e8b/versions.sh#L52).
 
 ## Flag ordering
 
@@ -49,7 +49,7 @@ jq <<<"$json" -r -S '.tags[]'
 jq <<<"$bk" -r '.commit // .version'
 ```
 
-Corpus refs: `corpus/debian-bin/repo/buildd.sh:62`, `corpus/docker-qemu/versions.sh:52`.
+Corpus refs: [`debian-bin/repo/buildd.sh#L62`](https://github.com/tianon/debian-bin/blob/d508ea34f15e88b8ac63d71ffb1938fccbc21206/repo/buildd.sh#L62), [`docker-qemu/versions.sh#L52`](https://github.com/tianon/docker-qemu/blob/3ce36843e253ddb7f63a39a6d0a27a7a46762e8b/versions.sh#L52).
 
 ## Quoting the expression
 
@@ -81,7 +81,7 @@ jq -n 'if env.variant == "" then . else .[env.variant] end'
 jq <<<"$json" ".versions[\"$go\"]"   # wrong
 ```
 
-Corpus refs: `corpus/tianon-dockerfiles/buildkit/versions.sh:67`, `corpus/debian-bin/repo/buildd.sh:59-71`.
+Corpus refs: [`tianon-dockerfiles/buildkit/versions.sh#L67`](https://github.com/tianon/dockerfiles/blob/2118a1979eff7545e06570d1eefc6434d691e68d/buildkit/versions.sh#L67), [`debian-bin/repo/buildd.sh#L59-L71`](https://github.com/tianon/debian-bin/blob/d508ea34f15e88b8ac63d71ffb1938fccbc21206/repo/buildd.sh#L59-L71).
 
 ## Single-line expressions
 
@@ -123,7 +123,7 @@ for variant in "${variants[@]}"; do          # 0 tabs (shell)
 done
 ```
 
-Corpus ref: `corpus/tianon-dockerfiles/buildkit/versions.sh:67-70`.
+Corpus ref: [`tianon-dockerfiles/buildkit/versions.sh#L67-L70`](https://github.com/tianon/dockerfiles/blob/2118a1979eff7545e06570d1eefc6434d691e68d/buildkit/versions.sh#L67-L70).
 
 ## `-f` flag for file-based programs
 
@@ -139,7 +139,7 @@ Or for library inclusion, the `include` directive with `-L`:
 exec jq -sR -L"$dir/../jq" 'include "deb822"; deb822_parse' "$@"
 ```
 
-Corpus refs: `corpus/tianon-dockerfiles/.github/workflows/update.yml:87`, `corpus/debian-bin/generic/deb822-json:7`.
+Corpus refs: [`tianon-dockerfiles/.github/workflows/update.yml#L87`](https://github.com/tianon/dockerfiles/blob/2118a1979eff7545e06570d1eefc6434d691e68d/.github/workflows/update.yml#L87), [`debian-bin/generic/deb822-json#L7`](https://github.com/tianon/debian-bin/blob/d508ea34f15e88b8ac63d71ffb1938fccbc21206/generic/deb822-json#L7).
 
 ## Output redirection
 
@@ -156,7 +156,7 @@ For a plain "identity" format pass (pretty-print only), the expression is `.`:
 jq <<<"$json" '.' > versions.json
 ```
 
-Corpus refs: `corpus/docker-qemu/versions.sh:52`, `corpus/tianon-dockerfiles/buildkit/versions.sh:73`.
+Corpus refs: [`docker-qemu/versions.sh#L52`](https://github.com/tianon/docker-qemu/blob/3ce36843e253ddb7f63a39a6d0a27a7a46762e8b/versions.sh#L52), [`tianon-dockerfiles/buildkit/versions.sh#L73`](https://github.com/tianon/dockerfiles/blob/2118a1979eff7545e06570d1eefc6434d691e68d/buildkit/versions.sh#L73).
 
 ## `eval` integration
 
@@ -173,7 +173,7 @@ eval "items=( $shell )"
 
 `@sh` in jq produces shell-quoted strings safe to `eval`.  `@json` converts values to their JSON string representation before shell-quoting.
 
-Corpus ref: `corpus/debian-bin/repo/buildd.sh:91-92`.
+Corpus ref: [`debian-bin/repo/buildd.sh#L91-L92`](https://github.com/tianon/debian-bin/blob/d508ea34f15e88b8ac63d71ffb1938fccbc21206/repo/buildd.sh#L91-L92).
 
 ## jq inside YAML `run:` steps
 
@@ -195,7 +195,7 @@ Inside GitHub Actions `run:` blocks, jq invocations follow the same conventions 
 
 The jq multi-line expression follows the same shell embedding rules: content indented one level inside the `'`, closing `'` at the outer shell level.
 
-Corpus ref: `corpus/tianon-dockerfiles/.github/workflows/update.yml:31-47`.
+Corpus ref: [`tianon-dockerfiles/.github/workflows/update.yml#L31-L47`](https://github.com/tianon/dockerfiles/blob/2118a1979eff7545e06570d1eefc6434d691e68d/.github/workflows/update.yml#L31-L47).
 
 ## Style differences from standalone `.jq`
 
@@ -207,6 +207,38 @@ Corpus ref: `corpus/tianon-dockerfiles/.github/workflows/update.yml:31-47`.
 | Shell variables | n/a | Via `--arg`, `--argjson`, `env.VAR` |
 | `include` | At top of file | Via `-L dir 'include "module"; ...'` |
 | Input | Via `inputs`, `input`, filters | Via here-string `<<<` or `-f file` |
+
+## The `versions.sh` archetype
+
+A highly consistent script pattern appears across virtually every image directory in [`tianon/dockerfiles`](https://github.com/tianon/dockerfiles):
+
+```bash
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+[ -e versions.json ]
+
+dir="$(readlink -ve "$BASH_SOURCE")"
+dir="$(dirname "$dir")"
+source "$dir/../.libs/git.sh"   # or deb-repo.sh, pypi.sh, etc.
+
+# ... fetch data, build $json ...
+
+jq <<<"$json" '.' > versions.json
+```
+
+The structure is invariant:
+- **Line 1**: `#!/usr/bin/env bash`
+- **Line 2**: `set -Eeuo pipefail`
+- **Line 3**: blank
+- **Line 4**: `[ -e versions.json ]` — a sanity check that `versions.json` already exists, which acts as both a guard against running the script from the wrong working directory and a signal that this image directory has been initialised; exits non-zero and stops immediately if the file is absent
+- **Line 5**: blank
+- **Lines 6+**: optional `source` of a shared `.libs/` helper, then fetch + transform logic
+- **Last line**: always `jq ... > versions.json`, writing the result back
+
+The final `jq` write varies by complexity — `jq <<<"$json" '.'` for a straight pass-through, `jq -nS '{ version: env.version }'` when building from exported variables, or a more complex expression when transforming the intermediate data.
+
+Corpus ref: [`tianon-dockerfiles/buildkit/versions.sh`](https://github.com/tianon/dockerfiles/blob/2118a1979eff7545e06570d1eefc6434d691e68d/buildkit/versions.sh), and nearly every `*/versions.sh` in that repo.
 
 ## Notable omissions
 
