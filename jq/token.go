@@ -10,10 +10,11 @@ type Token struct {
 	Kind Kind
 	Text string // exact source text
 	At   Pos
+	Line int // 1-based line number of the first byte of this token
 }
 
 func (t Token) String() string {
-	return fmt.Sprintf("%s(%q)@%d", t.Kind, t.Text, t.At)
+	return fmt.Sprintf("%s(%q)@%d:%d", t.Kind, t.Text, t.Line, t.At)
 }
 
 // Kind is a token kind.  ALL_CAPS constants avoid collision with the PascalCase
