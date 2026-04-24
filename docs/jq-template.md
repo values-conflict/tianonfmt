@@ -1,6 +1,6 @@
 # jq template format (`Dockerfile.template`)
 
-Files named `Dockerfile.template` (or occasionally `Dockerfile.bookworm`, `Dockerfile.rc`, etc. that contain `{{ }}` markers) use Tianon's jq-template format.  The canonical processor is `corpus/doi/bashbrew/scripts/jq-template.awk`.
+Files named `Dockerfile.template` (or occasionally `Dockerfile.bookworm`, `Dockerfile.rc`, etc. that contain `{{ }}` markers) use Tianon's jq-template format.  The canonical processor is [`doi/bashbrew/scripts/jq-template.awk`](https://github.com/docker-library/bashbrew/blob/d662ff01570964b5f648df009c9269f388285692/scripts/jq-template.awk).
 
 These files are **not** pure Dockerfiles — they are generators that produce Dockerfiles when evaluated.  The formatter must handle them differently from plain Dockerfiles.  See [dockerfile.md](dockerfile.md) for the Dockerfile rules that apply to the *output* (and to the non-template portions of the input).
 
@@ -33,7 +33,7 @@ ENV QEMU_URL {{ .url }}
 
 The jq expression is kept short and does not contain newlines.
 
-Corpus refs: `corpus/docker-qemu/Dockerfile.template:76-77`, `corpus/tianon-dockerfiles/steam/Dockerfile.template:37`.
+Corpus refs: [`docker-qemu/Dockerfile.template#L76-L77`](https://github.com/tianon/docker-qemu/blob/3ce36843e253ddb7f63a39a6d0a27a7a46762e8b/Dockerfile.template#L76-L77), [`tianon-dockerfiles/steam/Dockerfile.template#L37`](https://github.com/tianon/dockerfiles/blob/2118a1979eff7545e06570d1eefc6434d691e68d/steam/Dockerfile.template#L37).
 
 ### Block expressions
 
@@ -61,7 +61,7 @@ When a `{{ }}` block occupies its own line (or lines), the jq content is formatt
 
 Block expressions use `-}}` at the end to suppress the newline they would otherwise emit into the output.
 
-Corpus ref: `corpus/docker-qemu/Dockerfile.template:21-28`, `corpus/docker-qemu/Dockerfile.template:35-45`.
+Corpus ref: [`docker-qemu/Dockerfile.template#L21-L28`](https://github.com/tianon/docker-qemu/blob/3ce36843e253ddb7f63a39a6d0a27a7a46762e8b/Dockerfile.template#L21-L28), [`docker-qemu/Dockerfile.template#L35-L45`](https://github.com/tianon/docker-qemu/blob/3ce36843e253ddb7f63a39a6d0a27a7a46762e8b/Dockerfile.template#L35-L45).
 
 ### Conditional blocks
 
@@ -78,7 +78,7 @@ Corpus ref: `corpus/docker-qemu/Dockerfile.template:21-28`, `corpus/docker-qemu/
 
 Each conditional branch delimiter (`then (`, `) else (`, `) end`) is on its own `{{ ... -}}` line.  The `-}}` suppresses the newline so the Dockerfile content immediately follows.
 
-Corpus ref: `corpus/docker-qemu/Dockerfile.template:32-63`.
+Corpus ref: [`docker-qemu/Dockerfile.template#L32-L63`](https://github.com/tianon/docker-qemu/blob/3ce36843e253ddb7f63a39a6d0a27a7a46762e8b/Dockerfile.template#L32-L63).
 
 ### `def` hoisting
 
@@ -111,7 +111,7 @@ A `def` block always uses `-}}` and appears before the first non-def content.
 
 The variable is always read through `env.VARNAME`, never passed via `--arg` (since the template processor uses environment variables).
 
-Corpus refs: `corpus/docker-qemu/Dockerfile.template:32`, `corpus/docker-qemu/Dockerfile.template:124`.
+Corpus refs: [`docker-qemu/Dockerfile.template#L32`](https://github.com/tianon/docker-qemu/blob/3ce36843e253ddb7f63a39a6d0a27a7a46762e8b/Dockerfile.template#L32), [`docker-qemu/Dockerfile.template#L124`](https://github.com/tianon/docker-qemu/blob/3ce36843e253ddb7f63a39a6d0a27a7a46762e8b/Dockerfile.template#L124).
 
 ## Comments inside `{{ }}`
 

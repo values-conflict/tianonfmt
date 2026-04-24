@@ -4,9 +4,9 @@
 //
 //   - Instruction keywords are uppercased (all Dockerfiles in corpus)
 //   - Continuation lines preserve original leading-tab depth
-//     (corpus/debuerreotype/Dockerfile:17 — 2 tabs for apt-get arguments)
+//     (https://github.com/debuerreotype/debuerreotype/blob/3c3272fa743e0257ae64081987c500c2923ea963/Dockerfile#L17 — 2 tabs for apt-get arguments)
 //   - Inline comments within continuation blocks sit at column 0
-//     (corpus/tianon-dockerfiles/steam/Dockerfile.template:7)
+//     (https://github.com/tianon/dockerfiles/blob/2118a1979eff7545e06570d1eefc6434d691e68d/steam/Dockerfile.template#L7)
 //   - RUN shell content is normalised for tab depth using the shell.FormatRUN
 //     function (depth-based tab normalisation without restructuring)
 //   - A single blank line separates instruction groups
@@ -116,7 +116,7 @@ func (w *writer) plainInstruction(instr *Instruction) {
 
 		case LineKindComment:
 			// Inline comments within continuation blocks: column 0.
-			// Style ref: corpus/tianon-dockerfiles/steam/Dockerfile.template:7
+			// Style ref: https://github.com/tianon/dockerfiles/blob/2118a1979eff7545e06570d1eefc6434d691e68d/steam/Dockerfile.template#L7
 			w.writeln(strings.TrimLeft(line.Text, " \t"))
 		}
 	}

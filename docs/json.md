@@ -16,7 +16,7 @@ jq <<<"$json" -S . > versions.json
 
 This makes `git diff` output meaningful and deterministic.
 
-Corpus refs: `corpus/docker-qemu/versions.sh:52`, `corpus/tianon-dockerfiles/buildkit/versions.sh:73`.
+Corpus refs: [`docker-qemu/versions.sh#L52`](https://github.com/tianon/docker-qemu/blob/3ce36843e253ddb7f63a39a6d0a27a7a46762e8b/versions.sh#L52), [`tianon-dockerfiles/buildkit/versions.sh#L73`](https://github.com/tianon/dockerfiles/blob/2118a1979eff7545e06570d1eefc6434d691e68d/buildkit/versions.sh#L73).
 
 ## Root type
 

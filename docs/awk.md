@@ -1,6 +1,6 @@
 # AWK style
 
-Covers `.awk` files in the corpus.  The only significant AWK file is `corpus/doi/bashbrew/scripts/jq-template.awk`, which is the canonical processor for Tianon's jq-template Dockerfile format (see [jq-template.md](jq-template.md)).  The corpus explicitly notes this requires **gawk** (GNU awk), not POSIX awk.
+Covers `.awk` files in the corpus.  The only significant AWK file is [`doi/bashbrew/scripts/jq-template.awk`](https://github.com/docker-library/bashbrew/blob/d662ff01570964b5f648df009c9269f388285692/scripts/jq-template.awk), which is the canonical processor for Tianon's jq-template Dockerfile format (see [jq-template.md](jq-template.md)).  The corpus explicitly notes this requires **gawk** (GNU awk), not POSIX awk.
 
 ## Header comment
 
@@ -12,7 +12,7 @@ AWK files open with a comment block explaining the script's purpose, requirement
 # see https://github.com/docker-library/php or ... for examples of usage ("apply-templates.sh")
 ```
 
-Corpus ref: `corpus/doi/bashbrew/scripts/jq-template.awk:1-3`.
+Corpus ref: [`doi/bashbrew/scripts/jq-template.awk#L1-L3`](https://github.com/docker-library/bashbrew/blob/d662ff01570964b5f648df009c9269f388285692/scripts/jq-template.awk#L1-L3).
 
 ## Indentation
 
@@ -37,7 +37,7 @@ BEGIN {
 
 Blank lines separate logically distinct groups of variable initialisations.
 
-Corpus ref: `corpus/doi/bashbrew/scripts/jq-template.awk:27-36`.
+Corpus ref: [`doi/bashbrew/scripts/jq-template.awk#L27-L36`](https://github.com/docker-library/bashbrew/blob/d662ff01570964b5f648df009c9269f388285692/scripts/jq-template.awk#L27-L36).
 
 ## Function definitions
 
@@ -64,7 +64,7 @@ function num(haystack, needle, # parameters
 - The local variable declaration trick (extra parameters not passed by callers) is documented with comments: `# parameters` and `# locals`
 - Blank line before the opening `{` is used when the parameter list spans multiple lines
 
-Corpus ref: `corpus/doi/bashbrew/scripts/jq-template.awk:6-25`.
+Corpus ref: [`doi/bashbrew/scripts/jq-template.awk#L6-L25`](https://github.com/docker-library/bashbrew/blob/d662ff01570964b5f648df009c9269f388285692/scripts/jq-template.awk#L6-L25).
 
 ## Pattern-action blocks
 
@@ -92,7 +92,7 @@ END {
 }
 ```
 
-Corpus ref: `corpus/doi/bashbrew/scripts/jq-template.awk:71-135`.
+Corpus ref: [`doi/bashbrew/scripts/jq-template.awk#L71-L135`](https://github.com/docker-library/bashbrew/blob/d662ff01570964b5f648df009c9269f388285692/scripts/jq-template.awk#L71-L135).
 
 ## String handling
 
@@ -152,7 +152,7 @@ if (ENVIRON["DEBUG"]) {
 }
 ```
 
-Corpus ref: `corpus/doi/bashbrew/scripts/jq-template.awk:124-126`.
+Corpus ref: [`doi/bashbrew/scripts/jq-template.awk#L124-L126`](https://github.com/docker-library/bashbrew/blob/d662ff01570964b5f648df009c9269f388285692/scripts/jq-template.awk#L124-L126).
 
 ## Notable omissions
 
