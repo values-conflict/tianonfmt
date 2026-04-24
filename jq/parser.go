@@ -25,41 +25,91 @@ func ParseExpr(src string) (Node, error) {
 }
 
 type parser struct {
-	lex     *Lexer
-	src     string
-	pending []*Comment
+	lex             *Lexer
+	src             string
+	pending         []*Comment // leading comments (own-line)
+	pendingTrailing *Comment   // trailing comment (same line as last non-comment token)
+	lastLine        int        // line of the last non-comment token consumed
 }
 
-// next returns the next non-comment token, collecting comments into p.pending.
+// ── comment harvesting ───────────────────────────────────────────────────────
+//
+// The key distinction:
+//   - A comment on the SAME LINE as the preceding non-comment token is a
+//     "trailing" comment for that token's expression.
+//   - A comment on its OWN LINE (different from preceding) is a "leading"
+//     comment for the next non-comment token's expression.
+//
+// trailing comments go into p.pendingTrailing (only one can exist at a time).
+// leading comments go into p.pending (a slice, since there can be many).
+
 func (p *parser) next() Token {
 	for {
 		t := p.lex.Next()
 		if t.Kind == COMMENT {
-			p.pending = append(p.pending, &Comment{At: t.At, Text: t.Text})
+			p.absorbComment(t)
 			continue
 		}
+		p.lastLine = t.Line
 		return t
 	}
 }
 
-// peek returns the next non-comment token without consuming it.
 func (p *parser) peek() Token {
 	for {
 		t := p.lex.Peek()
 		if t.Kind == COMMENT {
 			p.lex.Next()
-			p.pending = append(p.pending, &Comment{At: t.At, Text: t.Text})
+			p.absorbComment(t)
 			continue
 		}
 		return t
 	}
 }
 
+func (p *parser) absorbComment(t Token) {
+	c := &Comment{At: t.At, Text: t.Text}
+	if p.lastLine > 0 && t.Line == p.lastLine {
+		// Trailing: on the same line as the last non-comment token.
+		p.pendingTrailing = c
+	} else {
+		// Leading: on its own line before the next real token.
+		p.pending = append(p.pending, c)
+	}
+}
+
+// takePendingTrailing returns and clears the pending trailing comment.
+func (p *parser) takePendingTrailing() *Comment {
+	tc := p.pendingTrailing
+	p.pendingTrailing = nil
+	return tc
+}
+
+// drainComments returns and clears all pending leading comments.
 func (p *parser) drainComments() []*Comment {
 	c := p.pending
 	p.pending = nil
 	return c
 }
+
+// wrapComments wraps n with any pending leading comments and the trailing
+// comment (if any) that was set during or after parsing n.
+// Returns n unchanged if there are no comments.
+func (p *parser) wrapComments(n Node) Node {
+	leading := p.drainComments()
+	tc := p.takePendingTrailing()
+	if len(leading) == 0 && tc == nil {
+		return n
+	}
+	return &CommentedExpr{
+		At:              n.nodePos(),
+		LeadingComments: leading,
+		Expr:            n,
+		TrailingComment: tc,
+	}
+}
+
+// ── error helpers ────────────────────────────────────────────────────────────
 
 func (p *parser) errorf(format string, args ...interface{}) error {
 	return fmt.Errorf("jq parse error: "+format, args...)
@@ -101,12 +151,15 @@ func (p *parser) parseFile() (*File, error) {
 			if err != nil {
 				return nil, err
 			}
-			fd.LeadingComments = leading
+			fd.LeadingComments = append(leading, fd.LeadingComments...)
 			f.FuncDefs = append(f.FuncDefs, fd)
 		} else {
 			q, err := p.parseQuery(0)
 			if err != nil {
 				return nil, err
+			}
+			if len(leading) > 0 {
+				q = &CommentedExpr{At: q.nodePos(), LeadingComments: leading, Expr: q}
 			}
 			f.Query = q
 			break
@@ -252,10 +305,38 @@ func (p *parser) parseQuery(minPrec int) (Node, error) {
 	return left, nil
 }
 
+// parseExpr is the Pratt parser.  After each operand is parsed, we check for
+// a trailing comment (same line as the operand's last token) and any leading
+// comments that were drained before the operand.  These are attached to the node.
+//
+// Pre-first-token comments (absorbed by parsePrimary's peek()) are handled in
+// parseTerm itself and arrive here already wrapped on the left node.
 func (p *parser) parseExpr(minPrec int) (Node, error) {
+	// Leading comments drained before parseTerm starts.
+	preLeading := p.drainComments()
+
 	left, err := p.parseTerm()
 	if err != nil {
 		return nil, err
+	}
+
+	// parseTerm may have returned a CommentedExpr (pre-first-token comments).
+	// Merge preLeading and any trailing comment into it to avoid double-wrapping.
+	tc := p.takePendingTrailing()
+
+	if len(preLeading) > 0 {
+		if ce, ok := left.(*CommentedExpr); ok {
+			ce.LeadingComments = append(preLeading, ce.LeadingComments...)
+		} else {
+			left = &CommentedExpr{At: left.nodePos(), LeadingComments: preLeading, Expr: left}
+		}
+	}
+	if tc != nil {
+		if ce, ok := left.(*CommentedExpr); ok {
+			ce.TrailingComment = tc
+		} else {
+			left = &CommentedExpr{At: left.nodePos(), Expr: left, TrailingComment: tc}
+		}
 	}
 
 	for {
@@ -264,12 +345,51 @@ func (p *parser) parseExpr(minPrec int) (Node, error) {
 			break
 		}
 		opTok := p.next()
+
+		// For comma: a comment on the SAME LINE as the comma is a trailing
+		// comment for the LEFT operand, not a leading comment for the right.
+		// Peek once to absorb it and attach it to left before parsing right.
+		// (This mirrors the same fix in parseObject for the field-comma case.)
+		if opText == "," {
+			p.peek() // absorbs any same-line comment into pendingTrailing
+			if tc := p.takePendingTrailing(); tc != nil {
+				if ce, ok := left.(*CommentedExpr); ok {
+					if ce.TrailingComment == nil {
+						ce.TrailingComment = tc
+					}
+				} else {
+					left = &CommentedExpr{
+						At:              left.nodePos(),
+						Expr:            left,
+						TrailingComment: tc,
+					}
+				}
+			}
+		}
+
+		// Drain leading comments between the operator and the right operand.
+		rightLeading := p.drainComments()
+
 		right, err := p.parseExpr(rightPrec)
 		if err != nil {
 			return nil, err
 		}
-		// Use dedicated Pipe / Comma nodes so the formatter can handle them
-		// differently from arithmetic/logical binary operators.
+
+		// Trailing comment immediately after the right operand.
+		rightTC := p.takePendingTrailing()
+		// Also drain any new leading comments that followed the trailing comment.
+		rightLeading2 := p.drainComments()
+		_ = rightLeading2 // these will be picked up on the next iteration
+
+		if len(rightLeading) > 0 || rightTC != nil {
+			right = &CommentedExpr{
+				At:              right.nodePos(),
+				LeadingComments: rightLeading,
+				Expr:            right,
+				TrailingComment: rightTC,
+			}
+		}
+
 		switch opText {
 		case "|":
 			left = &Pipe{At: opTok.At, Left: left, Right: right}
@@ -341,11 +461,42 @@ func (p *parser) infixOp() (string, int, int, bool) {
 
 // ── term + postfix ───────────────────────────────────────────────────────────
 
+// parseTerm parses a primary expression + postfix operators.
+//
+// Comment-attachment rule for terms:
+//   - Comments absorbed by parsePrimary's peek() calls appear BEFORE the first
+//     token of the primary (e.g. the comment between "(" and "add" in a reduce
+//     init).  These are PRE-FIRST-TOKEN and become leading comments for this term.
+//   - Comments absorbed by parseSuffix's peek() calls appear AFTER the primary
+//     (e.g. the comment between "startswith()" and "| not").  These are
+//     POST-TERM and must remain in p.pending for the parent expression to assign
+//     as a leading comment to the next right operand.
 func (p *parser) parseTerm() (Node, error) {
+	// Track p.pending length before parsePrimary to isolate pre-first-token comments.
+	beforePrimary := len(p.pending)
+
 	primary, err := p.parsePrimary()
 	if err != nil {
 		return nil, err
 	}
+
+	// Any new entries in p.pending that were added during parsePrimary are
+	// pre-first-token comments (absorbed by the first peek() before any
+	// non-comment token of the primary was consumed).  Attach them as leading
+	// comments to the primary and remove them from p.pending so they don't
+	// accidentally get picked up as leading comments for the right operand.
+	if afterPrimary := len(p.pending); afterPrimary > beforePrimary {
+		prePrimary := make([]*Comment, afterPrimary-beforePrimary)
+		copy(prePrimary, p.pending[beforePrimary:])
+		p.pending = p.pending[:beforePrimary] // restore
+
+		primary = &CommentedExpr{
+			At:              primary.nodePos(),
+			LeadingComments: prePrimary,
+			Expr:            primary,
+		}
+	}
+
 	return p.parseSuffix(primary)
 }
 
@@ -370,7 +521,6 @@ func (p *parser) parseSuffix(left Node) (Node, error) {
 				key := &StrLit{At: strTok.At, Raw: strTok.Text}
 				left = &Index{At: tok.At, Expr: left, Key: key}
 			default:
-				// bare . means identity
 				left = &BinOp{At: tok.At, Op: "", Left: left, Right: &Identity{At: tok.At}}
 			}
 
@@ -481,9 +631,6 @@ func (p *parser) parsePrimary() (Node, error) {
 	case KWBREAK:
 		return p.parseBreak()
 	case KWDEF:
-		// Local function definition: def name: body; REST
-		// We parse this as a LocalFuncDef node so the formatter can render it
-		// without inserting a pipe between the def and its scope.
 		tok := p.peek()
 		fd, err := p.parseFuncDef()
 		if err != nil {
@@ -619,6 +766,8 @@ func (p *parser) parseIf() (*IfExpr, error) {
 	if err != nil {
 		return nil, err
 	}
+	// Trailing comment after then body
+	then = p.wrapComments(then)
 
 	expr := &IfExpr{At: tok.At, Cond: cond, Then: then}
 
@@ -635,6 +784,7 @@ func (p *parser) parseIf() (*IfExpr, error) {
 		if err != nil {
 			return nil, err
 		}
+		et = p.wrapComments(et)
 		expr.ElseIfs = append(expr.ElseIfs, ElseIfClause{Cond: ec, Then: et})
 	}
 
@@ -644,6 +794,7 @@ func (p *parser) parseIf() (*IfExpr, error) {
 		if err != nil {
 			return nil, err
 		}
+		el = p.wrapComments(el)
 		expr.Else = el
 	}
 
@@ -673,6 +824,7 @@ func (p *parser) parseReduce() (*ReduceExpr, error) {
 	if err != nil {
 		return nil, err
 	}
+	init = p.wrapComments(init)
 	if _, err := p.expect(SEMI); err != nil {
 		return nil, err
 	}
@@ -680,6 +832,7 @@ func (p *parser) parseReduce() (*ReduceExpr, error) {
 	if err != nil {
 		return nil, err
 	}
+	update = p.wrapComments(update)
 	if _, err := p.expect(RPAREN); err != nil {
 		return nil, err
 	}
@@ -706,6 +859,7 @@ func (p *parser) parseForeach() (*ForeachExpr, error) {
 	if err != nil {
 		return nil, err
 	}
+	init = p.wrapComments(init)
 	if _, err := p.expect(SEMI); err != nil {
 		return nil, err
 	}
@@ -713,6 +867,7 @@ func (p *parser) parseForeach() (*ForeachExpr, error) {
 	if err != nil {
 		return nil, err
 	}
+	update = p.wrapComments(update)
 	var extract Node
 	if p.peek().Kind == SEMI {
 		p.next()
@@ -720,6 +875,7 @@ func (p *parser) parseForeach() (*ForeachExpr, error) {
 		if err != nil {
 			return nil, err
 		}
+		extract = p.wrapComments(extract)
 	}
 	if _, err := p.expect(RPAREN); err != nil {
 		return nil, err
@@ -791,6 +947,7 @@ func (p *parser) parseArray() (*Array, error) {
 	if err != nil {
 		return nil, err
 	}
+	elem = p.wrapComments(elem)
 	if _, err := p.expect(RBRACKET); err != nil {
 		return nil, err
 	}
@@ -807,8 +964,21 @@ func (p *parser) parseObject() (*Object, error) {
 		}
 		obj.Fields = append(obj.Fields, field)
 		if p.peek().Kind == COMMA {
-			p.next()
+			p.next() // consume ","
+			// Peek once so that any trailing comment on the SAME LINE as the
+			// comma is absorbed into pendingTrailing.  That comment belongs to
+			// the PREVIOUS field's value — not the next field.
+			p.peek()
+			if tc := p.takePendingTrailing(); tc != nil {
+				p.attachTrailingToField(field, tc)
+			}
 		} else {
+			// No comma: peek so any trailing comment on the last field's line
+			// is absorbed.  It belongs to the last field's value.
+			p.peek()
+			if tc := p.takePendingTrailing(); tc != nil {
+				p.attachTrailingToField(field, tc)
+			}
 			break
 		}
 	}
@@ -818,7 +988,31 @@ func (p *parser) parseObject() (*Object, error) {
 	return obj, nil
 }
 
+// attachTrailingToField sets tc as the trailing comment on field.Value,
+// wrapping it in a CommentedExpr if necessary.
+func (p *parser) attachTrailingToField(field *ObjectField, tc *Comment) {
+	if field.Value == nil {
+		return
+	}
+	if ce, ok := field.Value.(*CommentedExpr); ok {
+		if ce.TrailingComment == nil {
+			ce.TrailingComment = tc
+		}
+	} else {
+		field.Value = &CommentedExpr{
+			At:              field.Value.nodePos(),
+			Expr:            field.Value,
+			TrailingComment: tc,
+		}
+	}
+}
+
 func (p *parser) parseObjectField() (*ObjectField, error) {
+	// Drain any leading comments that appeared before the field key.
+	// Without this, they would end up absorbed by parseTerm during value
+	// parsing and get misplaced on the value instead of the field.
+	leading := p.drainComments()
+
 	at := p.peek().At
 	var key Node
 
@@ -837,7 +1031,7 @@ func (p *parser) parseObjectField() (*ObjectField, error) {
 		tok := p.next()
 		key = &Ident{At: tok.At, Name: tok.Text}
 	case VAR:
-		// {$foo} is shorthand for {foo: $foo}
+		// {$foo} shorthand for {foo: $foo}
 		tok := p.next()
 		key = &Var{At: tok.At, Name: tok.Text}
 	default:
@@ -850,7 +1044,7 @@ func (p *parser) parseObjectField() (*ObjectField, error) {
 	}
 
 	if p.peek().Kind != COLON {
-		return &ObjectField{At: at, Key: key, KeyOptional: keyOpt}, nil
+		return &ObjectField{At: at, LeadingComments: leading, Key: key, KeyOptional: keyOpt}, nil
 	}
 	p.next()
 
@@ -858,7 +1052,8 @@ func (p *parser) parseObjectField() (*ObjectField, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &ObjectField{At: at, Key: key, KeyOptional: keyOpt, Value: val}, nil
+	val = p.wrapComments(val)
+	return &ObjectField{At: at, LeadingComments: leading, Key: key, KeyOptional: keyOpt, Value: val}, nil
 }
 
 // ── patterns ─────────────────────────────────────────────────────────────────
@@ -928,7 +1123,7 @@ func (p *parser) parseObjectPattern() (*ObjectPattern, error) {
 	return op, nil
 }
 
-// isIdent is used by the formatter to determine if an object key needs quoting.
+// isIdent is used by the formatter to check if a name needs quoting.
 func isIdent(s string) bool {
 	if len(s) == 0 {
 		return false
@@ -944,5 +1139,4 @@ func isIdent(s string) bool {
 	return true
 }
 
-// suppress unused import
-var _ = strings.TrimPrefix
+var _ = strings.TrimPrefix // used indirectly

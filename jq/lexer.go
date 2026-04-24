@@ -6,23 +6,20 @@ import (
 	"unicode/utf8"
 )
 
-// Lexer tokenises a jq source string.
-//
-// Comments are emitted as COMMENT tokens so the formatter can preserve them.
-// String interpolations are lexed as a single STR token containing the raw
-// source text (quotes included); the formatter does not need to rewrite the
-// content of strings.
+// Lexer tokenises a jq source string, tracking line numbers so the parser can
+// distinguish trailing comments (same line as preceding code) from leading
+// comments (on their own line before the next expression).
 type Lexer struct {
 	src    string
 	pos    int
+	line   int // 1-based current line number (incremented on each \n)
 	peeked *Token
 }
 
 func NewLexer(src string) *Lexer {
-	return &Lexer{src: src}
+	return &Lexer{src: src, line: 1}
 }
 
-// Next returns the next token, consuming it.
 func (l *Lexer) Next() Token {
 	if l.peeked != nil {
 		t := *l.peeked
@@ -32,7 +29,6 @@ func (l *Lexer) Next() Token {
 	return l.next()
 }
 
-// Peek returns the next token without consuming it.
 func (l *Lexer) Peek() Token {
 	if l.peeked == nil {
 		t := l.next()
@@ -48,57 +44,58 @@ func (l *Lexer) next() Token {
 	}
 
 	at := Pos(l.pos)
+	line := l.line
 	ch := l.src[l.pos]
 
 	if ch == '#' {
-		return l.lexComment()
+		return l.lexComment(at, line)
 	}
 	if ch == '"' {
-		return l.lexString()
+		return l.lexString(at, line)
 	}
 	if ch >= '0' && ch <= '9' {
-		return l.lexNumber()
+		return l.lexNumber(at, line)
 	}
 	if ch == '$' {
-		return l.lexVar()
+		return l.lexVar(at, line)
 	}
 	if ch == '@' {
-		return l.lexFormat()
+		return l.lexFormat(at, line)
 	}
 	if isIdentStart(ch) {
-		return l.lexIdent()
+		return l.lexIdent(at, line)
 	}
 
 	// Multi-char operators — longest match first.
 	switch {
 	case l.has("?//"):
-		return l.advance(ALTALT, 3)
+		return l.advance(ALTALT, 3, line)
 	case l.has("//="):
-		return l.advance(ALTEQ, 3)
+		return l.advance(ALTEQ, 3, line)
 	case l.has("|="):
-		return l.advance(PIPEEQ, 2)
+		return l.advance(PIPEEQ, 2, line)
 	case l.has("+="):
-		return l.advance(PLUSEQ, 2)
+		return l.advance(PLUSEQ, 2, line)
 	case l.has("-="):
-		return l.advance(MINUSEQ, 2)
+		return l.advance(MINUSEQ, 2, line)
 	case l.has("*="):
-		return l.advance(STAREQ, 2)
+		return l.advance(STAREQ, 2, line)
 	case l.has("/="):
-		return l.advance(SLASHEQ, 2)
+		return l.advance(SLASHEQ, 2, line)
 	case l.has("%="):
-		return l.advance(PERCENTEQ, 2)
+		return l.advance(PERCENTEQ, 2, line)
 	case l.has("//"):
-		return l.advance(ALT, 2)
+		return l.advance(ALT, 2, line)
 	case l.has("=="):
-		return l.advance(EQ, 2)
+		return l.advance(EQ, 2, line)
 	case l.has("!="):
-		return l.advance(NEQ, 2)
+		return l.advance(NEQ, 2, line)
 	case l.has("<="):
-		return l.advance(LTEQ, 2)
+		return l.advance(LTEQ, 2, line)
 	case l.has(">="):
-		return l.advance(GTEQ, 2)
+		return l.advance(GTEQ, 2, line)
 	case l.has(".."):
-		return l.advance(DOTDOT, 2)
+		return l.advance(DOTDOT, 2, line)
 	}
 
 	l.pos++
@@ -110,10 +107,10 @@ func (l *Lexer) next() Token {
 	// A bare dot followed by an identifier is a FIELD token.
 	if k == DOT && l.pos < len(l.src) && isIdentStart(l.src[l.pos]) {
 		name := l.readIdent()
-		return Token{Kind: FIELD, Text: "." + name, At: at}
+		return Token{Kind: FIELD, Text: "." + name, At: at, Line: line}
 	}
 
-	return Token{Kind: k, Text: string(ch), At: at}
+	return Token{Kind: k, Text: string(ch), At: at, Line: line}
 }
 
 var singleChar = map[byte]Kind{
@@ -139,44 +136,46 @@ var singleChar = map[byte]Kind{
 	'}': RBRACE,
 }
 
-func (l *Lexer) lexComment() Token {
-	at := Pos(l.pos)
+func (l *Lexer) lexComment(at Pos, line int) Token {
 	start := l.pos
 	l.pos++ // consume #
 	for l.pos < len(l.src) {
 		ch := l.src[l.pos]
 		if ch == '\n' {
-			// check for \ continuation
 			if l.pos > start && l.src[l.pos-1] == '\\' {
 				l.pos++
+				l.line++
 				continue
 			}
 			break
 		}
 		l.pos++
 	}
-	return Token{Kind: COMMENT, Text: l.src[start:l.pos], At: at}
+	return Token{Kind: COMMENT, Text: l.src[start:l.pos], At: at, Line: line}
 }
 
-// lexString lexes a complete double-quoted string including any \(...) interpolations.
-func (l *Lexer) lexString() Token {
-	at := Pos(l.pos)
+func (l *Lexer) lexString(at Pos, line int) Token {
 	start := l.pos
-	l.pos++ // consume opening "
+	l.pos++ // opening "
 	depth := 0
 	for l.pos < len(l.src) {
 		ch := l.src[l.pos]
 		switch {
 		case ch == '"' && depth == 0:
 			l.pos++
-			return Token{Kind: STR, Text: l.src[start:l.pos], At: at}
+			return Token{Kind: STR, Text: l.src[start:l.pos], At: at, Line: line}
 		case ch == '\\' && l.pos+1 < len(l.src):
 			l.pos++
 			next := l.src[l.pos]
 			l.pos++
 			if next == '(' {
 				depth++
+			} else if next == '\n' {
+				l.line++
 			}
+		case ch == '\n':
+			l.line++
+			l.pos++
 		case ch == '(' && depth > 0:
 			depth++
 			l.pos++
@@ -188,11 +187,10 @@ func (l *Lexer) lexString() Token {
 			l.pos += size
 		}
 	}
-	return Token{Kind: STR, Text: l.src[start:l.pos], At: at}
+	return Token{Kind: STR, Text: l.src[start:l.pos], At: at, Line: line}
 }
 
-func (l *Lexer) lexNumber() Token {
-	at := Pos(l.pos)
+func (l *Lexer) lexNumber(at Pos, line int) Token {
 	start := l.pos
 	for l.pos < len(l.src) && l.src[l.pos] >= '0' && l.src[l.pos] <= '9' {
 		l.pos++
@@ -213,34 +211,31 @@ func (l *Lexer) lexNumber() Token {
 			l.pos++
 		}
 	}
-	return Token{Kind: NUMBER, Text: l.src[start:l.pos], At: at}
+	return Token{Kind: NUMBER, Text: l.src[start:l.pos], At: at, Line: line}
 }
 
-func (l *Lexer) lexVar() Token {
-	at := Pos(l.pos)
+func (l *Lexer) lexVar(at Pos, line int) Token {
 	l.pos++ // consume $
 	if l.has("__loc__") {
 		l.pos += len("__loc__")
-		return Token{Kind: KWLOC, Text: "$__loc__", At: at}
+		return Token{Kind: KWLOC, Text: "$__loc__", At: at, Line: line}
 	}
 	name := l.readIdent()
-	return Token{Kind: VAR, Text: "$" + name, At: at}
+	return Token{Kind: VAR, Text: "$" + name, At: at, Line: line}
 }
 
-func (l *Lexer) lexFormat() Token {
-	at := Pos(l.pos)
+func (l *Lexer) lexFormat(at Pos, line int) Token {
 	l.pos++ // consume @
 	name := l.readIdent()
-	return Token{Kind: FORMAT, Text: "@" + name, At: at}
+	return Token{Kind: FORMAT, Text: "@" + name, At: at, Line: line}
 }
 
-func (l *Lexer) lexIdent() Token {
-	at := Pos(l.pos)
+func (l *Lexer) lexIdent(at Pos, line int) Token {
 	name := l.readIdent()
 	if kw, ok := keywords[name]; ok {
-		return Token{Kind: kw, Text: name, At: at}
+		return Token{Kind: kw, Text: name, At: at, Line: line}
 	}
-	return Token{Kind: IDENT, Text: name, At: at}
+	return Token{Kind: IDENT, Text: name, At: at, Line: line}
 }
 
 func (l *Lexer) readIdent() string {
@@ -254,7 +249,10 @@ func (l *Lexer) readIdent() string {
 func (l *Lexer) skipWhitespace() {
 	for l.pos < len(l.src) {
 		ch := l.src[l.pos]
-		if ch == ' ' || ch == '\t' || ch == '\n' || ch == '\r' {
+		if ch == '\n' {
+			l.line++
+			l.pos++
+		} else if ch == ' ' || ch == '\t' || ch == '\r' {
 			l.pos++
 		} else {
 			break
@@ -266,15 +264,15 @@ func (l *Lexer) has(s string) bool {
 	return strings.HasPrefix(l.src[l.pos:], s)
 }
 
-func (l *Lexer) advance(k Kind, n int) Token {
+func (l *Lexer) advance(k Kind, n int, line int) Token {
 	at := Pos(l.pos)
 	text := l.src[l.pos : l.pos+n]
 	l.pos += n
-	return Token{Kind: k, Text: text, At: at}
+	return Token{Kind: k, Text: text, At: at, Line: line}
 }
 
 func (l *Lexer) tok(k Kind, text string) Token {
-	return Token{Kind: k, Text: text, At: Pos(l.pos)}
+	return Token{Kind: k, Text: text, At: Pos(l.pos), Line: l.line}
 }
 
 func isIdentStart(ch byte) bool {

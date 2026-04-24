@@ -306,11 +306,37 @@ func (o *Object) nodePos() Pos { return o.At }
 // ObjectField is a single key:value pair in an object literal.
 // If Value is nil, this is a shorthand field ({foo} == {foo: .foo}).
 type ObjectField struct {
-	At          Pos
-	Key         Node   // StrLit, Ident, or Paren (for computed keys)
-	KeyOptional bool   // key followed by ? inside the object
-	Value       Node   // nil for shorthand
+	At              Pos
+	LeadingComments []*Comment // comments that appear before the key
+	Key             Node       // StrLit, Ident, or Paren (for computed keys)
+	KeyOptional     bool       // key followed by ? inside the object
+	Value           Node       // nil for shorthand
 }
+
+// CommentedExpr wraps an expression with attached comments.
+//
+// Leading comments appear on their own lines immediately before the expression.
+// TrailingComment appears on the same line as the expression (after it).
+//
+// The critical formatting rule: when a trailing comment is present, the
+// enclosing comma/pipe sequence MUST use multi-line layout, because a trailing
+// comment can only live at the end of a line.
+//
+// This mirrors gofmt's rule: if any element in a list has a comment, the list
+// goes multi-line.
+//
+// Corpus ref: corpus/debian-bin/jq/deb822.jq — the comment
+// "# inject a synthetic blank line…" trails the "" literal inside foreach's
+// generator, forcing that comma sequence to be multi-line.
+type CommentedExpr struct {
+	At              Pos
+	LeadingComments []*Comment
+	Expr            Node
+	TrailingComment *Comment // nil if no trailing comment
+}
+
+func (c *CommentedExpr) jqNode()      {}
+func (c *CommentedExpr) nodePos() Pos { return c.At }
 
 // LocalFuncDef: def name(params): body; REST — a function definition scoped to
 // the rest of an expression.  The semicolon terminates the def and REST follows

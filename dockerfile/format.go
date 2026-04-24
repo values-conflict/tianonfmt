@@ -2,31 +2,54 @@
 //
 // Style rules (backed by corpus samples):
 //
-//   - Instruction keywords are uppercased (corpus: all Dockerfiles use UPPERCASE)
-//   - Continuation lines preserve their original leading-tab indentation
-//     (corpus/debuerreotype/Dockerfile:17 "apt-get install" args have 2 tabs;
-//     corpus/tianon-dockerfiles/steam/Dockerfile.template:6 "ca-certificates" 2 tabs)
-//   - Inline comments within continuation blocks have NO indentation — they sit
-//     at column 0 (corpus/tianon-dockerfiles/steam/Dockerfile.template:7
-//     "# zenity is used during early startup…"; debuerreotype/Dockerfile:23)
+//   - Instruction keywords are uppercased (all Dockerfiles in corpus)
+//   - Continuation lines preserve original leading-tab depth
+//     (corpus/debuerreotype/Dockerfile:17 — 2 tabs for apt-get arguments)
+//   - Inline comments within continuation blocks sit at column 0
+//     (corpus/tianon-dockerfiles/steam/Dockerfile.template:7)
+//   - RUN shell content is normalised for tab depth using the shell.FormatRUN
+//     function (depth-based tab normalisation without restructuring)
 //   - A single blank line separates instruction groups
-//   - No trailing whitespace on any line
-//   - File ends with a single newline
+//   - No trailing whitespace; file ends with a single newline
 package dockerfile
 
 import (
 	"strings"
 )
 
-// Format formats a parsed Dockerfile back to canonical source.
+// Formatter holds optional callbacks for embedded-language formatting.
+type Formatter struct {
+	// JQFmt, if set, is called to reformat jq expressions found in
+	// jq '...' invocations within RUN blocks.
+	JQFmt func(expr string, inline bool) string
+
+	// RUNShellFmt, if set, is called with the continuation lines of each RUN
+	// instruction to normalise their shell formatting.  It receives a slice of
+	// raw lines (with ` \` continuation markers) and returns a replacement slice.
+	RUNShellFmt func(lines []string, jqFmt func(expr string, inline bool) string) []string
+}
+
+// Format formats a parsed Dockerfile back to canonical source using the
+// default formatter (no embedded-language rewriting).
 func Format(f *File) string {
-	w := &writer{}
+	return (&Formatter{}).FormatFile(f)
+}
+
+// FormatWith formats with the provided embedded-language formatters.
+func FormatWith(f *File, fmt *Formatter) string {
+	return fmt.FormatFile(f)
+}
+
+// FormatFile is the method form of Format.
+func (fmtr *Formatter) FormatFile(f *File) string {
+	w := &writer{fmtr: fmtr}
 	w.file(f)
 	return w.out.String()
 }
 
 type writer struct {
-	out strings.Builder
+	out  strings.Builder
+	fmtr *Formatter
 }
 
 func (w *writer) write(s string)   { w.out.WriteString(s) }
@@ -63,43 +86,70 @@ func (w *writer) instruction(instr *Instruction) {
 	if len(instr.Lines) == 0 {
 		return
 	}
+
+	// For RUN instructions, optionally normalise the continuation-line shell.
+	if instr.Keyword == "RUN" && w.fmtr != nil && w.fmtr.RUNShellFmt != nil {
+		w.runInstruction(instr)
+		return
+	}
+
+	w.plainInstruction(instr)
+}
+
+// plainInstruction emits a Dockerfile instruction preserving original
+// continuation-line indentation.
+func (w *writer) plainInstruction(instr *Instruction) {
 	for _, line := range instr.Lines {
 		switch line.Kind {
 		case LineKindInstruction:
 			w.writeln(formatFirstLine(line.Text, instr.Keyword))
 
 		case LineKindContinuation:
-			// Preserve the original leading-tab indentation exactly.
-			// Only strip trailing whitespace.
-			// A blank continuation line (lone \ used as a visual separator) is
-			// preserved as a single \ with no extra indentation.
 			stripped := strings.TrimRight(line.Text, " \t")
 			if stripped == "" {
-				// The original line was blank after stripping the escape; emit \
-				// to preserve the visual separator.
 				w.writeln("\\")
 			} else {
-				// Re-emit with original leading tabs, normalised from any mix of
-				// spaces: count leading tabs in the original and preserve them.
 				tabs := countLeadingTabs(line.Text)
 				rest := strings.TrimLeft(line.Text, " \t")
 				w.writeln(strings.Repeat("\t", tabs) + rest)
 			}
 
 		case LineKindComment:
-			// Inline comments within a continuation block sit at column 0 — no
-			// leading indentation.
+			// Inline comments within continuation blocks: column 0.
 			// Style ref: corpus/tianon-dockerfiles/steam/Dockerfile.template:7
-			// "# zenity is used during early startup for dialogs and progress bars"
-			// corpus/debuerreotype/Dockerfile:23
-			// "# add "gpgv" explicitly (for now) since it's transitively-essential…"
 			w.writeln(strings.TrimLeft(line.Text, " \t"))
 		}
 	}
 }
 
-// formatFirstLine uppercases the keyword of the first instruction line while
-// preserving the rest of the line verbatim.
+// runInstruction emits a RUN instruction, applying shell normalisation to the
+// continuation lines.
+func (w *writer) runInstruction(instr *Instruction) {
+	if len(instr.Lines) == 0 {
+		return
+	}
+
+	// Emit the first line (RUN ...) unchanged.
+	firstLine := instr.Lines[0]
+	w.writeln(formatFirstLine(firstLine.Text, instr.Keyword))
+
+	if len(instr.Lines) == 1 {
+		return // single-line RUN
+	}
+
+	// Collect continuation + comment lines and pass to the shell formatter.
+	var contLines []string
+	for _, line := range instr.Lines[1:] {
+		contLines = append(contLines, line.Text)
+	}
+
+	normalised := w.fmtr.RUNShellFmt(contLines, w.fmtr.JQFmt)
+	for _, line := range normalised {
+		w.writeln(line)
+	}
+}
+
+// formatFirstLine uppercases the keyword while preserving the rest of the line.
 func formatFirstLine(raw, keyword string) string {
 	trimmed := strings.TrimSpace(raw)
 	idx := strings.IndexAny(trimmed, " \t\\")
@@ -109,7 +159,7 @@ func formatFirstLine(raw, keyword string) string {
 	return keyword + trimmed[idx:]
 }
 
-// countLeadingTabs counts leading tab characters (not spaces) in s.
+// countLeadingTabs counts leading tab characters in s.
 func countLeadingTabs(s string) int {
 	n := 0
 	for _, ch := range s {

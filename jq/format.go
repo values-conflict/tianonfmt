@@ -5,28 +5,28 @@ package jq
 // Style rules (all backed by corpus samples):
 //
 //   - Indentation: 1 hard tab per level
-//   - Pipe |: emitted at the START of the next line, not the end of the current
-//     (corpus ref: corpus/debian-bin/jq/deb822.jq:23-34, dpkg-version.jq:32-52)
-//   - Comma ,: emitted at the END of the line (commas in generators)
-//     (corpus ref: corpus/tianon-dockerfiles/scratch/multiarch.jq:6-20)
+//   - Pipe |: emitted at the START of the next line
+//     (corpus/debian-bin/jq/deb822.jq:23-34)
+//   - Comma ,: emitted at the END of the line
+//     (corpus/tianon-dockerfiles/scratch/multiarch.jq:6-20)
 //   - Arithmetic ops (+, -, etc.): lead the continuation line when broken
-//     (corpus ref: corpus/debian-bin/jq/dpkg-version.jq:22-28)
+//     (corpus/debian-bin/jq/dpkg-version.jq:22-28)
 //   - def body: indented 1 tab; closing ; at the def's own indentation
-//     (corpus ref: corpus/debian-bin/jq/deb822.jq:7-39)
-//   - if/then/else/end: inline when the whole expression fits <= shortThreshold;
-//     multi-line otherwise.  Short else body: "else BODY end" on same line.
-//     (corpus ref: dpkg-version.jq:22-29 multi, :35 inline)
-//   - foreach / reduce: always multi-line
-//     (corpus ref: deb822.jq:8-38)
-//   - Object literals: multi-line with one field+trailing-comma per line
-//     (corpus ref: multiarch.jq:5-16)
-//   - Comments: re-emitted before the node they precede
+//     (corpus/debian-bin/jq/deb822.jq:7-39)
+//   - if/then/else/end: inline when everything fits <= shortThreshold
+//     (corpus/debian-bin/jq/dpkg-version.jq:22-29 multi, :35 inline)
+//   - foreach/reduce: always multi-line
+//   - Object literals: multi-line with { key: val, } per line
+//     (corpus/tianon-dockerfiles/scratch/multiarch.jq:5-16)
+//   - COMMENT RULE: trailing comments force multi-line on the enclosing
+//     comma/pipe sequence; leading comments are emitted before their node.
+//     (gofmt rule; corpus ref: deb822.jq "# inject a synthetic blank line…")
 
 import (
 	"strings"
 )
 
-const shortThreshold = 60 // max chars for inline if/else forms
+const shortThreshold = 60
 
 // FormatFile formats a complete jq file.
 func FormatFile(f *File) string {
@@ -35,31 +35,118 @@ func FormatFile(f *File) string {
 	return p.out.String()
 }
 
-// FormatNode formats a single node.
+// FormatNode formats a single AST node.
 func FormatNode(n Node) string {
 	p := &printer{}
 	p.node(n)
 	return p.out.String()
 }
 
-// printer accumulates formatted output.
-type printer struct {
-	out   strings.Builder
-	depth int
+// FormatNodeInline formats a single AST node as a single-line compact string.
+// Used for jq-in-shell single-line expressions.
+func FormatNodeInline(n Node) string {
+	p := &printer{}
+	p.nodeInline(n)
+	return p.out.String()
 }
 
-func (p *printer) tab() string { return strings.Repeat("\t", p.depth) }
+// printer accumulates formatted output.
+type printer struct {
+	out              strings.Builder
+	depth            int
+	lastWasTrailing  bool // true immediately after emitting a trailing comment
+}
 
-func (p *printer) write(s string)   { p.out.WriteString(s) }
+// clearTrailing resets lastWasTrailing and returns its old value.
+func (p *printer) clearTrailing() bool {
+	v := p.lastWasTrailing
+	p.lastWasTrailing = false
+	return v
+}
+
+// closeDelimiter writes a closing bracket/paren.
+//
+// In "trailing comment" state (set by commentedExpr or writeAfterPunct), adds
+// a newline first so the delimiter appears on its own line and not inside the
+// comment.  In multi-line-block mode (atBlockEnd == true), always adds a
+// newline before the delimiter regardless (same as the old explicit p.newline()
+// call in array/paren/object formatters).
+func (p *printer) closeDelimiter(s string) {
+	if p.lastWasTrailing {
+		p.newline()
+		p.lastWasTrailing = false
+	}
+	p.write(s)
+}
+
+
+func (p *printer) tab() string { return strings.Repeat("\t", p.depth) }
+func (p *printer) write(s string) {
+	p.out.WriteString(s)
+}
 func (p *printer) writeln(s string) { p.out.WriteString(s); p.out.WriteByte('\n') }
 func (p *printer) indent()          { p.depth++ }
 func (p *printer) dedent()          { p.depth-- }
 
-// newline writes a newline followed by the current indentation.
-func (p *printer) newline() { p.out.WriteByte('\n'); p.write(p.tab()) }
+// newline writes a newline followed by the current indentation, and resets
+// lastWasTrailing (a newline always means we're on a fresh line).
+func (p *printer) newline() {
+	p.lastWasTrailing = false
+	p.out.WriteByte('\n')
+	p.write(p.tab())
+}
 
-// nl writes just a newline (no indentation follows).
+// nl writes just a bare newline.
 func (p *printer) nl() { p.out.WriteByte('\n') }
+
+// atLineStart reports whether the printer is logically at the start of a line:
+// either the buffer is empty, or everything after the last newline is whitespace.
+// This is true after p.newline() (which writes "\n" + tabs) as well as after p.nl().
+func (p *printer) atLineStart() bool {
+	s := p.out.String()
+	if s == "" {
+		return true
+	}
+	lastNL := strings.LastIndex(s, "\n")
+	if lastNL < 0 {
+		return strings.TrimLeft(s, " \t") == ""
+	}
+	return strings.TrimLeft(s[lastNL+1:], " \t") == ""
+}
+
+// ── helpers for comment-forced multi-line ────────────────────────────────────
+
+// hasTrailingComment reports whether n is a CommentedExpr with a trailing comment.
+func hasTrailingComment(n Node) bool {
+	ce, ok := n.(*CommentedExpr)
+	return ok && ce.TrailingComment != nil
+}
+
+// hasAnyComment reports whether n is a CommentedExpr (has any kind of comment).
+func hasAnyComment(n Node) bool {
+	_, ok := n.(*CommentedExpr)
+	return ok
+}
+
+// anyPartHasTrailingComment reports whether any element has a trailing comment.
+func anyPartHasTrailingComment(parts []Node) bool {
+	for _, part := range parts {
+		if hasTrailingComment(part) {
+			return true
+		}
+	}
+	return false
+}
+
+// anyPartHasComment reports whether any element has any kind of comment.
+func anyPartHasComment(parts []Node) bool {
+	for _, part := range parts {
+		if hasAnyComment(part) {
+			return true
+		}
+	}
+	return false
+}
 
 // ── top-level ────────────────────────────────────────────────────────────────
 
@@ -114,19 +201,15 @@ func (p *printer) importStmt(i *ImportStmt) {
 
 func (p *printer) comments(cs []*Comment) {
 	for _, c := range cs {
-		p.write(p.tab())
 		p.writeln(c.Text)
+		p.write(p.tab())
 	}
 }
 
-// localFuncDef formats a local function definition that scopes to REST.
-// Short bodies: "def name: body;" on one line followed by REST on the next.
-// Long bodies: multi-line form.
+// localFuncDef formats a local function definition scoped to REST.
+// Short bodies stay on one line; long bodies use multi-line form.
 // Style ref: corpus/debian-bin/jq/deb822.jq:21-22
-//   def _trimstart: until(startswith(" ") or startswith("\t") | not; .[1:]);
-//   def _trimend:   until(endswith(" ") or endswith("\t") | not; .[:-1]);
 func (p *printer) localFuncDef(v *LocalFuncDef) {
-	// Format the signature prefix.
 	var sig strings.Builder
 	sig.WriteString("def ")
 	sig.WriteString(v.Name)
@@ -143,15 +226,11 @@ func (p *printer) localFuncDef(v *LocalFuncDef) {
 	sig.WriteString(": ")
 
 	bodyInline := shortInline(v.Body)
-	// Local defs use a higher threshold (100) since the corpus shows them on
-	// single lines even when relatively long.
 	if len(sig.String())+len(bodyInline) <= 100 && !strings.Contains(bodyInline, "\n") {
-		// Single-line local def.
 		p.write(sig.String())
 		p.write(bodyInline)
 		p.write(";")
 	} else {
-		// Multi-line: body indented, ; on own line at same level.
 		p.write(strings.TrimRight(sig.String(), " "))
 		p.nl()
 		p.indent()
@@ -167,8 +246,8 @@ func (p *printer) localFuncDef(v *LocalFuncDef) {
 	p.node(v.Rest)
 }
 
-// funcDef formats: def name(params):\n\tbody\n;
-// Style ref: corpus/debian-bin/jq/deb822.jq lines 7-39
+// funcDef formats a top-level def: always multi-line body.
+// Style ref: corpus/debian-bin/jq/deb822.jq:7-39
 func (p *printer) funcDef(fd *FuncDef) {
 	p.write("def ")
 	p.write(fd.Name)
@@ -200,6 +279,8 @@ func (p *printer) node(n Node) {
 		return
 	}
 	switch v := n.(type) {
+	case *CommentedExpr:
+		p.commentedExpr(v)
 	case *FuncDef:
 		p.funcDef(v)
 	case *LocalFuncDef:
@@ -266,8 +347,8 @@ func (p *printer) node(n Node) {
 	case *Object:
 		p.objectExpr(v)
 	case *Paren:
-		inner := shortInline(v.Expr)
-		if len(inner) <= shortThreshold && !strings.Contains(inner, "\n") {
+		inner := inlineSafe(v.Expr)
+		if inner != "" && len(inner) <= shortThreshold && !strings.Contains(inner, "\n") && !hasAnyComment(v.Expr) {
 			p.write("(")
 			p.write(inner)
 			p.write(")")
@@ -278,7 +359,7 @@ func (p *printer) node(n Node) {
 			p.node(v.Expr)
 			p.dedent()
 			p.newline()
-			p.write(")")
+	p.write(")")
 		}
 	case *Optional:
 		p.node(v.Expr)
@@ -313,26 +394,86 @@ func (p *printer) node(n Node) {
 	}
 }
 
+// ── CommentedExpr ────────────────────────────────────────────────────────────
+
+// commentedExpr emits leading comments, then the expression, then the trailing
+// comment (if any) on the same line.
+//
+// If the printer is not at the start of a line when this is called, a newline
+// is injected first — this ensures comments always appear on their own line,
+// never appended to the end of the previous token.
+//
+// After emitting a trailing comment, sets lastWasTrailing so closing delimiters
+// (], ), }) know to go on the next line instead of inside the comment.
+func (p *printer) commentedExpr(v *CommentedExpr) {
+	p.lastWasTrailing = false
+	for _, c := range v.LeadingComments {
+		if !p.atLineStart() {
+			p.nl()
+			p.write(p.tab())
+		}
+		p.writeln(c.Text)
+		p.write(p.tab())
+	}
+	p.node(v.Expr)
+	if v.TrailingComment != nil {
+		p.write(" ")
+		p.write(v.TrailingComment.Text)
+		p.lastWasTrailing = true
+	}
+}
+
 // ── expression formatters ────────────────────────────────────────────────────
 
 // pipeChain formats a | chain.
-// Style ref: corpus/debian-bin/jq/deb822.jq:23-34 — | at the START of each
-// continuation line, at the same indentation as the expressions.
-//
-//	EXPR1
-//	| EXPR2
-//	| EXPR3
-//
-// Short pipes (e.g. "$line | _trimstart") stay inline.
+// | at the START of continuation lines; forced multi-line if any part has a
+// trailing comment (gofmt rule).
+// Style ref: corpus/debian-bin/jq/deb822.jq:23-34
 func (p *printer) pipeChain(v *Pipe) {
-	inline := shortInline(v)
-	if len(inline) <= shortThreshold && !strings.Contains(inline, "\n") {
+	parts := flattenPipe(v)
+
+	// Force multi-line if any part has any comment (trailing or leading).
+	// Trailing comments can only live at end-of-line; leading comments need
+	// their own line — both require multi-line layout.
+	if anyPartHasComment(parts) {
+		p.pipeChainMultiLine(parts)
+		return
+	}
+
+	inline := inlineSafe(v)
+	if inline != "" && len(inline) <= shortThreshold && !strings.Contains(inline, "\n") {
 		p.write(inline)
 		return
 	}
-	parts := flattenPipe(v)
+	p.pipeChainMultiLine(parts)
+}
+
+func (p *printer) pipeChainMultiLine(parts []Node) {
 	for i, part := range parts {
 		if i > 0 {
+			// If this part has leading comments, emit them BEFORE the |.
+			// This matches the corpus style where comments between pipe
+			// elements appear on their own line before the | :
+			//   prev_expr
+			//   # comment
+			//   | next_expr
+			// (corpus: version-components.jq lines 13-14)
+			if ce, ok := part.(*CommentedExpr); ok && len(ce.LeadingComments) > 0 {
+				for _, c := range ce.LeadingComments {
+					p.newline()
+					p.write(c.Text)
+				}
+				p.newline()
+				p.write("| ")
+				// Emit the rest of the CommentedExpr (expr + trailing comment)
+				// without repeating the leading comments.
+				p.node(ce.Expr)
+				if ce.TrailingComment != nil {
+					p.write(" ")
+					p.write(ce.TrailingComment.Text)
+				}
+				continue
+			}
 			p.newline()
 			p.write("| ")
 		}
@@ -357,21 +498,40 @@ func flattenPipe(v *Pipe) []Node {
 }
 
 // commaExpr formats a , generator chain.
-// Style ref: corpus/tianon-dockerfiles/scratch/multiarch.jq:6-20 — comma at
-// END of line, each element on its own line when multi-line.
+// , at END of line; forced multi-line if any part has a trailing comment.
+// Style ref: corpus/tianon-dockerfiles/scratch/multiarch.jq:6-20
 func (p *printer) commaExpr(v *Comma) {
-	inline := shortInline(v)
-	if len(inline) <= shortThreshold && !strings.Contains(inline, "\n") {
+	parts := flattenComma(v)
+
+	if anyPartHasComment(parts) {
+		p.commaExprMultiLine(parts)
+		return
+	}
+
+	inline := inlineSafe(v)
+	if inline != "" && len(inline) <= shortThreshold && !strings.Contains(inline, "\n") {
 		p.write(inline)
 		return
 	}
-	parts := flattenComma(v)
+	p.commaExprMultiLine(parts)
+}
+
+func (p *printer) commaExprMultiLine(parts []Node) {
 	for i, part := range parts {
 		if i > 0 {
-			p.write(",")
+			// The comma belongs after the previous part.  Leading comments of
+			// the CURRENT part belong before it (handled by commentedExpr).
 			p.newline()
 		}
-		p.node(part)
+		if i < len(parts)-1 {
+			// For all but the last part: strip trailing comment, emit node,
+			// then write "," BEFORE the trailing comment so it isn't eaten.
+			inner, tc := stripTrailing(part)
+			p.node(inner)
+			p.writeAfterPunct(",", tc)
+		} else {
+			p.node(part)
+		}
 	}
 }
 
@@ -392,11 +552,7 @@ func flattenComma(v *Comma) []Node {
 }
 
 // asExpr formats: expr as $pat\n| body
-// The | that separates the pattern binding from its scope belongs at the START
-// of the next line, matching the pipe-at-start-of-line convention.
 // Style ref: corpus/debian-bin/jq/deb822.jq:24
-//   ($line | _trimstart) as $ltrim
-//   | ($ltrim | _trimend) as $trim
 func (p *printer) asExpr(v *AsExpr) {
 	p.node(v.Expr)
 	p.write(" as ")
@@ -407,74 +563,79 @@ func (p *printer) asExpr(v *AsExpr) {
 }
 
 // binOp formats a binary expression.
-// For chained arithmetic/logical ops that exceed shortThreshold, each operand
-// starts on a new line with the operator leading.
-// Style ref: dpkg-version.jq:22-28 "+ .upstream", "+ if .revision..."
+// For chained arithmetic/logical ops that exceed threshold, each operand starts
+// on a new line with the operator leading.
+// Style ref: corpus/debian-bin/jq/dpkg-version.jq:22-28
 func (p *printer) binOp(v *BinOp) {
 	if v.Op == "neg" {
 		p.write("-")
 		p.node(v.Left)
 		return
 	}
-	// Field chaining: left.field or left.field (Right is a Field node)
 	if v.Op == "" {
 		p.node(v.Left)
-		p.node(v.Right) // Field already has its leading dot
+		p.node(v.Right)
 		return
 	}
-	// Pipe embedded in suffix (e.g. @fmt pipe) stays inline
 	if v.Op == "|" {
+		// Inline pipe from suffix (format expressions)
 		p.node(v.Left)
 		p.write(" | ")
 		p.node(v.Right)
 		return
 	}
 
-	// For all other binary operators: try inline first; break if too long.
-	inline := shortInline(v)
-	if len(inline) <= shortThreshold && !strings.Contains(inline, "\n") {
+	inline := inlineSafe(v)
+	if inline != "" && len(inline) <= shortThreshold && !strings.Contains(inline, "\n") {
 		p.write(inline)
 		return
 	}
 
-	// Multi-line: each operand on its own line, operator leads subsequent lines.
-	// Flatten the left-spine so chains like a + b + c all break uniformly.
-	type opPart struct {
+	// Multi-line: flatten same-op chain so all parts break uniformly.
+	type part struct {
 		op   string
 		node Node
 	}
-	var parts []opPart
+	var parts []part
 	var flatten func(n Node)
 	flatten = func(n Node) {
 		if b, ok := n.(*BinOp); ok && b.Op == v.Op {
 			flatten(b.Left)
-			parts = append(parts, opPart{op: b.Op, node: b.Right})
+			parts = append(parts, part{op: b.Op, node: b.Right})
 		} else {
-			parts = append(parts, opPart{node: n})
+			parts = append(parts, part{node: n})
 		}
 	}
 	flatten(v)
 
-	for i, part := range parts {
+	for i, pt := range parts {
 		if i > 0 {
 			p.newline()
-			p.write(part.op)
+			p.write(pt.op)
 			p.write(" ")
 		}
-		p.node(part.node)
+		p.node(pt.node)
 	}
 }
 
 // ifExpr formats if/then/else/end.
-// Style refs:
-//   - Inline:     dpkg-version.jq:35 "if index(":") then . else "0:" + . end"
-//   - Multi-line: dpkg-version.jq:22-29
-//   - Short else: "else "" end" on same line (dpkg-version.jq:24,28)
+// Inline when everything fits; multi-line otherwise.
+// Style refs: dpkg-version.jq:22-29 (multi), :35 (inline); deb822.jq:18-35
 func (p *printer) ifExpr(v *IfExpr) {
-	inline := shortInline(v)
-	if len(inline) <= shortThreshold && !strings.Contains(inline, "\n") {
-		p.write(inline)
-		return
+	// Any comment in any branch forces multi-line.
+	forcedMulti := hasAnyComment(v.Then) || hasAnyComment(v.Else)
+	for _, ei := range v.ElseIfs {
+		if hasAnyComment(ei.Then) {
+			forcedMulti = true
+		}
+	}
+
+	if !forcedMulti {
+		inline := inlineSafe(v)
+		if inline != "" && len(inline) <= shortThreshold && !strings.Contains(inline, "\n") {
+			p.write(inline)
+			return
+		}
 	}
 
 	p.write("if ")
@@ -499,7 +660,7 @@ func (p *printer) ifExpr(v *IfExpr) {
 	if v.Else != nil {
 		p.newline()
 		elseInline := shortInline(v.Else)
-		if len(elseInline) <= 30 && !strings.Contains(elseInline, "\n") {
+		if len(elseInline) <= 30 && !strings.Contains(elseInline, "\n") && !hasAnyComment(v.Else) {
 			p.write("else ")
 			p.write(elseInline)
 			p.write(" end")
@@ -518,7 +679,7 @@ func (p *printer) ifExpr(v *IfExpr) {
 	}
 }
 
-// reduceExpr formats: reduce expr as $pat (\n\tinit;\n\tupdate\n)
+// reduceExpr: always multi-line.
 // Style ref: corpus/tianon-dockerfiles/scratch/multiarch.jq:67-68
 func (p *printer) reduceExpr(v *ReduceExpr) {
 	p.write("reduce ")
@@ -528,8 +689,9 @@ func (p *printer) reduceExpr(v *ReduceExpr) {
 	p.write(" (")
 	p.indent()
 	p.newline()
-	p.node(v.Init)
-	p.write(";")
+	initInner, initTC := stripTrailing(v.Init)
+	p.node(initInner)
+	p.writeAfterPunct(";", initTC)
 	p.newline()
 	p.node(v.Update)
 	p.dedent()
@@ -537,8 +699,7 @@ func (p *printer) reduceExpr(v *ReduceExpr) {
 	p.write(")")
 }
 
-// foreachExpr formats: foreach expr as $pat (\n\tinit;\n\tupdate\n)
-// or with extract: foreach ... (\n\tinit;\n\tupdate;\n\textract\n)
+// foreachExpr: always multi-line.
 // Style ref: corpus/debian-bin/jq/deb822.jq:8-38
 func (p *printer) foreachExpr(v *ForeachExpr) {
 	p.write("foreach ")
@@ -548,35 +709,51 @@ func (p *printer) foreachExpr(v *ForeachExpr) {
 	p.write(" (")
 	p.indent()
 	p.newline()
-	p.node(v.Init)
-	p.write(";")
+	initInner, initTC := stripTrailing(v.Init)
+	p.node(initInner)
+	p.writeAfterPunct(";", initTC)
 	p.newline()
-	p.node(v.Update)
+	updateInner, updateTC := stripTrailing(v.Update)
+	p.node(updateInner)
 	if v.Extract != nil {
 		extractInline := shortInline(v.Extract)
-		if len(extractInline) <= 50 && !strings.Contains(extractInline, "\n") {
-			// Short extract: "; extract)" on the close line
+		if len(extractInline) <= 50 && !strings.Contains(extractInline, "\n") && !hasAnyComment(v.Extract) {
+			// Short extract on the same close line, with the `;` separator.
 			// Style ref: deb822.jq:60 "; if .out then .out else empty end)"
+			// The updateTC comment (if any) goes after the node but before the ";".
+			// We OMIT the trailing comment here because if we wrote it, we'd need
+			// to start a new line — defeating the "short extract on close line" goal.
+			// In practice, trailing comments on the update of a foreach are rare.
+			if updateTC != nil {
+				p.write(" ")
+				p.write(updateTC.Text)
+			}
 			p.dedent()
 			p.newline()
 			p.write("; ")
 			p.write(extractInline)
 		} else {
-			p.write(";")
+			// Multi-line extract: `;` separates update from extract.
+			// updateTC goes after update and before the `;`.
+			p.writeAfterPunct(";", updateTC)
 			p.newline()
 			p.node(v.Extract)
 			p.dedent()
 			p.newline()
 		}
 	} else {
+		// No extract: trailing comment (if any) goes inline after update.
+		if updateTC != nil {
+			p.write(" ")
+			p.write(updateTC.Text)
+		}
 		p.dedent()
 		p.newline()
 	}
-	p.write(")")
+	p.closeDelimiter(")")
 }
 
-// tryExpr formats: try body (catch handler)?
-// Style ref: dpkg-version.jq:38 "try tonumber // (...)"
+// tryExpr: try body (catch handler)?
 func (p *printer) tryExpr(v *TryExpr) {
 	p.write("try ")
 	p.node(v.Body)
@@ -595,7 +772,7 @@ func (p *printer) indexExpr(v *Index) {
 	} else {
 		p.write("[")
 		p.node(v.Key)
-		p.write("]")
+		p.closeDelimiter("]")
 	}
 	if v.Optional {
 		p.write("?")
@@ -622,29 +799,65 @@ func (p *printer) sliceExpr(v *Slice) {
 
 func (p *printer) callExpr(v *Call) {
 	p.write(v.Name)
-	if len(v.Args) > 0 {
+	if len(v.Args) == 0 {
+		return
+	}
+
+	// If any argument has comments, use multi-line call format so each argument
+	// starts on its own line (ensuring leading comments are at line start).
+	anyCommented := false
+	for _, arg := range v.Args {
+		if hasAnyComment(arg) {
+			anyCommented = true
+			break
+		}
+	}
+
+	if anyCommented {
 		p.write("(")
+		p.indent()
 		for i, arg := range v.Args {
 			if i > 0 {
-				p.write("; ")
+				p.write(";")
 			}
+			p.newline()
 			p.node(arg)
 		}
+		p.dedent()
+		p.newline()
 		p.write(")")
+		return
 	}
+
+	p.write("(")
+	for i, arg := range v.Args {
+		if i > 0 {
+			p.write("; ")
+		}
+		p.node(arg)
+	}
+	p.closeDelimiter(")")
 }
 
-// arrayExpr formats an array literal.
-// Style ref: corpus/tianon-dockerfiles/scratch/multiarch.jq — multi-line when
-// the element expression is a pipe chain or comma generator.
+// arrayExpr: multi-line when element is complex.
 func (p *printer) arrayExpr(v *Array) {
 	if v.Elem == nil {
 		p.write("[]")
 		return
 	}
-	inline := "[" + shortInline(v.Elem) + "]"
-	if len(inline) <= shortThreshold && !strings.Contains(inline, "\n") {
-		p.write(inline)
+	if hasAnyComment(v.Elem) {
+		p.write("[")
+		p.indent()
+		p.newline()
+		p.node(v.Elem)
+		p.dedent()
+		p.newline()
+		p.write("]")
+		return
+	}
+	elemInline := inlineSafe(v.Elem)
+	if elemInline != "" && len("["+elemInline+"]") <= shortThreshold && !strings.Contains(elemInline, "\n") {
+		p.write("[" + elemInline + "]")
 		return
 	}
 	p.write("[")
@@ -656,15 +869,15 @@ func (p *printer) arrayExpr(v *Array) {
 	p.write("]")
 }
 
-// objectExpr formats an object literal.
-// Style ref: multiarch.jq:5-16 — each field on its own line, trailing comma.
+// objectExpr: multi-line with trailing commas.
+// Style ref: corpus/tianon-dockerfiles/scratch/multiarch.jq:5-16
 func (p *printer) objectExpr(v *Object) {
 	if len(v.Fields) == 0 {
 		p.write("{}")
 		return
 	}
 	inline := shortInlineObject(v)
-	if len(inline) <= shortThreshold && !strings.Contains(inline, "\n") {
+	if inline != "" && len(inline) <= shortThreshold && !strings.Contains(inline, "\n") {
 		p.write(inline)
 		return
 	}
@@ -672,19 +885,36 @@ func (p *printer) objectExpr(v *Object) {
 	p.indent()
 	for _, f := range v.Fields {
 		p.newline()
-		p.objectField(f)
-		p.write(",")
+		tc := p.objectField(f)
+		// Comma must come BEFORE the trailing comment so it isn't eaten:
+		//   key: value, # comment  ← correct
+		//   key: value # comment,  ← wrong (comma inside comment)
+		p.writeAfterPunct(",", tc)
 	}
 	p.dedent()
 	p.newline()
 	p.write("}")
 }
 
-func (p *printer) objectField(f *ObjectField) {
-	// Variable shorthand: {$foo} — key is Var, no value
+// objectField emits the field's leading comments (if any), the key, and the
+// value.  If the value has a trailing comment, it is NOT emitted — it is
+// returned to the caller so that structural punctuation (the field comma) can
+// be written before the comment rather than after it.
+func (p *printer) objectField(f *ObjectField) *Comment {
+	// Emit field-level leading comments (e.g. comment before the key).
+	for _, c := range f.LeadingComments {
+		if !p.atLineStart() {
+			p.nl()
+			p.write(p.tab())
+		}
+		p.writeln(c.Text)
+		p.write(p.tab())
+	}
+
 	if v, ok := f.Key.(*Var); ok && f.Value == nil {
+		// {$foo} shorthand
 		p.write(v.Name)
-		return
+		return nil
 	}
 	p.node(f.Key)
 	if f.KeyOptional {
@@ -692,14 +922,48 @@ func (p *printer) objectField(f *ObjectField) {
 	}
 	if f.Value != nil {
 		p.write(": ")
-		p.node(f.Value)
+		val, tc := stripTrailing(f.Value)
+		p.node(val)
+		return tc
+	}
+	return nil
+}
+
+// ── structural-punctuation-before-trailing-comment helpers ───────────────────
+
+// stripTrailing returns the node with its trailing comment removed (if any),
+// and the trailing comment separately.  Use this when structural punctuation
+// (comma, semicolon) must appear AFTER the value but BEFORE the trailing comment:
+//
+//	key: value, # comment   ← correct
+//	key: value # comment,   ← wrong (comma is eaten by the comment)
+func stripTrailing(n Node) (Node, *Comment) {
+	if ce, ok := n.(*CommentedExpr); ok && ce.TrailingComment != nil {
+		tc := ce.TrailingComment
+		var inner Node
+		if len(ce.LeadingComments) > 0 {
+			inner = &CommentedExpr{At: ce.At, LeadingComments: ce.LeadingComments, Expr: ce.Expr}
+		} else {
+			inner = ce.Expr
+		}
+		return inner, tc
+	}
+	return n, nil
+}
+
+// writeAfterPunct emits `punct` then (if tc != nil) ` tc.Text` on the same line.
+// Sets lastWasTrailing when a trailing comment is emitted, so that any
+// subsequent closeDelimiter call knows to add a newline first.
+func (p *printer) writeAfterPunct(punct string, tc *Comment) {
+	p.write(punct)
+	if tc != nil {
+		p.write(" ")
+		p.write(tc.Text)
+		p.lastWasTrailing = true
 	}
 }
 
 // ── "short inline" helpers ───────────────────────────────────────────────────
-//
-// shortInline renders a node as a single-line string for length-check purposes.
-// The actual output is generated by node(); this is only for the threshold test.
 
 func shortInline(n Node) string {
 	p := &printer{}
@@ -707,13 +971,28 @@ func shortInline(n Node) string {
 	return p.out.String()
 }
 
-// shortInlineObject returns the single-line form of an object literal.
-// Non-empty inline objects use spaces inside the braces:
-//   { key: val, other: val }
-// per corpus/debian-bin/jq/deb822.jq:17 "{ accum: {} }" and :19 "{ out: .accum, accum: {} }"
+// inlineSafe returns the inline representation of n if it is safe to follow
+// immediately with a closing delimiter (], ), }).  If the inline representation
+// contains a trailing comment ("# text"), the delimiter would be inside the
+// comment — in that case, returns "" to signal "cannot inline".
+func inlineSafe(n Node) string {
+	s := shortInline(n)
+	if strings.Contains(s, " #") {
+		return ""
+	}
+	return s
+}
+
+// shortInlineObject returns "" if unsafe to inline (any trailing comment on a field value).
 func shortInlineObject(v *Object) string {
 	if len(v.Fields) == 0 {
 		return "{}"
+	}
+	// Check: any trailing comment on a field value makes inline unsafe.
+	for _, f := range v.Fields {
+		if _, tc := stripTrailing(f.Value); tc != nil {
+			return ""
+		}
 	}
 	var b strings.Builder
 	b.WriteString("{ ")
@@ -729,12 +1008,26 @@ func shortInlineObject(v *Object) string {
 	return b.String()
 }
 
-// nodeInline renders n without multi-line expansion.
+// nodeInline renders n as a single-line string (no newlines ever).
+// Used for threshold checks and for jq-in-shell inline mode.
 func (p *printer) nodeInline(n Node) {
 	if n == nil {
 		return
 	}
 	switch v := n.(type) {
+	case *CommentedExpr:
+		// In inline mode, emit leading comments as inline prefix and trailing
+		// comment as inline suffix (best effort — the caller should not inline
+		// nodes with trailing comments).
+		for _, c := range v.LeadingComments {
+			p.write(c.Text)
+			p.write(" ")
+		}
+		p.nodeInline(v.Expr)
+		if v.TrailingComment != nil {
+			p.write(" ")
+			p.write(v.TrailingComment.Text)
+		}
 	case *Pipe:
 		parts := flattenPipe(v)
 		for i, part := range parts {
@@ -820,26 +1113,7 @@ func (p *printer) nodeInline(n Node) {
 			p.write(" catch ")
 			p.nodeInline(v.Handler)
 		}
-	case *Array:
-		if v.Elem == nil {
-			p.write("[]")
-			return
-		}
-		p.write("[")
-		p.nodeInline(v.Elem)
-		p.write("]")
-	case *Object:
-		inl := shortInlineObject(v)
-		p.write(inl)
-	case *Paren:
-		p.write("(")
-		p.nodeInline(v.Expr)
-		p.write(")")
-	case *Optional:
-		p.nodeInline(v.Expr)
-		p.write("?")
 	case *LocalFuncDef:
-		bodyInline := shortInline(v.Body)
 		p.write("def ")
 		p.write(v.Name)
 		if len(v.Params) > 0 {
@@ -853,9 +1127,31 @@ func (p *printer) nodeInline(n Node) {
 			p.write(")")
 		}
 		p.write(": ")
-		p.write(bodyInline)
+		p.nodeInline(v.Body)
 		p.write("; ")
 		p.nodeInline(v.Rest)
+	case *Array:
+		if v.Elem == nil {
+			p.write("[]")
+			return
+		}
+		p.write("[")
+		p.nodeInline(v.Elem)
+		p.write("]")
+	case *Object:
+		inl := shortInlineObject(v)
+		if inl != "" {
+			p.write(inl)
+		} else {
+			p.node(n) // fall back to multi-line
+		}
+	case *Paren:
+		p.write("(")
+		p.nodeInline(v.Expr)
+		p.write(")")
+	case *Optional:
+		p.nodeInline(v.Expr)
+		p.write("?")
 	default:
 		p.node(n)
 	}

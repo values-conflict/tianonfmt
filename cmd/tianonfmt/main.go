@@ -1,42 +1,77 @@
-// tianonfmt formats jq, Dockerfile, and shell script files.
+// tianonfmt formats jq, Dockerfile, Dockerfile templates, and shell scripts.
 //
 // Usage:
 //
-//	tianonfmt [file ...]
+//	tianonfmt [-w | -d] [file ...]
 //
-// With no arguments, reads from stdin and writes to stdout (type detected from
-// content).  With file arguments, formats each file in place (original is
-// overwritten only when the output differs).
+// With no file arguments, reads from stdin and writes to stdout.
+// With file arguments and no flags, prints formatted output to stdout.
 //
-// File type detection:
-//   - .jq extension → jq formatter
-//   - Dockerfile, Dockerfile.* → Dockerfile formatter
-//   - .sh extension or bash/sh shebang on line 1 → shell formatter
+// Flags:
+//
+//	-w   Write result back to each source file; print filenames of changed files.
+//	     Mutually exclusive with -d.  Errors if used with stdin.
+//	-d   Print a unified diff for each file that would change; exit non-zero if
+//	     any file differs.  Mutually exclusive with -w.
+//
+// File type detection (by path):
+//   - .jq extension                → jq formatter
+//   - Dockerfile, Dockerfile.*     → Dockerfile formatter
+//   - Dockerfile.template, etc. containing {{ }} → jq-template formatter
+//   - .sh extension or bash/sh shebang → shell formatter
+//   - stdin / unknown: shebang or first keyword detection
 package main
 
 import (
+	"bytes"
+	"flag"
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 
 	"github.com/tianon/fmt/tianonfmt/dockerfile"
 	"github.com/tianon/fmt/tianonfmt/jq"
 	"github.com/tianon/fmt/tianonfmt/shell"
+	"github.com/tianon/fmt/tianonfmt/template"
+	"mvdan.cc/sh/v3/syntax"
 )
 
 func main() {
-	args := os.Args[1:]
+	writeFlag := flag.Bool("w", false, "write result to source file (print filenames of changed files)")
+	diffFlag := flag.Bool("d", false, "display diffs; exit non-zero if any file differs")
+	flag.Parse()
+
+	if *writeFlag && *diffFlag {
+		fatalf("-w and -d are mutually exclusive")
+	}
+
+	args := flag.Args()
+
 	if len(args) == 0 {
-		// Stdin mode: read from stdin, detect type from content, write to stdout.
+		if *writeFlag {
+			fatalf("-w cannot be used with stdin")
+		}
 		src, err := io.ReadAll(os.Stdin)
 		if err != nil {
 			fatalf("reading stdin: %v", err)
 		}
-		out, err := formatByContent(string(src))
+		out, err := formatByContent("<stdin>", string(src))
 		if err != nil {
 			fatalf("%v", err)
+		}
+		if *diffFlag {
+			diff, err := computeDiff("<stdin>", string(src), out)
+			if err != nil {
+				fatalf("diff: %v", err)
+			}
+			if len(diff) > 0 {
+				os.Stdout.Write(diff)
+				os.Exit(1)
+			}
+			return
 		}
 		fmt.Print(out)
 		return
@@ -44,33 +79,54 @@ func main() {
 
 	exitCode := 0
 	for _, path := range args {
-		if err := formatFile(path); err != nil {
+		src, err := os.ReadFile(path)
+		if err != nil {
 			fmt.Fprintf(os.Stderr, "tianonfmt: %s: %v\n", path, err)
 			exitCode = 1
+			continue
 		}
+
+		out, err := formatByPath(path, string(src))
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "tianonfmt: %s: %v\n", path, err)
+			exitCode = 1
+			continue
+		}
+
+		if *diffFlag {
+			diff, err := computeDiff(path, string(src), out)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "tianonfmt: %s: diff: %v\n", path, err)
+				exitCode = 1
+				continue
+			}
+			if len(diff) > 0 {
+				os.Stdout.Write(diff)
+				exitCode = 1
+			}
+			continue
+		}
+
+		if *writeFlag {
+			if out != string(src) {
+				if err := os.WriteFile(path, []byte(out), 0o666); err != nil {
+					fmt.Fprintf(os.Stderr, "tianonfmt: %s: %v\n", path, err)
+					exitCode = 1
+					continue
+				}
+				fmt.Println(path)
+			}
+			continue
+		}
+
+		// Default: print to stdout.
+		fmt.Print(out)
 	}
 	os.Exit(exitCode)
 }
 
-func formatFile(path string) error {
-	src, err := os.ReadFile(path)
-	if err != nil {
-		return err
-	}
+// ── type detection ────────────────────────────────────────────────────────────
 
-	out, err := formatByPath(path, string(src))
-	if err != nil {
-		return err
-	}
-
-	if out == string(src) {
-		return nil
-	}
-
-	return os.WriteFile(path, []byte(out), 0o666)
-}
-
-// formatByPath detects file type from path and formats src.
 func formatByPath(path, src string) (string, error) {
 	base := filepath.Base(path)
 	ext := filepath.Ext(base)
@@ -79,34 +135,41 @@ func formatByPath(path, src string) (string, error) {
 	case ext == ".jq":
 		return formatJQ(src)
 
-	case base == "Dockerfile" || strings.HasPrefix(base, "Dockerfile."):
+	case isDockerfileName(base):
+		// Check for template syntax before choosing formatter.
+		if template.IsTemplate(src) {
+			return formatTemplate(src)
+		}
 		return formatDockerfile(src)
 
 	case ext == ".sh":
 		return formatShell(src)
 
 	default:
-		// Try shebang detection.
-		return formatByContent(src)
+		return formatByContent(path, src)
 	}
 }
 
-// formatByContent detects file type from content (shebang or first keyword) and formats.
-func formatByContent(src string) (string, error) {
+func isDockerfileName(base string) bool {
+	return base == "Dockerfile" || strings.HasPrefix(base, "Dockerfile.")
+}
+
+func formatByContent(name, src string) (string, error) {
 	first, _, _ := strings.Cut(src, "\n")
 	first = strings.TrimSpace(first)
 	switch {
 	case strings.HasPrefix(first, "#!/") && (strings.Contains(first, "bash") || strings.Contains(first, "/sh")):
 		return formatShell(src)
 	case isDockerfileContent(src):
+		if template.IsTemplate(src) {
+			return formatTemplate(src)
+		}
 		return formatDockerfile(src)
 	default:
 		return formatJQ(src)
 	}
 }
 
-// dockerfileKeywords is the set of first-word tokens that unambiguously
-// identify a file as a Dockerfile.
 var dockerfileKeywords = map[string]bool{
 	"FROM": true, "RUN": true, "COPY": true, "ADD": true, "ENV": true,
 	"ARG": true, "WORKDIR": true, "EXPOSE": true, "CMD": true,
@@ -114,8 +177,6 @@ var dockerfileKeywords = map[string]bool{
 	"STOPSIGNAL": true, "HEALTHCHECK": true, "SHELL": true, "ONBUILD": true,
 }
 
-// isDockerfileContent returns true if src looks like a Dockerfile by checking
-// whether the first non-comment, non-blank line starts with a Dockerfile keyword.
 func isDockerfileContent(src string) bool {
 	for _, line := range strings.Split(src, "\n") {
 		trimmed := strings.TrimSpace(line)
@@ -123,13 +184,12 @@ func isDockerfileContent(src string) bool {
 			continue
 		}
 		kw, _, _ := strings.Cut(trimmed, " ")
-		if !dockerfileKeywords[strings.ToUpper(kw)] {
-			return false
-		}
-		return true
+		return dockerfileKeywords[strings.ToUpper(kw)]
 	}
 	return false
 }
+
+// ── per-language formatters ──────────────────────────────────────────────────
 
 func formatJQ(src string) (string, error) {
 	f, err := jq.ParseFile(src)
@@ -139,21 +199,99 @@ func formatJQ(src string) (string, error) {
 	return jq.FormatFile(f), nil
 }
 
+// jqFmtFunc returns a formatter callback suitable for passing to embedded-
+// language formatters.  If inline is true, a single-line compact format is
+// returned; otherwise the standard multi-line format is used.
+func jqFmtFunc(expr string, inline bool) string {
+	node, err := jq.ParseExpr(strings.TrimSpace(expr))
+	if err != nil {
+		// Also try as a full file (for expressions containing top-level defs).
+		f, ferr := jq.ParseFile(strings.TrimSpace(expr))
+		if ferr != nil {
+			return "" // signal parse failure — caller preserves original
+		}
+		return jq.FormatFile(f)
+	}
+	if inline {
+		return jq.FormatNodeInline(node)
+	}
+	return jq.FormatNode(node)
+}
+
 func formatDockerfile(src string) (string, error) {
 	f, err := dockerfile.Parse(src)
 	if err != nil {
 		return "", fmt.Errorf("dockerfile parse: %w", err)
 	}
-	return dockerfile.Format(f), nil
+	fmtr := &dockerfile.Formatter{
+		JQFmt:       jqFmtFunc,
+		RUNShellFmt: shell.FormatRUN,
+	}
+	return dockerfile.FormatWith(f, fmtr), nil
+}
+
+func formatTemplate(src string) (string, error) {
+	return template.Format(src, jqFmtFunc), nil
 }
 
 func formatShell(src string) (string, error) {
 	lang := shell.DetectLang(src)
-	out, err := shell.Format(src, lang)
+	out, err := shell.Format(src, lang, jqFmtFunc)
 	if err != nil {
 		return "", fmt.Errorf("shell format: %w", err)
 	}
 	return out, nil
+}
+
+// ── diff ─────────────────────────────────────────────────────────────────────
+
+// computeDiff returns a unified diff of before vs after for the named file.
+// Returns nil if they are identical.
+func computeDiff(name, before, after string) ([]byte, error) {
+	if before == after {
+		return nil, nil
+	}
+
+	f1, err := os.CreateTemp("", "tianonfmt-*.orig")
+	if err != nil {
+		return nil, err
+	}
+	defer os.Remove(f1.Name())
+
+	f2, err := os.CreateTemp("", "tianonfmt-*.new")
+	if err != nil {
+		return nil, err
+	}
+	defer os.Remove(f2.Name())
+
+	if _, err := f1.WriteString(before); err != nil {
+		return nil, err
+	}
+	f1.Close()
+
+	if _, err := f2.WriteString(after); err != nil {
+		return nil, err
+	}
+	f2.Close()
+
+	cmd := exec.Command("diff",
+		"--unified",
+		"--label=a/"+name,
+		"--label=b/"+name,
+		f1.Name(), f2.Name())
+
+	var buf bytes.Buffer
+	cmd.Stdout = &buf
+	// diff exits 1 when there are differences, 2 on error — only treat 2 as error.
+	err = cmd.Run()
+	if err != nil {
+		if exitErr, ok := err.(*exec.ExitError); ok {
+			if exitErr.ExitCode() == 1 {
+				err = nil // differences found — not an error
+			}
+		}
+	}
+	return buf.Bytes(), err
 }
 
 // fatalf prints to stderr and exits 1.
@@ -161,3 +299,6 @@ func fatalf(format string, args ...interface{}) {
 	fmt.Fprintf(os.Stderr, "tianonfmt: "+format+"\n", args...)
 	os.Exit(1)
 }
+
+// suppress unused import warning; syntax is used via shell package
+var _ = syntax.LangBash
