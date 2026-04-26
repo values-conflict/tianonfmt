@@ -48,7 +48,7 @@ Corpus refs: [`rawdns/README.md#L39-L52`](https://github.com/tianon/rawdns/blob/
 
 ## Code blocks
 
-**Fenced with triple backticks**, never indented.  A language identifier is always provided.
+**Fenced with triple backticks**, never indented.  A language identifier is always provided.  When a code block itself contains fenced code blocks (e.g. a markdown example showing a fenced block), the outer fence uses four or more backticks — a fence closes at the next fence of equal or greater length, so triple-backtick inner fences would incorrectly close the outer block.
 
 The critical distinction between language identifiers:
 
@@ -125,7 +125,7 @@ Used for step-by-step instructions where order matters:
 
 ## Line breaks within list items
 
-A "soft line break" (two trailing spaces) is used to wrap long content within a single list item when the content is a continuation of the same point rather than a new point:
+A "soft line break" (two trailing spaces) is used to wrap long content within a single list item when the content is a continuation of the same point rather than a new point.  This is the one case where trailing whitespace is intentional and meaningful — it renders as `<br>` and keeps continuation text visually attached to its bullet:
 
 ```markdown
 - `FAKEGIT_GO_SEMVER`  
@@ -200,7 +200,7 @@ Corpus ref: [`debuerreotype/README.md#L28-L39`](https://github.com/debuerreotype
 
 ## Quotation marks in prose
 
-Straight ASCII double quotes `"..."` for quoting terms and names, not typographic curly quotes:
+Straight ASCII double quotes `"..."` for quoting terms and names, not typographic curly quotes.  This applies in all files Tianon writes, not just markdown — see [prose.md](prose.md).
 
 ```markdown
 "Hocker" is a Docker wrapper for "hacky shell script deployment".
@@ -210,9 +210,9 @@ Straight ASCII double quotes `"..."` for quoting terms and names, not typographi
 
 Contractions appear freely: `it's`, `they're`, `we're`, `you've`, `can't`.  This is an informal register — technical precision and conversational tone coexist.
 
-Abbreviations:
+Abbreviations — these apply universally across all prose, not just markdown (see [prose.md](prose.md)):
 - `ie,` (not `i.e.,` — no periods, no comma after) for "that is"
-- `eg,` (not `e.g.,`) for "for example"  
+- `eg,` (not `e.g.,`) for "for example"
 - `etc` (not `etc.`) — no trailing period
 
 Corpus refs: [`rawdns/README.md#L35`](https://github.com/tianon/rawdns/blob/ea662544c8b03ef7133cc6fc75f63e107265b3f2/README.md#L35), [`fake-git/README.md#L8`](https://github.com/tianon/fake-git/blob/4639d58ce5f6488e448a019acc2b5ffc55d0925f/README.md#L8).

@@ -109,7 +109,7 @@ A `def` block always uses `-}}` and appears before the first non-def content.
 {{ if env.variant == "native" then ( -}}
 ```
 
-The variable is always read through `env.VARNAME`, never passed via `--arg` (since the template processor uses environment variables).
+The variable is always read through `env.VARNAME`.  `--arg` is not an option here — the template processor (`jq-template.awk`) constructs and runs the jq invocation internally; there is no mechanism for the template author to add flags to that invocation.
 
 Corpus refs: [`docker-qemu/Dockerfile.template#L32`](https://github.com/tianon/docker-qemu/blob/3ce36843e253ddb7f63a39a6d0a27a7a46762e8b/Dockerfile.template#L32), [`docker-qemu/Dockerfile.template#L124`](https://github.com/tianon/docker-qemu/blob/3ce36843e253ddb7f63a39a6d0a27a7a46762e8b/Dockerfile.template#L124).
 

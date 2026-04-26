@@ -31,16 +31,18 @@ Flags appear **between the here-string and the expression**:
 jq <<<"$input" [flags...] 'expression'
 ```
 
-Common flags and their order:
-- `-r` / `--raw-output` — raw string output (no quotes)
-- `-c` / `--compact-output` — compact JSON output
-- `-s` / `--slurp` — slurp all inputs into an array
-- `-n` / `--null-input` — no input (use `null` as input)
-- `-S` / `--sort-keys` — sort object keys
-- `-e` / `--exit-status` — exit non-zero if last value is false or null
+**Long-form flags are preferred** (`--raw-output` over `-r`, `--compact-output` over `-c`, etc.).  Short forms appear frequently in the corpus due to muscle memory, but long-form is the stated preference and should be used in new code.
+
+Common flags and their long forms:
+- `--raw-output` / `-r` — raw string output (no quotes)
+- `--compact-output` / `-c` — compact JSON output
+- `--slurp` / `-s` — slurp all inputs into an array
+- `--null-input` / `-n` — no input (use `null` as input)
+- `--sort-keys` / `-S` — sort object keys
+- `--exit-status` / `-e` — exit non-zero if last value is false or null
 - `--arg name value` — bind shell variable as jq string
 - `--argjson name value` — bind shell variable as jq value (parsed JSON)
-- `-f filename` / `--from-file filename` — load jq program from a file
+- `--from-file filename` / `-f filename` — load jq program from a file
 
 Multiple flags are written separately (never combined like `-rc`):
 
@@ -207,38 +209,6 @@ Corpus ref: [`tianon-dockerfiles/.github/workflows/update.yml#L31-L47`](https://
 | Shell variables | n/a | Via `--arg`, `--argjson`, `env.VAR` |
 | `include` | At top of file | Via `-L dir 'include "module"; ...'` |
 | Input | Via `inputs`, `input`, filters | Via here-string `<<<` or `-f file` |
-
-## The `versions.sh` archetype
-
-A highly consistent script pattern appears across virtually every image directory in [`tianon/dockerfiles`](https://github.com/tianon/dockerfiles):
-
-```bash
-#!/usr/bin/env bash
-set -Eeuo pipefail
-
-[ -e versions.json ]
-
-dir="$(readlink -ve "$BASH_SOURCE")"
-dir="$(dirname "$dir")"
-source "$dir/../.libs/git.sh"   # or deb-repo.sh, pypi.sh, etc.
-
-# ... fetch data, build $json ...
-
-jq <<<"$json" '.' > versions.json
-```
-
-The structure is invariant:
-- **Line 1**: `#!/usr/bin/env bash`
-- **Line 2**: `set -Eeuo pipefail`
-- **Line 3**: blank
-- **Line 4**: `[ -e versions.json ]` — a sanity check that `versions.json` already exists, which acts as both a guard against running the script from the wrong working directory and a signal that this image directory has been initialised; exits non-zero and stops immediately if the file is absent
-- **Line 5**: blank
-- **Lines 6+**: optional `source` of a shared `.libs/` helper, then fetch + transform logic
-- **Last line**: always `jq ... > versions.json`, writing the result back
-
-The final `jq` write varies by complexity — `jq <<<"$json" '.'` for a straight pass-through, `jq -nS '{ version: env.version }'` when building from exported variables, or a more complex expression when transforming the intermediate data.
-
-Corpus ref: [`tianon-dockerfiles/buildkit/versions.sh`](https://github.com/tianon/dockerfiles/blob/2118a1979eff7545e06570d1eefc6434d691e68d/buildkit/versions.sh), and nearly every `*/versions.sh` in that repo.
 
 ## Notable omissions
 

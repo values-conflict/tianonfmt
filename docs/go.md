@@ -4,10 +4,11 @@ Covers Go source files (`.go`) in the corpus.  `gofmt` handles all mechanical fo
 
 ## Import grouping
 
-Imports are grouped into two blocks separated by a blank line:
+Imports are grouped into **three blocks** separated by blank lines:
 
 1. Standard library packages
-2. Third-party / internal packages
+2. Packages local to the same module (same module path prefix, e.g. `github.com/foo/bar/baz` when the module is `github.com/foo/bar`)
+3. External third-party packages
 
 ```go
 import (
@@ -15,12 +16,14 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/foo/bar/internal/util"
+
 	"cuelabs.dev/go/oci/ociregistry"
 	"cuelabs.dev/go/oci/ociregistry/ocimem"
 )
 ```
 
-`gofmt` (and `goimports`) enforce this two-group style automatically.  A third group for internal packages sometimes appears when internal packages are distinct from third-party ones, but this is not consistently observed in the corpus.
+When a module has no local sub-packages used in a given file, the second group is absent and imports collapse to two groups.  `goimports` can enforce this grouping automatically.
 
 Corpus ref: [`meta-scripts/registry/lookup.go#L3-L10`](https://github.com/docker-library/meta-scripts/blob/205031aee2fdfbbd449038afd58f0f0a6915c217/registry/lookup.go#L3-L10).
 
