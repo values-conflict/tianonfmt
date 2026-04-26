@@ -4,6 +4,10 @@ Covers `versions.json` files and other JSON data files in the corpus.  These fil
 
 See [universal.md](universal.md) for the general indentation principle.
 
+## Key naming
+
+Object keys follow the [universal.md naming conventions](universal.md#naming-conventions): single-word keys are **lowercase** (`type`, `name`, `file`); multi-word keys are **camelCase** (`filetype`, `funcDefs`, `startLine`, `trailingComment`).  No underscores in JSON keys.
+
 ## Indentation
 
 **Hard tabs**, produced by `jq --tab`.  This matches the universal tab-indentation preference — see [universal.md](universal.md).  The common 2-space JSON default seen in many editors and tools is not used.
