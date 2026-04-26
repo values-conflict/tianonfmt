@@ -102,7 +102,12 @@ func (w *writer) plainInstruction(instr *Instruction) {
 	for _, line := range instr.Lines {
 		switch line.Kind {
 		case LineKindInstruction:
-			w.writeln(formatFirstLine(line.Text, instr.Keyword))
+			first := formatFirstLine(line.Text, instr.Keyword)
+			// Normalise single-line ENV "KEY=VALUE" → "KEY VALUE" (Dockerfile-native form).
+			if instr.Keyword == "ENV" && len(instr.Lines) == 1 {
+				first = "ENV " + normalizeEnvArgs(instr.Args)
+			}
+			w.writeln(first)
 
 		case LineKindContinuation:
 			stripped := strings.TrimRight(line.Text, " \t")
@@ -157,6 +162,36 @@ func formatFirstLine(raw, keyword string) string {
 		return keyword
 	}
 	return keyword + trimmed[idx:]
+}
+
+// normalizeEnvArgs converts shell-assignment form ENV args ("KEY=VALUE") to
+// Dockerfile-native form ("KEY VALUE") for single-value ENV instructions.
+// Multi-pair args (containing spaces before a second "=") are left unchanged,
+// as are empty values.
+// Per dockerfile.md: the Dockerfile-native space-separated form is preferred.
+func normalizeEnvArgs(args string) string {
+	args = strings.TrimSpace(args)
+	eqIdx := strings.IndexByte(args, '=')
+	if eqIdx <= 0 {
+		return args // already "KEY VALUE" form or no =
+	}
+	key := args[:eqIdx]
+	// Key must look like a valid env var name with no whitespace.
+	if strings.ContainsAny(key, " \t") {
+		return args
+	}
+	value := args[eqIdx+1:]
+	if value == "" {
+		return args // don't normalise empty-value form
+	}
+	// Strip a single layer of surrounding quotes from the value.
+	if len(value) >= 2 {
+		if (value[0] == '"' && value[len(value)-1] == '"') ||
+			(value[0] == '\'' && value[len(value)-1] == '\'') {
+			value = value[1 : len(value)-1]
+		}
+	}
+	return key + " " + value
 }
 
 // countLeadingTabs counts leading tab characters in s.
