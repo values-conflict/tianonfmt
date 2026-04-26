@@ -190,7 +190,7 @@ Local actions (within the same repository) use relative paths:
 - uses: ./.github/tmp/checkout
 ```
 
-## `run:` steps — shell code
+## Shell in run steps
 
 ### Single-line commands
 

@@ -43,23 +43,38 @@ When needed, `shopt` calls appear near the top of the script, immediately after 
 
 - `shopt -s dotglob` — include dotfiles in glob patterns
 - `shopt -s nullglob` — return empty list (not the literal pattern) when a glob matches nothing
+- `shopt -s globstar` — enable `**` for recursive glob matching across directory levels
 
 These appear near the top because they change the semantics of glob expansion throughout the entire script.  If a glob option is truly necessary, it must apply consistently — having different glob behavior in different places is already a footgun for unexpected behavior.  Placing them at the top makes the script's behavior uniform and makes it clear to readers that globs behave non-standardly.
 
+`globstar` specifically enables the `**/` pattern for recursive directory traversal without `find`, which avoids `find`'s notoriously awkward output-feeding behaviour.  Combined with an array, this is the idiomatic pattern:
+
+```bash
+shopt -s globstar
+files=( **/**.go go.mod go.sum )
+```
+
+Inside a loop, `for f; do` (without `in`) iterates the script's own positional arguments — equivalent to `for f in "$@"; do` but idiomatic shorthand:
+
+```bash
+shopt -s globstar
+for go in **/**.go go.mod go.sum; do
+    for f; do   # iterates $@ (the script's own positional args)
+        if [ "$go" -nt "$f" ]; then exit 0; fi
+    done
+done
+```
+
+Corpus ref: [`meta-scripts-cosine/.any-go-nt.sh`](https://github.com/docker-library/meta-scripts/blob/205031aee2fdfbbd449038afd58f0f0a6915c217/.any-go-nt.sh).
+
 ### Vim modelines for ambiguous file types
 
-Executable scripts without a `.sh` extension, and non-standard config files that vim cannot auto-detect, carry a vim modeline comment to set the filetype explicitly:
+See [universal.md §Vim modelines](universal.md#vim-modelines) for the general rule.  In bash scripts specifically, the modeline goes on the second line, immediately after the shebang:
 
 ```bash
 #!/usr/bin/env hocker
 # vim:set ft=sh:
 ```
-
-```gitconfig
-# vim:set ft=gitconfig:
-```
-
-The modeline goes on the second line for scripts (after the shebang), or the first line for non-executable files.  Placing it at the top minimises the chance of it being accidentally removed by a refactor or touched by an unrelated diff.
 
 Corpus refs: [`home/git-config.d/common`](https://github.com/tianon/home/blob/720c476e79a50ab0dd133f7187bd046b32cd5b73/git-config.d/common), the `# vim:set ft=sh:` pattern in executable scripts without `.sh` extension.
 
@@ -416,6 +431,8 @@ trap "$exitTrap" EXIT
 
 `printf '%q'` safely shell-quotes the path in the trap command string.
 
+Corpus ref: [`debian-bin/repo/buildd.sh#L86-L88`](https://github.com/tianon/debian-bin/blob/d508ea34f15e88b8ac63d71ffb1938fccbc21206/repo/buildd.sh#L86-L88).
+
 **Subshell error isolation** — `( ... ) || ...` isolates a block so errors inside don't propagate:
 
 ```bash
@@ -429,9 +446,23 @@ if ! (
 fi
 ```
 
+Corpus ref: [`debian-bin/repo/incoming.sh#L44-L53`](https://github.com/tianon/debian-bin/blob/d508ea34f15e88b8ac63d71ffb1938fccbc21206/repo/incoming.sh#L44-L53).
+
 **Error messages** always go to stderr: `echo >&2 "error: ..."` or `echo >&2 "warning: ..."`.  The prefix `error:` or `warning:` is literal text, lowercased, always followed by a colon, always active voice and specific.
 
-Corpus refs: [`debian-bin/repo/buildd.sh#L86-L88`](https://github.com/tianon/debian-bin/blob/d508ea34f15e88b8ac63d71ffb1938fccbc21206/repo/buildd.sh#L86-L88), [`debian-bin/repo/incoming.sh#L44-L53`](https://github.com/tianon/debian-bin/blob/d508ea34f15e88b8ac63d71ffb1938fccbc21206/repo/incoming.sh#L44-L53).
+**Suppressing `-x` trace around sensitive values** — when `bash -x` trace output would expose credential material, `set +x` / `set -x` pairs isolate the sensitive commands:
+
+```bash
+set +x # TODO
+: "${INPUT_TOKEN:=$ACTIONS_RUNTIME_TOKEN}"
+b64token="$(tr -d '\n' <<<"x-access-token:$INPUT_TOKEN" | base64 -w0)"
+git config --local "http.$host/.extraheader" "Authorization: Basic $b64token"
+set -x # TODO
+```
+
+The `# TODO` comments are an acknowledgement that the overall design should eventually not require this workaround — not a directive to fix the surrounding code.  See also [groovy.md §Suppressing trace for sensitive operations](groovy.md#suppressing-trace-for-sensitive-operations) for the same pattern in Jenkins pipeline shell blocks.
+
+Corpus ref: [`actions/checkout/checkout.sh#L47-L51`](https://github.com/tianon/actions/blob/c109aa98a82622edf55e0e6380a1672368930b30/checkout/checkout.sh#L47-L51).
 
 ### `eval` with jq output
 

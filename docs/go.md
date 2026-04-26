@@ -132,6 +132,24 @@ var (
 
 Corpus ref: [`meta-scripts/registry/lookup.go#L43-L46`](https://github.com/docker-library/meta-scripts/blob/205031aee2fdfbbd449038afd58f0f0a6915c217/registry/lookup.go#L43-L46).
 
+## Generics
+
+Generics appear when they solve a specific, well-motivated problem — not for abstraction's sake.  The type parameter is constrained only as tightly as necessary (often unconstrained `any`), and the motivating issue or design decision is cited directly:
+
+```go
+// https://github.com/golang/go/issues/27179
+
+// only supports string keys because JSON is the intended use case (and the JSON spec says only string keys are allowed)
+type OrderedMap[T any] struct {
+    m    map[string]T
+    keys []string
+}
+```
+
+Pointer vs value receiver distinction is maintained correctly even on generic types.  `TODO` comments on individual methods note planned extensions without implementing them prematurely.
+
+Corpus ref: [`meta-scripts-cosine/om/om.go`](https://github.com/docker-library/meta-scripts/blob/4ffc0a381657133b62c3e233e18ee35d17bedbd8/om/om.go).
+
 ## Package-level documentation
 
 Complex packages have a doc comment at the top of a relevant file explaining the package's purpose.  Simple utility packages (`true.go`, `main.go` in trivial commands) have minimal or no package doc.

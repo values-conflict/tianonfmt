@@ -19,6 +19,7 @@ The documentation is deliberately exhaustive — it captures not only what Tiano
 | [go.md](go.md) | Go source code (beyond what `gofmt` enforces) |
 | [perl.md](perl.md) | Perl scripts and modules |
 | [awk.md](awk.md) | AWK scripts |
+| [groovy.md](groovy.md) | Groovy scripts and `Jenkinsfile*` pipeline files |
 | [markdown.md](markdown.md) | Markdown documentation files |
 | [prose.md](prose.md) | Code comment style and writing voice across all languages |
 | [FUTURE.md](FUTURE.md) | Topics deferred for further exploration |
