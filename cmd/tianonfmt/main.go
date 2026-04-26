@@ -24,6 +24,7 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -40,9 +41,22 @@ import (
 )
 
 func main() {
+	// TODO: add --tidy / -t: apply idiomatic rewrites (RUN && chains → set -eux; semicolons,
+	// shell || true → || :, jq == false → | not, etc.).  See FUTURE.md for the full design.
+	//
+	// TODO: add --pedantic / -p: reject (exit 1, no file modification) constructs Tianon
+	// considers Wrong — capital W intentional, see prose.md §Intentional mid-sentence
+	// capitalisation.  Help text should read: "fail if any constructs remain that Tianon
+	// considers Wrong".  Acts as a linter; composes with --diff to show what would need to
+	// change.  --pedantic without --tidy checks current state; --pedantic with --tidy checks
+	// after applying tidy rewrites.
 	fs := flags.New("tianonfmt")
 	writeFlag := fs.Bool("write", 'w', "write result to source file (print filenames of changed files)")
 	diffFlag := fs.Bool("diff", 'd', "display diffs; exit non-zero if any file differs")
+	// --ast or --ast=input → pre-format AST JSON; --ast=format → post-format AST JSON.
+	// Combined with --diff, shows the diff between the two AST representations.
+	// Value must use = syntax: --ast=format (per GNU optional-argument convention).
+	astFlag := fs.OptString("ast", 0, "input", "dump parsed AST as JSON to stdout; --ast=format dumps post-format AST; combine with --diff to show AST diff")
 
 	args, err := fs.Parse(os.Args[1:])
 	if err != nil {
@@ -51,6 +65,9 @@ func main() {
 
 	if *writeFlag && *diffFlag {
 		fatalf("--write and --diff are mutually exclusive")
+	}
+	if *writeFlag && *astFlag != "" {
+		fatalf("--write and --ast are mutually exclusive")
 	}
 
 	// args already populated by fs.Parse above
@@ -63,6 +80,15 @@ func main() {
 		if err != nil {
 			fatalf("reading stdin: %v", err)
 		}
+
+		if *astFlag != "" {
+			pre, post, err := astByContent("-", string(src))
+			if err != nil {
+				fatalf("%v", err)
+			}
+			os.Exit(printAST("<stdin>", pre, post, *astFlag, *diffFlag))
+		}
+
 		out, err := formatByContent("<stdin>", string(src))
 		if err != nil {
 			fatalf("%v", err)
@@ -88,6 +114,19 @@ func main() {
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "tianonfmt: %s: %v\n", path, err)
 			exitCode = 1
+			continue
+		}
+
+		if *astFlag != "" {
+			pre, post, err := astByPath(path, string(src))
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "tianonfmt: %s: %v\n", path, err)
+				exitCode = 1
+				continue
+			}
+			if code := printAST(path, pre, post, *astFlag, *diffFlag); code != 0 {
+				exitCode = code
+			}
 			continue
 		}
 
@@ -246,6 +285,97 @@ func formatShell(src string) (string, error) {
 		return "", fmt.Errorf("shell format: %w", err)
 	}
 	return out, nil
+}
+
+// ── AST dump ─────────────────────────────────────────────────────────────────
+
+// astByPath computes the pre- and post-format AST JSON for a named file.
+func astByPath(path, src string) (pre, post string, err error) {
+	base := filepath.Base(path)
+	ext := filepath.Ext(base)
+	switch {
+	case ext == ".jq":
+		return jqASTPair(path, src)
+	case isDockerfileName(base), ext == ".sh":
+		return "", "", fmt.Errorf("--ast not yet supported for this file type")
+	default:
+		return jqASTPair(path, src)
+	}
+}
+
+// astByContent is like astByPath but uses content-based detection.
+// name should be "-" for stdin.
+func astByContent(name, src string) (pre, post string, err error) {
+	first, _, _ := strings.Cut(src, "\n")
+	first = strings.TrimSpace(first)
+	switch {
+	case strings.HasPrefix(first, "#!/") && (strings.Contains(first, "bash") || strings.Contains(first, "/sh")):
+		return "", "", fmt.Errorf("--ast not yet supported for shell files")
+	case isDockerfileContent(src):
+		return "", "", fmt.Errorf("--ast not yet supported for Dockerfile files")
+	default:
+		return jqASTPair(name, src)
+	}
+}
+
+// jqASTPair parses src as jq and returns both the pre-format and post-format
+// AST as JSON strings (tab-indented, with trailing newline).
+// name is embedded as "file" in each AST object; use "-" for stdin.
+func jqASTPair(name, src string) (pre, post string, err error) {
+	f, err := jq.ParseFile(src)
+	if err != nil {
+		return "", "", fmt.Errorf("jq parse: %w", err)
+	}
+	preMap := f.MarshalAST()
+	preMap["file"] = name
+	pre, err = marshalASTJSON(preMap)
+	if err != nil {
+		return "", "", err
+	}
+	formatted := jq.FormatFile(f)
+	g, err := jq.ParseFile(formatted)
+	if err != nil {
+		return "", "", fmt.Errorf("jq re-parse after format: %w", err)
+	}
+	postMap := g.MarshalAST()
+	postMap["file"] = name
+	post, err = marshalASTJSON(postMap)
+	if err != nil {
+		return "", "", err
+	}
+	return pre, post, nil
+}
+
+// marshalASTJSON encodes v as tab-indented JSON with a trailing newline.
+func marshalASTJSON(v any) (string, error) {
+	b, err := json.MarshalIndent(v, "", "\t")
+	if err != nil {
+		return "", fmt.Errorf("marshal AST: %w", err)
+	}
+	return string(b) + "\n", nil
+}
+
+// printAST selects and prints the right AST output based on mode and diffMode.
+// Returns an exit code: 0 for no difference, 1 if --diff found differences.
+func printAST(name, pre, post, mode string, diffMode bool) int {
+	if diffMode {
+		diff, err := computeDiff(name+".ast", pre, post)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "tianonfmt: %s: ast diff: %v\n", name, err)
+			return 1
+		}
+		if len(diff) > 0 {
+			os.Stdout.Write(diff)
+			return 1
+		}
+		return 0
+	}
+	if mode == "format" {
+		fmt.Print(post)
+	} else {
+		fmt.Print(pre)
+	}
+	return 0
 }
 
 // ── diff ─────────────────────────────────────────────────────────────────────
