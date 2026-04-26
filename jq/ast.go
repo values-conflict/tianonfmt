@@ -1,9 +1,14 @@
 package jq
 
 // Node is implemented by every AST node.
+//
+// Adding a new concrete type requires implementing all three methods.
+// MarshalAST() is enforced at compile time — a missing implementation
+// causes a build error, preventing silent "unknown" nodes in AST output.
 type Node interface {
 	jqNode()
 	nodePos() Pos
+	MarshalAST() map[string]any
 }
 
 func pos(n Node) Pos { return n.nodePos() }

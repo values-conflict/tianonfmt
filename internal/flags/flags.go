@@ -6,25 +6,15 @@
 //   - Anything after a bare -- is treated as a positional argument
 //   - Single-dash long flags (-flag instead of --flag) are an error
 //
-// TODO: flesh this out more.  Currently only boolean flags are supported.
-// Planned extensions:
-//
-//   - Optional-value string flags (OptString): --ast (use default) vs
-//     --ast=format (use specified value) vs absent (not set).  This allows a
-//     single flag to be both a boolean trigger and a mode selector, avoiding
-//     an explosion of mutually-exclusive flags.  For example:
-//
-//       ast := fs.OptString("ast", 0, "input",
-//           "dump AST as JSON; --ast=format to dump post-format AST instead")
-//       // *ast == ""       → flag not given
-//       // *ast == "input"  → --ast (no value; uses the default "input")
-//       // *ast == "format" → --ast=format
+// TODO: flesh this out more.  Planned extensions:
 //
 //   - Required string arguments: --output=FILE or --output FILE.
 //
 //   - Enum validation, integer flags.
 //
 //   - Combined short flags: -wq equivalent to -w -q.
+//
+//   - Help text formatting / usage output.
 package flags
 
 import (
@@ -34,25 +24,31 @@ import (
 
 // FlagSet is a set of defined flags.
 type FlagSet struct {
-	name   string
-	flags  []*boolFlag          // in registration order, for help text
-	byLong map[string]*boolFlag // long name → flag
-	byShort map[byte]*boolFlag  // short char → flag
+	name    string
+	byLong  map[string]flag
+	byShort map[byte]flag
 }
 
-type boolFlag struct {
-	long  string
-	short byte // 0 = no short form
-	val   *bool
-	usage string
+// flag is the internal interface for any registered flag.
+type flag interface {
+	longName() string
+	setLong(val string, hasVal bool) error // called for --name or --name=val
+	setShort() error                       // called for -f
 }
 
 // New returns a new FlagSet with the given program name (used in error messages).
 func New(name string) *FlagSet {
 	return &FlagSet{
 		name:    name,
-		byLong:  make(map[string]*boolFlag),
-		byShort: make(map[byte]*boolFlag),
+		byLong:  make(map[string]flag),
+		byShort: make(map[byte]flag),
+	}
+}
+
+func (fs *FlagSet) register(f flag, short byte) {
+	fs.byLong[f.longName()] = f
+	if short != 0 {
+		fs.byShort[short] = f
 	}
 }
 
@@ -60,12 +56,35 @@ func New(name string) *FlagSet {
 // the single-character short name (without -), or 0 for no short form.
 func (fs *FlagSet) Bool(long string, short byte, usage string) *bool {
 	v := false
-	f := &boolFlag{long: long, short: short, val: &v, usage: usage}
-	fs.flags = append(fs.flags, f)
-	fs.byLong[long] = f
-	if short != 0 {
-		fs.byShort[short] = f
-	}
+	f := &boolFlag{long: long, val: &v, usage: usage}
+	fs.register(f, short)
+	return &v
+}
+
+// OptString registers an optional-value string flag.
+//
+// The flag has three states:
+//
+//	absent:         *result == ""   (flag not given at all)
+//	--flag:         *result == def  (flag given with no value; uses the default)
+//	--flag=value:   *result == value
+//
+// This allows a single flag to act as both a boolean trigger (--ast) and a mode
+// selector (--ast=format), without an explosion of mutually-exclusive flags.
+// Per GNU convention, the value MUST use = syntax; --flag value treats "value"
+// as a positional argument, not the flag's value.
+//
+// Example:
+//
+//	ast := fs.OptString("ast", 0, "input",
+//	    "dump AST as JSON; --ast=format to dump post-format AST instead")
+//	// *ast == ""       → flag not given
+//	// *ast == "input"  → --ast (no =value; uses the default "input")
+//	// *ast == "format" → --ast=format
+func (fs *FlagSet) OptString(long string, short byte, def, usage string) *string {
+	v := ""
+	f := &optStringFlag{long: long, val: &v, def: def, usage: usage}
+	fs.register(f, short)
 	return &v
 }
 
@@ -79,7 +98,6 @@ func (fs *FlagSet) Parse(args []string) ([]string, error) {
 
 		switch {
 		case arg == "--":
-			// Everything after -- is positional.
 			positional = append(positional, args[i+1:]...)
 			return positional, nil
 
@@ -87,24 +105,19 @@ func (fs *FlagSet) Parse(args []string) ([]string, error) {
 			positional = append(positional, arg)
 
 		case strings.HasPrefix(arg, "--"):
-			// Long flag: --name or --name=value
 			rest := arg[2:]
 			name, val, hasVal := strings.Cut(rest, "=")
 			f, ok := fs.byLong[name]
 			if !ok {
 				return nil, fmt.Errorf("%s: unknown flag: %s", fs.name, arg)
 			}
-			if err := f.setbool(val, hasVal); err != nil {
+			if err := f.setLong(val, hasVal); err != nil {
 				return nil, fmt.Errorf("%s: %s: %w", fs.name, arg, err)
 			}
 
 		default:
-			// Single-dash argument: must be a single character (-f) or an
-			// attempt to use a long flag with one dash (-flag → error).
 			rest := arg[1:]
 			if len(rest) > 1 {
-				// Could be -abc (stacked shorts, not yet supported) or -longflag.
-				// Check if it's a known long flag name first so we give a good error.
 				longName, _, _ := strings.Cut(rest, "=")
 				if _, ok := fs.byLong[longName]; ok {
 					return nil, fmt.Errorf("%s: use --%s, not %s (long flags require --)", fs.name, longName, arg)
@@ -115,13 +128,25 @@ func (fs *FlagSet) Parse(args []string) ([]string, error) {
 			if !ok {
 				return nil, fmt.Errorf("%s: unknown flag: %s", fs.name, arg)
 			}
-			*f.val = true
+			if err := f.setShort(); err != nil {
+				return nil, fmt.Errorf("%s: -%c: %w", fs.name, rest[0], err)
+			}
 		}
 	}
 	return positional, nil
 }
 
-func (f *boolFlag) setbool(val string, hasVal bool) error {
+// ── boolFlag ─────────────────────────────────────────────────────────────────
+
+type boolFlag struct {
+	long  string
+	val   *bool
+	usage string
+}
+
+func (f *boolFlag) longName() string { return f.long }
+
+func (f *boolFlag) setLong(val string, hasVal bool) error {
 	if !hasVal {
 		*f.val = true
 		return nil
@@ -136,3 +161,27 @@ func (f *boolFlag) setbool(val string, hasVal bool) error {
 	}
 	return nil
 }
+
+func (f *boolFlag) setShort() error { *f.val = true; return nil }
+
+// ── optStringFlag ─────────────────────────────────────────────────────────────
+
+type optStringFlag struct {
+	long  string
+	val   *string
+	def   string
+	usage string
+}
+
+func (f *optStringFlag) longName() string { return f.long }
+
+func (f *optStringFlag) setLong(val string, hasVal bool) error {
+	if !hasVal {
+		*f.val = f.def
+		return nil
+	}
+	*f.val = val
+	return nil
+}
+
+func (f *optStringFlag) setShort() error { *f.val = f.def; return nil }
