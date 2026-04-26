@@ -2,6 +2,8 @@
 
 Covers Perl scripts (`.pl`) and modules (`.pm`) in the corpus.  The corpus has a small but consistent set of Perl files in [`doi/perl-bashbrew`](https://github.com/docker-library/perl-bashbrew/tree/2ab6f478d8cf809b67ebd21930e84c51ad61dc7b).
 
+**Caveat**: the Perl corpus is limited to one project.  The documented conventions are consistent within that project but may not fully represent Tianon's Perl style in other contexts.  Treat these rules as observed patterns with lower confidence than the bash or jq docs.
+
 ## Shebang
 
 ```perl
@@ -175,7 +177,7 @@ Corpus ref: [`doi/perl-bashbrew/lib/Bashbrew.pm#L6-L10`](https://github.com/dock
 
 Comments follow the `#` convention.  Multi-line comments in regexes use the `/x` modifier and inline `#` annotations.  Explanatory comments appear above complex logic blocks.
 
-TODO comments follow the same pattern as in other languages:
+`TODO` comments follow the same pattern as in other languages:
 
 ```perl
 # TODO create dedicated Bashbrew::Arch package?

@@ -185,14 +185,17 @@ Multi-source `COPY` uses the space-separated form, not the JSON array form.
 
 ## `CMD` and `ENTRYPOINT`
 
-JSON array (exec) form is used:
+JSON array (exec) form is always used.  When a shell is needed, it is always named explicitly rather than relying on Docker's implicit `/bin/sh`:
 
 ```dockerfile
 CMD ["start-qemu"]
 ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
+
+# if a shell is required, name it explicitly:
+CMD ["bash", "-c", "..."]
 ```
 
-Shell form is used only when the command requires shell features.
+The combinatory behaviour of mixing exec-form and shell-form `CMD`/`ENTRYPOINT` is too difficult to reason about.  If a script's worth of shell is needed, the right answer is a dedicated shell `ENTRYPOINT` script rather than shell-form `CMD`.
 
 ## `STOPSIGNAL`, `EXPOSE`, `WORKDIR`
 

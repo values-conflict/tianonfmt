@@ -6,22 +6,57 @@ direct input to document correctly.
 
 ## The bashbrew library maintenance trio
 
-Three related script patterns that together form Tianon's workflow for
-maintaining Docker Official Images (and his personal images):
+Three related script patterns form Tianon's workflow for maintaining Docker
+Official Images (and his personal images):
 
-- **`versions.sh`** — fetches upstream version data, writes `versions.json`
-  (documented in [jq-sh.md](jq-sh.md))
-- **`apply-templates.sh`** — runs `jq-template.awk` on `Dockerfile.template`
-  to generate concrete `Dockerfile` files (documented in [jq-template.md](jq-template.md))
-- **`gsl.sh`** (Generate Stackbrew Library) — generates the `library/NAME`
-  entry for `docker-library/official-images`, using `arches`, `commit`, and
-  `dir` to produce the bashbrew format via jq
+### `versions.sh`
+
+A highly consistent script pattern that appears across virtually every image
+directory in [`tianon/dockerfiles`](https://github.com/tianon/dockerfiles):
+
+```bash
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+[ -e versions.json ]
+
+dir="$(readlink -ve "$BASH_SOURCE")"
+dir="$(dirname "$dir")"
+source "$dir/../.libs/git.sh"   # or deb-repo.sh, pypi.sh, etc.
+
+# ... fetch data, build $json ...
+
+jq --tab <<<"$json" '.' > versions.json
+```
+
+The structure is invariant:
+- **Line 1**: `#!/usr/bin/env bash`
+- **Line 2**: `set -Eeuo pipefail`
+- **Line 3**: blank
+- **Line 4**: `[ -e versions.json ]` — a rough "are we in the right directory?" check: if `versions.json` doesn't exist, the script is almost certainly being run from the wrong working directory; exits non-zero and stops immediately if the file is absent
+- **Line 5**: blank
+- **Lines 6+**: optional `source` of a shared `.libs/` helper, then fetch + transform logic
+- **Last line**: always `jq ... > versions.json`, writing the result back
+
+The final `jq` write varies by complexity — `jq --tab <<<"$json" '.'` for a straight pass-through, `jq --null-input --sort-keys '{ version: env.version }'` when building from exported variables, or a more complex expression when transforming intermediate data.
+
+Corpus ref: [`tianon-dockerfiles/buildkit/versions.sh`](https://github.com/tianon/dockerfiles/blob/2118a1979eff7545e06570d1eefc6434d691e68d/buildkit/versions.sh), and nearly every `*/versions.sh` in that repo.
+
+### `apply-templates.sh`
+
+Runs `jq-template.awk` on `Dockerfile.template` to generate concrete
+`Dockerfile` files.  Documented in [jq-template.md](jq-template.md) for the
+template format itself; the script that drives it deserves its own section here.
+
+### `gsl.sh` (Generate Stackbrew Library)
+
+Generates the `library/NAME` entry for `docker-library/official-images`,
+using exported `arches`, `commit`, and `dir` variables to produce the bashbrew
+format via jq.  Corpus ref: [`tianon-dockerfiles/buildkit/gsl.sh`](https://github.com/tianon/dockerfiles/blob/2118a1979eff7545e06570d1eefc6434d691e68d/buildkit/gsl.sh).
 
 All three ultimately feed the `library/` files consumed by bashbrew, used both
 for DOI and for Tianon's personal Docker images.  They deserve a unified
 document explaining how the pipeline fits together.
-
-Corpus ref: [`tianon-dockerfiles/buildkit/gsl.sh`](https://github.com/tianon/dockerfiles/blob/2118a1979eff7545e06570d1eefc6434d691e68d/buildkit/gsl.sh).
 
 ## Docker Compose / stack YAML
 

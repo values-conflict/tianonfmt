@@ -9,7 +9,7 @@ These are kept together because the same voice shows up in both: the person who 
 
 ## Reliability and attribution
 
-Several repos in the corpus are collaborative.  For code comment style, the mechanical patterns (capitalisation, punctuation, TODO format) are consistent enough across the corpus that they appear to reflect a house style Tianon established even in collaborative contexts.  For prose *voice*, the most reliable sources are repos where Tianon is clearly the primary or sole author:
+Several repos in the corpus are collaborative.  For code comment style, the mechanical patterns (capitalisation, punctuation, `TODO` format) are consistent enough across the corpus that they appear to reflect a house style Tianon established even in collaborative contexts.  For prose *voice*, the most reliable sources are repos where Tianon is clearly the primary or sole author:
 
 **High confidence (Tianon-authored):**
 - [`tianon-dockerfiles`](https://github.com/tianon/dockerfiles/tree/2118a1979eff7545e06570d1eefc6434d691e68d) — personal Dockerfiles
@@ -85,11 +85,13 @@ Comments do **not** end with a period, even when the comment is a complete sente
 # ignore malformed lines that miss a colon                 ← no period
 ```
 
-Exceptions: `!` appears for genuine emphasis (`# this script assumes gawk!`), and `?` appears in question-form TODOs and consideration comments.  A comment that is a verbatim quote or a genuinely complete and formal thought may start with a capital, but this is rare — most of Tianon's comments are fragments, not sentences.
+Exceptions: `!` appears for genuine emphasis (`# this script assumes gawk!`), and `?` appears in question-form `TODO`s and consideration comments.  A comment that is a verbatim quote or a genuinely complete and formal thought may start with a capital, but this is rare — most of Tianon's comments are fragments, not sentences.
 
-### TODO format
+### `TODO` format
 
-`TODO` is always **all-caps** and is followed by a **concrete, specific description**.  Vague TODOs do not appear.
+`TODO` is always **all-caps** and is followed by a **concrete, specific description**.  Vague `TODO`s do not appear.
+
+In code comments (bash, jq, Go, etc.), `TODO` is unquoted — the comment syntax already marks the context.  In markdown prose, `TODO` is backticked: it is a programming convention appearing in natural language, so it follows the same rule that backticks any technical term (`--flag`, `$VARIABLE`, command names).  This is not consistently visible in the current corpus but is a stated preference.
 
 ```bash
 # TODO --pull flag
@@ -112,11 +114,11 @@ Exceptions: `!` appears for genuine emphasis (`# this script assumes gawk!`), an
 # TODO make this promise-based and non-blocking? (and/or make a dedicated Package for it?)
 ```
 
-Patterns within TODO comments:
-- Question-form TODOs often end with `?`: `# TODO should we throw an error...?`
+Patterns within `TODO` comments:
+- Question-form `TODO`s often end with `?`: `# TODO should we throw an error...?`
 - A concrete alternative or example may be included: `like "filter_inline_pgp_noise"`
 - Linked considerations are parenthesised: `(and/or make a dedicated Package for it?)`
-- Some TODOs in jq use a space before the `?`: `# TODO consider ... ?` — this is an idiosyncrasy of jq comment style
+- Some `TODO`s in jq use a space before the `?`: `# TODO consider ... ?` — this is an idiosyncrasy of jq comment style
 
 Corpus refs: [`tianon-dockerfiles/buildkit/versions.sh#L17`](https://github.com/tianon/dockerfiles/blob/2118a1979eff7545e06570d1eefc6434d691e68d/buildkit/versions.sh#L17), [`debian-bin/jq/deb822.jq#L15`](https://github.com/tianon/debian-bin/blob/d508ea34f15e88b8ac63d71ffb1938fccbc21206/jq/deb822.jq#L15), [`meta-scripts/registry/lookup.go#L27-L28`](https://github.com/docker-library/meta-scripts/blob/205031aee2fdfbbd449038afd58f0f0a6915c217/registry/lookup.go#L27-L28), [`doi/perl-bashbrew/lib/Bashbrew.pm#L12`](https://github.com/docker-library/perl-bashbrew/blob/2ab6f478d8cf809b67ebd21930e84c51ad61dc7b/lib/Bashbrew.pm#L12).
 
@@ -443,7 +445,7 @@ Things that do not appear in Tianon's comments or documentation prose:
 
 - Capital letter to start a comment sentence (except Go exported doc comments)
 - Period at the end of a comment line
-- Vague TODOs (`# TODO fix this`, `# TODO improve`)
+- Vague `TODO`s (`# TODO fix this`, `# TODO improve`)
 - `e.g.` or `i.e.` with periods — always `eg,` and `ie,`
 - `etc.` with a period — always `etc` without
 - Passive voice in error messages (`"an error occurred"`) — always active and specific
@@ -451,3 +453,5 @@ Things that do not appear in Tianon's comments or documentation prose:
 - Marketing language or superlatives in documentation
 - Formal register / corporate tone
 - `s/he`, `they` (singular) or other gender-neutral contortions — documentation addresses "you" directly or uses "we" for the project
+- Punctuation inside quotation marks — terminators (`.`, `?`, `!`) always go *outside* the closing quote, contrary to American typographic convention: `"foo bar".` not `"foo bar."` — this is the logical-quotation style; when a sentence ends with a quoted fragment and also ends with `?` or `!`, the terminator is typically spaced from the closing quote: `this question ends with a "quoted bit" ?` (space before the `?`)
+- Curly/typographic quotation marks — always straight ASCII `"..."` and `'...'` in all files, not just markdown

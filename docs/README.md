@@ -8,6 +8,7 @@ The documentation is deliberately exhaustive — it captures not only what Tiano
 
 | File | Covers |
 |------|--------|
+| [universal.md](universal.md) | Cross-language principles: tabs, inline/multi-line threshold, trailing commas |
 | [bash.md](bash.md) | Standalone Bash/shell scripts (`.sh` files and shebang-identified scripts) |
 | [jq.md](jq.md) | Standalone jq source files (`.jq`) |
 | [jq-sh.md](jq-sh.md) | jq expressions embedded inside shell scripts (`jq '...'` invocations) |
@@ -18,18 +19,21 @@ The documentation is deliberately exhaustive — it captures not only what Tiano
 | [go.md](go.md) | Go source code (beyond what `gofmt` enforces) |
 | [perl.md](perl.md) | Perl scripts and modules |
 | [awk.md](awk.md) | AWK scripts |
+| [markdown.md](markdown.md) | Markdown documentation files |
+| [prose.md](prose.md) | Code comment style and writing voice across all languages |
+| [FUTURE.md](FUTURE.md) | Topics deferred for further exploration |
 
 ## Cross-cutting principles
 
-A few things are true across every file type:
+Cross-language principles are documented in [universal.md](universal.md).  The short version:
 
-- **Hard tabs for indentation in all non-web languages.**  Shell, jq, Dockerfile continuation lines, Makefile, Go, AWK, and Perl all use hard tabs.  The sole exceptions are YAML (2 spaces, required by spec) and JSON (2 spaces, conventional).
+- **Hard tabs for indentation everywhere the format permits.**  YAML is the only forced exception (spec forbids tabs); Python is also an exception (ecosystem forbids tabs).  JSON uses tabs via `jq --tab`.
 
-- **No trailing whitespace** on any line, in any file type.
+- **No trailing whitespace** on any line, in any file type — with one exception: markdown uses two trailing spaces as a semantic soft line break (`<br>`), so trailing whitespace on continuation lines within list items is intentional and meaningful.
 
 - **Files end with a single newline** — no blank line at the end, no missing terminator.
 
-- **Comments are always meaningful.**  Tianon writes comments that explain *why* something is done, not *what* the code does.  TODO comments are common and concrete.
+- **Comments are always meaningful.**  Tianon writes comments that explain *why* something is done, not *what* the code does.  `TODO` comments are common and concrete.
 
 ## Embedding relationships
 

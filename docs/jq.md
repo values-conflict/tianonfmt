@@ -10,7 +10,7 @@ Corpus refs: [`debian-bin/jq/deb822.jq`](https://github.com/tianon/debian-bin/bl
 
 ## Pipe `|` placement
 
-In standalone jq files, `|` goes at the **start** of the continuation line, not at the end of the previous one.  This is the **opposite** of the convention in [shell scripts](bash.md).
+In standalone jq files, `|` goes at the **start** of the continuation line, not at the end of the previous one.  This matches the convention in [shell scripts](bash.md) — both use leading operators on continuation lines.
 
 ```jq
 del(.out)
@@ -37,6 +37,17 @@ foreach (
 ```
 
 Short comma sequences that fit on one line stay inline: `"linux", "windows", "freebsd"`.
+
+The trailing-comma preference (see [universal.md](universal.md)) means that when a comma sequence is multi-line, all elements including the last should ideally carry a trailing comma.  Since jq's comma operator is semantic (not decorative), the `empty` element is used as a no-op last entry to allow this — `empty` generates nothing but lets every real element end with `,`:
+
+```jq
+(
+	"linux",
+	"windows",
+	"freebsd",
+	empty # trailing comma
+)
+```
 
 Corpus ref: [`tianon-dockerfiles/scratch/multiarch.jq#L6-L20`](https://github.com/tianon/dockerfiles/blob/2118a1979eff7545e06570d1eefc6434d691e68d/scratch/multiarch.jq#L6-L20).
 
@@ -259,7 +270,7 @@ empty # trailing comma hack
 empty # tailing comma (sic)
 ```
 
-TODO comments appear frequently and are concrete:
+`TODO` comments appear frequently and are concrete:
 
 ```jq
 # TODO consider splitting this into a separate function?

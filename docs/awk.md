@@ -1,6 +1,8 @@
 # AWK style
 
-Covers `.awk` files in the corpus.  The only significant AWK file is [`doi/bashbrew/scripts/jq-template.awk`](https://github.com/docker-library/bashbrew/blob/d662ff01570964b5f648df009c9269f388285692/scripts/jq-template.awk), which is the canonical processor for Tianon's jq-template Dockerfile format (see [jq-template.md](jq-template.md)).  The corpus explicitly notes this requires **gawk** (GNU awk), not POSIX awk.
+Covers `.awk` files in the corpus.  The only significant AWK file is [`doi/bashbrew/scripts/jq-template.awk`](https://github.com/docker-library/bashbrew/blob/d662ff01570964b5f648df009c9269f388285692/scripts/jq-template.awk), which is the canonical processor for Tianon's jq-template Dockerfile format (see [jq-template.md](jq-template.md)).
+
+When Tianon writes complex AWK scripts, they often end up requiring gawk features — the `jq-template.awk` file itself says `# this script assumes gawk!`.  However, simpler scripts are written to work in `mawk` as well (mawk and BusyBox `awk` appear to be similar enough that targeting one usually means the other works too).  POSIX awk compatibility is less of a concern than BusyBox/mawk compatibility.
 
 ## Header comment
 

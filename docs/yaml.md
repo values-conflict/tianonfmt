@@ -1,10 +1,27 @@
 # YAML style
 
-Covers `.yml` and `.yaml` files in the corpus, which are exclusively GitHub Actions workflow files.  The `.yml` extension is always used — `.yaml` does not appear.
+Covers `.yml` and `.yaml` files in the corpus.  The `.yml` extension is always used — `.yaml` does not appear.
 
-## Indentation
+The corpus contains two distinct YAML contexts: **GitHub Actions workflows** (the majority) and **Docker Compose / Swarm stack files** (a small number).  Most of this document covers GitHub Actions.  Docker Compose files follow the same generic YAML conventions but may use additional constructs (like flow sequences) that do not appear in GHA workflows.
 
-**2 spaces per level.**  No tabs anywhere in YAML files.
+## Generic YAML conventions
+
+These apply regardless of the YAML file's purpose.
+
+### Indentation
+
+**2 spaces per level.**  Tabs are forbidden by the YAML specification — this is the one format where hard tabs cannot be used.  2 spaces is the standard choice, not a preference.  See [universal.md](universal.md).
+
+### Quoting
+
+- **Unquoted** for simple alphanumeric values, version strings, and most GitHub Actions expressions
+- **Single-quoted** for strings containing YAML special characters or that should be treated as literals: `'bash -Eeuo pipefail -x {0}'`
+- **Double-quoted** only when the string contains a single quote or requires escape sequences
+- Booleans (`true`, `false`) and numbers are always **unquoted**
+
+### Comments
+
+Comments appear on their own lines, indented to match the surrounding context.  Inline comments are used sparingly.  `TODO` comments follow the same concrete style as code comments — see [prose.md](prose.md).
 
 ## File structure and top-level key order
 
@@ -310,7 +327,7 @@ Inline comments (on the same line as a value) are used sparingly:
         timezone: America/Los_Angeles   # ~3:13pm PT
 ```
 
-TODO comments in YAML follow the same concrete pattern as elsewhere in the corpus:
+`TODO` comments in YAML follow the same concrete pattern as elsewhere in the corpus:
 
 ```yaml
           # TODO - windows-2025
@@ -348,10 +365,7 @@ IDs are kebab-case, matching the step's logical purpose.
 ## Notable omissions
 
 - `.yaml` extension — always `.yml`
-- Folded block scalar `>` for any `run:` content
 - `true` / `false` for booleans as strings (never `'true'` or `"true"`)
-- Flow sequences `[item1, item2]` — always block style in GitHub Actions workflows; Docker Compose files in the corpus do use flow sequences, reflecting that format's different conventions
-- Anchors and aliases (`&anchor`, `*alias`) — not used
 - `null` values — absent keys are omitted rather than set to null
 - Tab indentation — YAML requires spaces; 2 spaces specifically
 - `on: push` triggering `main` branch specifically — all branches trigger unless filtered with `branches-ignore`
