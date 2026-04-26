@@ -326,9 +326,7 @@ func jqASTPair(name, src string) (pre, post string, err error) {
 	if err != nil {
 		return "", "", fmt.Errorf("jq parse: %w", err)
 	}
-	preMap := f.MarshalAST()
-	preMap["file"] = name
-	pre, err = marshalASTJSON(preMap)
+	pre, err = marshalASTJSON(f.MarshalAST().Insert(1, "file", name))
 	if err != nil {
 		return "", "", err
 	}
@@ -337,9 +335,7 @@ func jqASTPair(name, src string) (pre, post string, err error) {
 	if err != nil {
 		return "", "", fmt.Errorf("jq re-parse after format: %w", err)
 	}
-	postMap := g.MarshalAST()
-	postMap["file"] = name
-	post, err = marshalASTJSON(postMap)
+	post, err = marshalASTJSON(g.MarshalAST().Insert(1, "file", name))
 	if err != nil {
 		return "", "", err
 	}

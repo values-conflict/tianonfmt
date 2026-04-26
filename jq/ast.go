@@ -8,7 +8,7 @@ package jq
 type Node interface {
 	jqNode()
 	nodePos() Pos
-	MarshalAST() map[string]any
+	MarshalAST() OrderedMap
 }
 
 func pos(n Node) Pos { return n.nodePos() }
