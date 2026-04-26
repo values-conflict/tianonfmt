@@ -23,6 +23,45 @@ There is no hard rule — it is vibes-based, in the spirit of Linus Torvalds's "
 
 This applies uniformly across jq `if`/`else`, shell test expressions, function call argument lists, Dockerfile `RUN` command chains, and anywhere else a similar choice arises.
 
+## Naming conventions
+
+The base preference is **camelCase**, applied whenever the ecosystem has no stronger convention.  Ecosystem idioms override the base when they conflict.
+
+| Context | Convention | Reason |
+|---------|-----------|--------|
+| JSON / data keys | `lowercase` or `camelCase` | Single-word keys are lowercase (`type`, `name`); multi-word keys are camelCase (`filetype`, `funcDefs`, `startLine`). No underscores. |
+| Go unexported identifiers | `camelCase` | `gofmt`/Go idiom |
+| Go exported identifiers | `CamelCase` | `gofmt`/Go idiom |
+| Shell local/script-specific variables | `camelCase` | `dpkgArch`, `exitTrap`, `buildArgs` |
+| Shell conventional env vars | `SCREAMING_SNAKE` | Unix convention; well-known names (`PATH`, `TZ`) and namespace-prefixed vars (`TIANON_PYTHON_FROM_TEMPLATE`, `BASHBREW_NAMESPACE`) |
+| jq function names | `snake_case` | jq ecosystem convention (`dpkg_version_parse`, `deb822_stream`) |
+| jq variable bindings | `$camelCase` | `$dpkgArch`, `$buildArgs` |
+
+The key principle: **defer to the ecosystem when it has a clear convention; use camelCase when it doesn't**.  This is why Bash exported variables are `SCREAMING_SNAKE` (Unix convention) while Bash local script variables are `camelCase` — `dpkgArch` is exported for jq/subshells but stays camelCase because it's a script-specific name, not a conventional env var.
+
+See [bash.md §Variable naming conventions](bash.md#variable-naming-conventions) for the shell-specific details.
+
+## Filename conventions
+
+The base preference is **all-lowercase with hyphens** as word separators.  This applies across every language and file type.
+
+| File type | Convention | Examples |
+|-----------|-----------|---------|
+| Shell scripts | `lower-hyphen.sh` or hyphenated extensionless | `generate-stackbrew-library.sh`, `dsc-from-source`, `apt-ftparchive-wrapper.sh` |
+| Go source | `lower-hyphen.go` | `cmd-build.go`, `docker-hub.go`, `manifest-children.go`, `rate-limits.go` |
+| jq files | `lower-hyphen.jq` | `dpkg-version.jq` |
+| Directories | `lower-hyphen` | `meta-scripts`, `debian-bin`, `containerd-registry` |
+
+**Underscores in filenames are ecosystem idioms only:**
+
+- **Go `_test.go` suffix**: the Go toolchain requires this for test files.  The base name still uses hyphens: `oci-platform_test.go`, `lib_example_test.go`.
+- **Go build-tag suffixes**: `_linux.go`, `_amd64.go`, `_GOOS_GOARCH.go` — required by the Go build system.
+- **Leading `_` for private/internal scripts**: a shell-convention marker that the script is an internal helper, not a user-facing entry point: `_setup.sh`, `_bashbrew-cat-sorted.sh`.
+
+Underscores as **word separators** within a filename never appear in Tianon's code.  A name like `ast_json.go` (underscore mid-word) would instead be written `ast-json.go` or, more likely, a single lower-hyphen word like `marshal.go`.
+
+Corpus refs: [`bashbrew/cmd/bashbrew/cmd-build.go`](https://github.com/docker-library/bashbrew/blob/50f3fe5fd4f3cae2a80c47a5c3d5b17f36aa2fc5/cmd/bashbrew/cmd-build.go), [`bashbrew/architecture/oci-platform_test.go`](https://github.com/docker-library/bashbrew/blob/50f3fe5fd4f3cae2a80c47a5c3d5b17f36aa2fc5/architecture/oci-platform_test.go), [`meta-scripts-cosine/registry/docker-hub.go`](https://github.com/docker-library/meta-scripts/blob/b8a7dd27e71e7c32ff8e9d2ea7c5b4f02b9af5b8/registry/docker-hub.go).
+
 ## Vim modelines
 
 Files with non-standard extensions or no extension that vim cannot auto-detect carry a vim modeline comment to set the filetype explicitly:

@@ -216,6 +216,16 @@ Three dots appear for an informal "gesture at a vague concept" rather than as a 
 
 Corpus ref: [`debian-bin/repo/buildd.sh`](https://github.com/tianon/debian-bin/blob/d508ea34f15e88b8ac63d71ffb1938fccbc21206/repo/buildd.sh), [`meta-scripts/registry/manifest-children.go#L10`](https://github.com/docker-library/meta-scripts/blob/205031aee2fdfbbd449038afd58f0f0a6915c217/registry/manifest-children.go#L10).
 
+### Intentional mid-sentence capitalisation
+
+Occasionally a common word is capitalised mid-sentence to elevate it from adjective or noun to concept — treating it as a proper noun signals "this is A Thing, not just a description".  The archetypal example is **Wrong** (capital W): when something is not merely incorrect but violates a principle, it is Wrong.
+
+```
+fail if any constructs remain that Tianon considers Wrong
+```
+
+This device is used sparingly (overuse dilutes it) and only where the conceptual elevation genuinely adds meaning.  It is a **stated preference, not yet consistently observed in the corpus** — the corpus shows it primarily as proper nouns (Cloudflare, Gatekeeper, etc.) rather than as rhetorical elevation.
+
 ### Asterisks for emphasis within comments
 
 Single asterisks around a word for emphasis, matching markdown italic style:
