@@ -24,7 +24,6 @@ package main
 
 import (
 	"bytes"
-	"flag"
 	"fmt"
 	"io"
 	"os"
@@ -33,6 +32,7 @@ import (
 	"strings"
 
 	"github.com/tianon/fmt/tianonfmt/dockerfile"
+	"github.com/tianon/fmt/tianonfmt/internal/flags"
 	"github.com/tianon/fmt/tianonfmt/jq"
 	"github.com/tianon/fmt/tianonfmt/shell"
 	"github.com/tianon/fmt/tianonfmt/template"
@@ -40,15 +40,20 @@ import (
 )
 
 func main() {
-	writeFlag := flag.Bool("w", false, "write result to source file (print filenames of changed files)")
-	diffFlag := flag.Bool("d", false, "display diffs; exit non-zero if any file differs")
-	flag.Parse()
+	fs := flags.New("tianonfmt")
+	writeFlag := fs.Bool("write", 'w', "write result to source file (print filenames of changed files)")
+	diffFlag := fs.Bool("diff", 'd', "display diffs; exit non-zero if any file differs")
 
-	if *writeFlag && *diffFlag {
-		fatalf("-w and -d are mutually exclusive")
+	args, err := fs.Parse(os.Args[1:])
+	if err != nil {
+		fatalf("%v", err)
 	}
 
-	args := flag.Args()
+	if *writeFlag && *diffFlag {
+		fatalf("--write and --diff are mutually exclusive")
+	}
+
+	// args already populated by fs.Parse above
 
 	if len(args) == 0 {
 		if *writeFlag {
