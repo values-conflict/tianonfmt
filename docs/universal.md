@@ -23,6 +23,30 @@ There is no hard rule — it is vibes-based, in the spirit of Linus Torvalds's "
 
 This applies uniformly across jq `if`/`else`, shell test expressions, function call argument lists, Dockerfile `RUN` command chains, and anywhere else a similar choice arises.
 
+## Vim modelines
+
+Files with non-standard extensions or no extension that vim cannot auto-detect carry a vim modeline comment to set the filetype explicitly:
+
+```bash
+#!/usr/bin/env hocker
+# vim:set ft=sh:
+```
+
+```
+# vim:set ft=gitconfig:
+```
+
+```nginx
+# vim:set ft=nginx:
+```
+
+Vim checks the first and last few lines of any file for modelines, so placement is flexible.  The guiding principle is **least disruptive and least likely to be accidentally removed**:
+
+- **Executable scripts**: second line, immediately after the shebang — stays at the top where edits to the body are very unlikely to touch it
+- **Non-executable config files**: last line — the start of a config file often carries meaningful content that should not be preceded by a comment; the end of the file is safe and conventional
+
+Corpus refs: [`home/git-config.d/common#L1`](https://github.com/tianon/home/blob/720c476e79a50ab0dd133f7187bd046b32cd5b73/git-config.d/common#L1) (first line), [`squignix/http.conf`](https://github.com/tianon/squignix/blob/fe9946c06ac4f9163ed81f2ba499835dc0494097/http.conf) (last line).
+
 ## Trailing commas in multiline structures
 
 Wherever a format permits trailing commas, prefer them.  This makes diffs cleaner (additions don't touch the preceding line) and removes a class of "forgot the comma" errors.
