@@ -972,15 +972,64 @@ func shortInline(n Node) string {
 }
 
 // inlineSafe returns the inline representation of n if it is safe to follow
-// immediately with a closing delimiter (], ), }).  If the inline representation
-// contains a trailing comment ("# text"), the delimiter would be inside the
-// comment — in that case, returns "" to signal "cannot inline".
+// immediately with a closing delimiter (], ), }).  If n or any subnode carries
+// a trailing comment, the delimiter would land inside the comment — in that
+// case, returns "" to signal "cannot inline".
+//
+// This uses an AST walk rather than a text scan to avoid false positives from
+// string literals that happen to contain " #" in their text content.
 func inlineSafe(n Node) string {
-	s := shortInline(n)
-	if strings.Contains(s, " #") {
+	if anyNodeHasTrailingComment(n) {
 		return ""
 	}
-	return s
+	return shortInline(n)
+}
+
+// anyNodeHasTrailingComment recursively checks whether n or any of its
+// directly-rendered sub-nodes carries a trailing comment.
+func anyNodeHasTrailingComment(n Node) bool {
+	if n == nil {
+		return false
+	}
+	switch v := n.(type) {
+	case *CommentedExpr:
+		return v.TrailingComment != nil || anyNodeHasTrailingComment(v.Expr)
+	case *Pipe:
+		return anyNodeHasTrailingComment(v.Left) || anyNodeHasTrailingComment(v.Right)
+	case *Comma:
+		return anyNodeHasTrailingComment(v.Left) || anyNodeHasTrailingComment(v.Right)
+	case *BinOp:
+		return anyNodeHasTrailingComment(v.Left) || anyNodeHasTrailingComment(v.Right)
+	case *AsExpr:
+		return anyNodeHasTrailingComment(v.Expr) || anyNodeHasTrailingComment(v.Body)
+	case *IfExpr:
+		if anyNodeHasTrailingComment(v.Then) || anyNodeHasTrailingComment(v.Else) {
+			return true
+		}
+		for _, ei := range v.ElseIfs {
+			if anyNodeHasTrailingComment(ei.Then) {
+				return true
+			}
+		}
+	case *Array:
+		return anyNodeHasTrailingComment(v.Elem)
+	case *Object:
+		for _, f := range v.Fields {
+			_, tc := stripTrailing(f.Value)
+			if tc != nil || anyNodeHasTrailingComment(f.Value) {
+				return true
+			}
+		}
+	case *Paren:
+		return anyNodeHasTrailingComment(v.Expr)
+	case *Optional:
+		return anyNodeHasTrailingComment(v.Expr)
+	case *Index:
+		return anyNodeHasTrailingComment(v.Key)
+	case *Slice:
+		return anyNodeHasTrailingComment(v.Start) || anyNodeHasTrailingComment(v.End)
+	}
+	return false
 }
 
 // shortInlineObject returns "" if unsafe to inline (any trailing comment on a field value).

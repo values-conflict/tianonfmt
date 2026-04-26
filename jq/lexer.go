@@ -104,6 +104,25 @@ func (l *Lexer) next() Token {
 		panic(fmt.Sprintf("jq lexer: unexpected character %q at offset %d", ch, at))
 	}
 
+	// A bare dot followed by a digit is a leading-decimal number: .5, .25e3, etc.
+	// Per jq spec: ([0-9]+(\.[0-9]*)?|\.[0-9]+)([eE][+-]?[0-9]+)?
+	if k == DOT && l.pos < len(l.src) && l.src[l.pos] >= '0' && l.src[l.pos] <= '9' {
+		numStart := l.pos - 1 // include the leading dot
+		for l.pos < len(l.src) && l.src[l.pos] >= '0' && l.src[l.pos] <= '9' {
+			l.pos++
+		}
+		if l.pos < len(l.src) && (l.src[l.pos] == 'e' || l.src[l.pos] == 'E') {
+			l.pos++
+			if l.pos < len(l.src) && (l.src[l.pos] == '+' || l.src[l.pos] == '-') {
+				l.pos++
+			}
+			for l.pos < len(l.src) && l.src[l.pos] >= '0' && l.src[l.pos] <= '9' {
+				l.pos++
+			}
+		}
+		return Token{Kind: NUMBER, Text: l.src[numStart:l.pos], At: at, Line: line}
+	}
+
 	// A bare dot followed by an identifier is a FIELD token.
 	if k == DOT && l.pos < len(l.src) && isIdentStart(l.src[l.pos]) {
 		name := l.readIdent()
