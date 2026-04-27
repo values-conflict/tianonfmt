@@ -296,8 +296,10 @@ func astByPath(path, src string) (pre, post string, err error) {
 	switch {
 	case ext == ".jq":
 		return jqASTPair(path, src)
-	case isDockerfileName(base), ext == ".sh":
-		return "", "", fmt.Errorf("--ast not yet supported for this file type")
+	case isDockerfileName(base):
+		return dockerfileASTPair(path, src)
+	case ext == ".sh":
+		return "", "", fmt.Errorf("--ast not yet supported for shell files")
 	default:
 		return jqASTPair(path, src)
 	}
@@ -312,7 +314,7 @@ func astByContent(name, src string) (pre, post string, err error) {
 	case strings.HasPrefix(first, "#!/") && (strings.Contains(first, "bash") || strings.Contains(first, "/sh")):
 		return "", "", fmt.Errorf("--ast not yet supported for shell files")
 	case isDockerfileContent(src):
-		return "", "", fmt.Errorf("--ast not yet supported for Dockerfile files")
+		return dockerfileASTPair(name, src)
 	default:
 		return jqASTPair(name, src)
 	}
@@ -342,13 +344,38 @@ func jqASTPair(name, src string) (pre, post string, err error) {
 	return pre, post, nil
 }
 
-// marshalASTJSON encodes v as tab-indented JSON with a trailing newline.
-func marshalASTJSON(v any) (string, error) {
-	b, err := json.MarshalIndent(v, "", "\t")
+// dockerfileASTPair parses src as a Dockerfile and returns both the pre- and
+// post-format AST as JSON strings.  name is embedded as "file"; use "-" for stdin.
+func dockerfileASTPair(name, src string) (pre, post string, err error) {
+	f, err := dockerfile.Parse(src)
 	if err != nil {
+		return "", "", fmt.Errorf("dockerfile parse: %w", err)
+	}
+	pre, err = marshalASTJSON(dockerfile.MarshalFile(f, name))
+	if err != nil {
+		return "", "", err
+	}
+	fmtr := &dockerfile.Formatter{JQFmt: jqFmtFunc, RUNShellFmt: shell.FormatRUN}
+	formatted := dockerfile.FormatWith(f, fmtr)
+	g, err := dockerfile.Parse(formatted)
+	if err != nil {
+		return "", "", fmt.Errorf("dockerfile re-parse after format: %w", err)
+	}
+	post, err = marshalASTJSON(dockerfile.MarshalFile(g, name))
+	return pre, post, err
+}
+
+// marshalASTJSON encodes v as tab-indented JSON with a trailing newline.
+// HTML escaping is disabled so characters like & appear literally.
+func marshalASTJSON(v any) (string, error) {
+	var buf bytes.Buffer
+	enc := json.NewEncoder(&buf)
+	enc.SetEscapeHTML(false)
+	enc.SetIndent("", "\t")
+	if err := enc.Encode(v); err != nil {
 		return "", fmt.Errorf("marshal AST: %w", err)
 	}
-	return string(b) + "\n", nil
+	return buf.String(), nil
 }
 
 // printAST selects and prints the right AST output based on mode and diffMode.
