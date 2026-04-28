@@ -57,6 +57,8 @@ func main() {
 	// Combined with --diff, shows the diff between the two AST representations.
 	// Value must use = syntax: --ast=format (per GNU optional-argument convention).
 	astFlag := fs.OptString("ast", 0, "input", "dump parsed AST as JSON to stdout; --ast=format dumps post-format AST; combine with --diff to show AST diff")
+	tidyFlag := fs.Bool("tidy", 't', "apply idiomatic rewrites: Dockerfile RUN && chains → set -eux; semicolons, shell || true → || :")
+	pedanticFlag := fs.Bool("pedantic", 'p', "fail if any constructs remain that Tianon considers Wrong; lists offending files (use with --diff to show what needs changing)")
 
 	args, err := fs.Parse(os.Args[1:])
 	if err != nil {
@@ -70,7 +72,7 @@ func main() {
 		fatalf("--write and --ast are mutually exclusive")
 	}
 
-	// args already populated by fs.Parse above
+	fmtr := &formatter{tidy: *tidyFlag}
 
 	if len(args) == 0 {
 		if *writeFlag {
@@ -89,9 +91,16 @@ func main() {
 			os.Exit(printAST("<stdin>", pre, post, *astFlag, *diffFlag))
 		}
 
-		out, err := formatByContent("<stdin>", string(src))
+		out, err := fmtr.byContent("-", string(src))
 		if err != nil {
 			fatalf("%v", err)
+		}
+		if *pedanticFlag {
+			checkSrc := string(src)
+			if *tidyFlag {
+				checkSrc = out
+			}
+			os.Exit(pedanticCheck("-", checkSrc, false, *diffFlag))
 		}
 		if *diffFlag {
 			diff, err := computeDiff("<stdin>", string(src), out)
@@ -130,10 +139,21 @@ func main() {
 			continue
 		}
 
-		out, err := formatByPath(path, string(src))
+		out, err := fmtr.byPath(path, string(src))
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "tianonfmt: %s: %v\n", path, err)
 			exitCode = 1
+			continue
+		}
+
+		if *pedanticFlag {
+			checkSrc := string(src)
+			if *tidyFlag {
+				checkSrc = out
+			}
+			if code := pedanticCheck(path, checkSrc, true, *diffFlag); code != 0 {
+				exitCode = code
+			}
 			continue
 		}
 
@@ -169,49 +189,115 @@ func main() {
 	os.Exit(exitCode)
 }
 
-// ── type detection ────────────────────────────────────────────────────────────
+// ── formatter ─────────────────────────────────────────────────────────────────
 
-func formatByPath(path, src string) (string, error) {
+// formatter holds formatting options and dispatches to per-language formatters.
+type formatter struct {
+	tidy bool
+}
+
+func (f *formatter) byPath(path, src string) (string, error) {
 	base := filepath.Base(path)
 	ext := filepath.Ext(base)
-
 	switch {
 	case ext == ".jq":
-		return formatJQ(src)
-
+		return f.jq(src)
 	case isDockerfileName(base):
-		// Check for template syntax before choosing formatter.
 		if template.IsTemplate(src) {
-			return formatTemplate(src)
+			return f.template(src)
 		}
-		return formatDockerfile(src)
-
+		return f.dockerfile(src)
 	case ext == ".sh":
-		return formatShell(src)
-
+		return f.shell(src)
 	default:
-		return formatByContent(path, src)
+		return f.byContent(path, src)
 	}
 }
 
-func isDockerfileName(base string) bool {
-	return base == "Dockerfile" || strings.HasPrefix(base, "Dockerfile.")
-}
-
-func formatByContent(name, src string) (string, error) {
+func (f *formatter) byContent(name, src string) (string, error) {
 	first, _, _ := strings.Cut(src, "\n")
 	first = strings.TrimSpace(first)
 	switch {
 	case strings.HasPrefix(first, "#!/") && (strings.Contains(first, "bash") || strings.Contains(first, "/sh")):
-		return formatShell(src)
+		return f.shell(src)
 	case isDockerfileContent(src):
 		if template.IsTemplate(src) {
-			return formatTemplate(src)
+			return f.template(src)
 		}
-		return formatDockerfile(src)
+		return f.dockerfile(src)
 	default:
-		return formatJQ(src)
+		return f.jq(src)
 	}
+}
+
+func (f *formatter) jq(src string) (string, error) {
+	// TODO: apply jq-specific tidy rewrites (e.g. == false → | not) when
+	// f.tidy is true, once jq AST transformation infrastructure exists.
+	parsed, err := jq.ParseFile(src)
+	if err != nil {
+		return "", fmt.Errorf("jq parse: %w", err)
+	}
+	return jq.FormatFile(parsed), nil
+}
+
+func (f *formatter) dockerfile(src string) (string, error) {
+	parsed, err := dockerfile.Parse(src)
+	if err != nil {
+		return "", fmt.Errorf("dockerfile parse: %w", err)
+	}
+	if f.tidy {
+		dockerfile.TidyFile(parsed, tidyRUN)
+	}
+	dfFmt := &dockerfile.Formatter{
+		JQFmt:       jqFmtFunc,
+		RUNShellFmt: shell.FormatRUN,
+	}
+	return dockerfile.FormatWith(parsed, dfFmt), nil
+}
+
+func (f *formatter) template(src string) (string, error) {
+	return template.Format(src, jqFmtFunc), nil
+}
+
+func (f *formatter) shell(src string) (string, error) {
+	lang := shell.DetectLang(src)
+	if f.tidy {
+		out, err := shell.FormatWithTidy(src, lang, jqFmtFunc)
+		if err != nil {
+			return "", fmt.Errorf("shell format: %w", err)
+		}
+		return out, nil
+	}
+	out, err := shell.Format(src, lang, jqFmtFunc)
+	if err != nil {
+		return "", fmt.Errorf("shell format: %w", err)
+	}
+	return out, nil
+}
+
+// ── embedded jq callback ──────────────────────────────────────────────────────
+
+// jqFmtFunc reformats a jq expression for embedding in another language.
+// If inline is true, a single-line compact format is returned.
+func jqFmtFunc(expr string, inline bool) string {
+	node, err := jq.ParseExpr(strings.TrimSpace(expr))
+	if err != nil {
+		f, ferr := jq.ParseFile(strings.TrimSpace(expr))
+		if ferr != nil {
+			return "" // parse failure — caller preserves original
+		}
+		return jq.FormatFile(f)
+	}
+	if inline {
+		return jq.FormatNodeInline(node)
+	}
+	return jq.FormatNode(node)
+}
+
+// ── type detection ────────────────────────────────────────────────────────────
+
+func isDockerfileName(base string) bool {
+	return base == "Dockerfile" || strings.HasPrefix(base, "Dockerfile.")
 }
 
 var dockerfileKeywords = map[string]bool{
@@ -233,58 +319,63 @@ func isDockerfileContent(src string) bool {
 	return false
 }
 
-// ── per-language formatters ──────────────────────────────────────────────────
+// ── tidy callback ─────────────────────────────────────────────────────────────
 
-func formatJQ(src string) (string, error) {
-	f, err := jq.ParseFile(src)
-	if err != nil {
-		return "", fmt.Errorf("jq parse: %w", err)
+// tidyRUN parses args as shell and returns the list of commands to emit in
+// set -eux; form, or nil if no transformation applies.
+// It is the tidyRUN callback for dockerfile.TidyFile.
+func tidyRUN(args string) []string {
+	parser := syntax.NewParser(syntax.Variant(syntax.LangBash))
+	f, err := parser.Parse(strings.NewReader(strings.TrimSpace(args)), "")
+	if err != nil || len(f.Stmts) != 1 {
+		return nil
 	}
-	return jq.FormatFile(f), nil
-}
-
-// jqFmtFunc returns a formatter callback suitable for passing to embedded-
-// language formatters.  If inline is true, a single-line compact format is
-// returned; otherwise the standard multi-line format is used.
-func jqFmtFunc(expr string, inline bool) string {
-	node, err := jq.ParseExpr(strings.TrimSpace(expr))
-	if err != nil {
-		// Also try as a full file (for expressions containing top-level defs).
-		f, ferr := jq.ParseFile(strings.TrimSpace(expr))
-		if ferr != nil {
-			return "" // signal parse failure — caller preserves original
+	shell.ApplyTidy(f)
+	stmts := shell.FlattenAndChain(f.Stmts[0])
+	if len(stmts) < 2 {
+		return nil
+	}
+	cmdStrs := make([]string, 0, len(stmts))
+	for _, stmt := range stmts {
+		s, err := shell.FormatStmtOneLine(stmt)
+		if err != nil || s == "" {
+			return nil
 		}
-		return jq.FormatFile(f)
+		cmdStrs = append(cmdStrs, s)
 	}
-	if inline {
-		return jq.FormatNodeInline(node)
+	if !strings.HasPrefix(strings.TrimSpace(cmdStrs[0]), "set -") {
+		cmdStrs = append([]string{"set -eux"}, cmdStrs...)
 	}
-	return jq.FormatNode(node)
+	return cmdStrs
 }
 
-func formatDockerfile(src string) (string, error) {
-	f, err := dockerfile.Parse(src)
-	if err != nil {
-		return "", fmt.Errorf("dockerfile parse: %w", err)
-	}
-	fmtr := &dockerfile.Formatter{
-		JQFmt:       jqFmtFunc,
-		RUNShellFmt: shell.FormatRUN,
-	}
-	return dockerfile.FormatWith(f, fmtr), nil
-}
+// ── pedantic check ───────────────────────────────────────────────────────────
 
-func formatTemplate(src string) (string, error) {
-	return template.Format(src, jqFmtFunc), nil
-}
-
-func formatShell(src string) (string, error) {
-	lang := shell.DetectLang(src)
-	out, err := shell.Format(src, lang, jqFmtFunc)
-	if err != nil {
-		return "", fmt.Errorf("shell format: %w", err)
+// pedanticCheck checks whether checkSrc contains Wrong constructs that --tidy
+// would fix.  byPath controls whether to dispatch by filename (byPath=true)
+// or by content sniffing (byPath=false).  showDiff controls whether the diff
+// between checkSrc and the tidy result is printed to stdout.
+//
+// Returns 0 (clean) or 1 (Wrong constructs found).
+func pedanticCheck(name, checkSrc string, byPath, showDiff bool) int {
+	tidyFmtr := &formatter{tidy: true}
+	var tidied string
+	var err error
+	if byPath {
+		tidied, err = tidyFmtr.byPath(name, checkSrc)
+	} else {
+		tidied, err = tidyFmtr.byContent(name, checkSrc)
 	}
-	return out, nil
+	if err != nil || tidied == checkSrc {
+		return 0
+	}
+	if showDiff {
+		diff, _ := computeDiff(name, checkSrc, tidied)
+		os.Stdout.Write(diff)
+	} else {
+		fmt.Fprintf(os.Stderr, "tianonfmt: %s: Wrong constructs (use --tidy --diff to see what needs changing)\n", name)
+	}
+	return 1
 }
 
 // ── AST dump ─────────────────────────────────────────────────────────────────
@@ -458,5 +549,3 @@ func fatalf(format string, args ...interface{}) {
 	os.Exit(1)
 }
 
-// suppress unused import warning; syntax is used via shell package
-var _ = syntax.LangBash
