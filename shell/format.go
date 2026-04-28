@@ -33,27 +33,54 @@ const (
 // Format formats a shell script.  jq expressions inside `jq '...'` invocations
 // are reformatted using the provided jqFmt function (if non-nil).
 func Format(src string, lang syntax.LangVariant, jqFmt func(expr string, inline bool) string) (string, error) {
-	parser := syntax.NewParser(syntax.KeepComments(true), syntax.Variant(lang))
-	f, err := parser.Parse(strings.NewReader(src), "")
+	f, err := parseShell(src, lang)
 	if err != nil {
-		return "", fmt.Errorf("shell parse: %w", err)
+		return "", err
 	}
-
 	if jqFmt != nil {
 		formatJQInAST(f, jqFmt)
 	}
+	return printShell(f)
+}
 
+// FormatWithTidy formats a shell script with idiomatic rewrites applied first.
+// Currently rewrites: "|| true" → "|| :".
+func FormatWithTidy(src string, lang syntax.LangVariant, jqFmt func(expr string, inline bool) string) (string, error) {
+	f, err := parseShell(src, lang)
+	if err != nil {
+		return "", err
+	}
+	ApplyTidy(f)
+	if jqFmt != nil {
+		formatJQInAST(f, jqFmt)
+	}
+	return printShell(f)
+}
+
+func parseShell(src string, lang syntax.LangVariant) (*syntax.File, error) {
+	parser := syntax.NewParser(syntax.KeepComments(true), syntax.Variant(lang))
+	f, err := parser.Parse(strings.NewReader(src), "")
+	if err != nil {
+		return nil, fmt.Errorf("shell parse: %w", err)
+	}
+	return f, nil
+}
+
+func printShell(f *syntax.File) (string, error) {
 	var buf bytes.Buffer
-	printer := syntax.NewPrinter(
+	if err := newPrinter().Print(&buf, f); err != nil {
+		return "", fmt.Errorf("shell format: %w", err)
+	}
+	return buf.String(), nil
+}
+
+func newPrinter() *syntax.Printer {
+	return syntax.NewPrinter(
 		syntax.Indent(0),             // 0 = tabs (corpus: all .sh files use tabs)
 		syntax.BinaryNextLine(false), // binary ops stay on current line
 		syntax.SwitchCaseIndent(true),
 		syntax.KeepPadding(false),
 	)
-	if err := printer.Print(&buf, f); err != nil {
-		return "", fmt.Errorf("shell format: %w", err)
-	}
-	return buf.String(), nil
 }
 
 // FormatRUN normalises the shell content of a Dockerfile RUN instruction.
@@ -128,7 +155,7 @@ func FormatRUN(lines []string, jqFmt func(expr string, inline bool) string) []st
 			trimmed = reformatJQInLine(trimmed, jqFmt)
 		}
 
-		result = append(result, appendCont(strings.Repeat("\t", depth)+trimmed, hasCont))
+		result = append(result, appendCont(strings.Repeat("\t", depth+1)+trimmed, hasCont))
 
 		// Depth adjustments for opening keywords.
 		if closingKeyword {
