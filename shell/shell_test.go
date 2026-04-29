@@ -355,6 +355,71 @@ func TestFormatWithPedantic_AlreadyCanonical(t *testing.T) {
 	}
 }
 
+// ── FormatRUN with jq callback ────────────────────────────────────────────────
+
+// jqFmtPassthrough returns the expression unchanged — used when we only care
+// that detection fired (or didn't fire), not the rewrite itself.
+func jqFmtPassthrough(expr string, _ bool) string { return expr }
+
+// jqFmtUpperDot replaces `.foo` with `.FOO` so we can verify the callback ran.
+func jqFmtUpperDot(expr string, _ bool) string {
+	return strings.ReplaceAll(expr, ".foo", ".FOO")
+}
+
+func TestFormatRUN_JQ_StartOfLine(t *testing.T) {
+	// Plain `jq '...'` at the start of a continuation line.
+	lines := []string{"\tjq '.foo' /data.json"}
+	got := shell.FormatRUN(lines, jqFmtUpperDot)
+	if len(got) != 1 || !strings.Contains(got[0], ".FOO") {
+		t.Errorf("jq at start of line not reformatted: %v", got)
+	}
+}
+
+func TestFormatRUN_JQ_DollarParenPattern(t *testing.T) {
+	// `$(jq '...')` — tests the hasJQ detection fix for subshell pattern.
+	lines := []string{"\tresult=$(jq '.foo' /data.json)"}
+	got := shell.FormatRUN(lines, jqFmtUpperDot)
+	if len(got) != 1 || !strings.Contains(got[0], ".FOO") {
+		t.Errorf("$(jq '...') not reformatted: %v", got)
+	}
+}
+
+func TestFormatRUN_JQ_PreservesArgsAfterQuote(t *testing.T) {
+	// Filename arg after the closing quote must survive reformatting.
+	lines := []string{"\tjq '.foo' /input.json > /output.json"}
+	got := shell.FormatRUN(lines, jqFmtPassthrough)
+	if len(got) != 1 || !strings.Contains(got[0], "/output.json") {
+		t.Errorf("args after closing quote dropped: %v", got)
+	}
+}
+
+func TestFormatRUN_JQ_PreservesHereString(t *testing.T) {
+	// `<<<\"$var\"` after the closing quote must survive reformatting.
+	lines := []string{`	jq '.foo' <<<"$var"`}
+	got := shell.FormatRUN(lines, jqFmtPassthrough)
+	if len(got) != 1 || !strings.Contains(got[0], `<<<"$var"`) {
+		t.Errorf("here-string after closing quote dropped: %v", got)
+	}
+}
+
+func TestFormatRUN_JQ_InPipeline(t *testing.T) {
+	// `... | jq '...'` — jq appears mid-line after a pipe.
+	lines := []string{"\tcat /data.json | jq '.foo'"}
+	got := shell.FormatRUN(lines, jqFmtUpperDot)
+	if len(got) != 1 || !strings.Contains(got[0], ".FOO") {
+		t.Errorf("jq in pipeline not reformatted: %v", got)
+	}
+}
+
+func TestFormatRUN_JQ_NonJQSingleQuote_NotTouched(t *testing.T) {
+	// A single-quoted string in a non-jq command must not be touched.
+	lines := []string{"\techo 'hello world'"}
+	got := shell.FormatRUN(lines, jqFmtUpperDot)
+	if len(got) != 1 || got[0] != "\techo 'hello world'" {
+		t.Errorf("non-jq single-quoted string was modified: %v", got)
+	}
+}
+
 // ── Format with jq callback ───────────────────────────────────────────────────
 
 func TestFormatWithJQCallback_NoChange(t *testing.T) {
@@ -527,12 +592,4 @@ func TestMarshalFile_NegatedBackground(t *testing.T) {
 }
 
 // ── golden helper ─────────────────────────────────────────────────────────────
-
-
-func min(n, max int) int {
-	if n > max {
-		return max
-	}
-	return n
-}
 
