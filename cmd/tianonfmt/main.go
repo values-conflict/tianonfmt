@@ -1,23 +1,36 @@
-// tianonfmt formats jq, Dockerfile, Dockerfile templates, and shell scripts.
+// tianonfmt formats jq, Dockerfile, Dockerfile templates, and shell scripts
+// according to Tianon's personal style conventions.
 //
 // Usage:
 //
-//	tianonfmt [-w | -d] [file ...]
+//	tianonfmt [flags] [file ...]
 //
 // With no file arguments, reads from stdin and writes to stdout.
 // With file arguments and no flags, prints formatted output to stdout.
 //
 // Flags:
 //
-//	-w   Write result back to each source file; print filenames of changed files.
-//	     Mutually exclusive with -d.  Errors if used with stdin.
-//	-d   Print a unified diff for each file that would change; exit non-zero if
-//	     any file differs.  Mutually exclusive with -w.
+//	-w, --write     Write result back to each source file; print filenames of changed files.
+//	                Mutually exclusive with --diff.  Errors if used with stdin.
+//	-d, --diff      Print a unified diff for each file that would change; exit non-zero if
+//	                any file differs.  Mutually exclusive with --write.
+//	-t, --tidy      Apply idiomatic rewrites beyond formatting:
+//	                  shell: #!/bin/bash → #!/usr/bin/env bash; || true → || :
+//	                  Dockerfile RUN: && chains → set -eux; semicolons;
+//	                                 set -Eeuo pipefail → set -eux
+//	-p, --pedantic  Implies --tidy, plus stricter normalisations not applied by --tidy alone:
+//	                  shell: set -e → set -eu (sh) or set -Eeuo pipefail (bash)
+//	                Additionally fails (exit 1) if any constructs remain Wrong.
+//	                Combine with --diff to see what needs changing.
+//	    --ast[=mode]  Dump parsed AST as JSON to stdout.
+//	                  --ast or --ast=input: pre-format AST
+//	                  --ast=format: post-format AST
+//	                  Combined with --diff: show diff between the two AST representations.
 //
 // File type detection (by path):
-//   - .jq extension                → jq formatter
-//   - Dockerfile, Dockerfile.*     → Dockerfile formatter
-//   - Dockerfile.template, etc. containing {{ }} → jq-template formatter
+//   - .jq extension                    → jq formatter
+//   - Dockerfile, Dockerfile.*         → Dockerfile formatter
+//   - Dockerfile.template (with {{ }}) → jq-template formatter
 //   - .sh extension or bash/sh shebang → shell formatter
 //   - stdin / unknown: shebang or first keyword detection
 package main
@@ -35,93 +48,107 @@ import (
 	"github.com/tianon/fmt/tianonfmt/dockerfile"
 	"github.com/tianon/fmt/tianonfmt/internal/flags"
 	"github.com/tianon/fmt/tianonfmt/jq"
+	"github.com/tianon/fmt/tianonfmt/markdown"
 	"github.com/tianon/fmt/tianonfmt/shell"
 	"github.com/tianon/fmt/tianonfmt/template"
 	"mvdan.cc/sh/v3/syntax"
 )
 
+// main is the thin shell around run; keeping it separate makes the tool testable.
 func main() {
-	// TODO: add --tidy / -t: apply idiomatic rewrites (RUN && chains → set -eux; semicolons,
-	// shell || true → || :, jq == false → | not, etc.).  See FUTURE.md for the full design.
-	//
-	// TODO: add --pedantic / -p: reject (exit 1, no file modification) constructs Tianon
-	// considers Wrong — capital W intentional, see prose.md §Intentional mid-sentence
-	// capitalisation.  Help text should read: "fail if any constructs remain that Tianon
-	// considers Wrong".  Acts as a linter; composes with --diff to show what would need to
-	// change.  --pedantic without --tidy checks current state; --pedantic with --tidy checks
-	// after applying tidy rewrites.
+	os.Exit(run(os.Args[1:], os.Stdin, os.Stdout, os.Stderr))
+}
+
+// run is the testable entry point for the formatter.  It returns the exit code.
+// stdin/stdout/stderr replace the corresponding os.* variables so tests can
+// capture and inject I/O without spawning a subprocess.
+func run(args []string, stdin io.Reader, stdout, stderr io.Writer) (exitCode int) {
+	// die is fatalf for use inside run — it panics with a sentinel so the
+	// deferred recover can return 1 instead of calling os.Exit.
+	type dieSignal struct{ msg string }
+	defer func() {
+		if r := recover(); r != nil {
+			if ds, ok := r.(dieSignal); ok {
+				fmt.Fprintln(stderr, ds.msg)
+				exitCode = 1
+			} else {
+				panic(r) // re-panic for genuine panics
+			}
+		}
+	}()
+	die := func(format string, a ...interface{}) {
+		panic(dieSignal{"tianonfmt: " + fmt.Sprintf(format, a...)})
+	}
+
 	fs := flags.New("tianonfmt")
 	writeFlag := fs.Bool("write", 'w', "write result to source file (print filenames of changed files)")
 	diffFlag := fs.Bool("diff", 'd', "display diffs; exit non-zero if any file differs")
-	// --ast or --ast=input → pre-format AST JSON; --ast=format → post-format AST JSON.
-	// Combined with --diff, shows the diff between the two AST representations.
-	// Value must use = syntax: --ast=format (per GNU optional-argument convention).
 	astFlag := fs.OptString("ast", 0, "input", "dump parsed AST as JSON to stdout; --ast=format dumps post-format AST; combine with --diff to show AST diff")
 	tidyFlag := fs.Bool("tidy", 't', "apply idiomatic rewrites: Dockerfile RUN && chains → set -eux; semicolons, shell || true → || :")
 	pedanticFlag := fs.Bool("pedantic", 'p', "fail if any constructs remain that Tianon considers Wrong; lists offending files (use with --diff to show what needs changing)")
 
-	args, err := fs.Parse(os.Args[1:])
+	fileArgs, err := fs.Parse(args)
 	if err != nil {
-		fatalf("%v", err)
+		die("%v", err)
 	}
 
 	if *writeFlag && *diffFlag {
-		fatalf("--write and --diff are mutually exclusive")
+		die("--write and --diff are mutually exclusive")
 	}
 	if *writeFlag && *astFlag != "" {
-		fatalf("--write and --ast are mutually exclusive")
+		die("--write and --ast are mutually exclusive")
 	}
 
-	fmtr := &formatter{tidy: *tidyFlag}
+	fmtr := &formatter{
+		tidy:     *tidyFlag || *pedanticFlag,
+		pedantic: *pedanticFlag,
+	}
 
-	if len(args) == 0 {
+	if len(fileArgs) == 0 {
 		if *writeFlag {
-			fatalf("-w cannot be used with stdin")
+			die("-w cannot be used with stdin")
 		}
-		src, err := io.ReadAll(os.Stdin)
+		src, err := io.ReadAll(stdin)
 		if err != nil {
-			fatalf("reading stdin: %v", err)
+			die("reading stdin: %v", err)
 		}
 
 		if *astFlag != "" {
 			pre, post, err := astByContent("-", string(src))
 			if err != nil {
-				fatalf("%v", err)
+				die("%v", err)
 			}
-			os.Exit(printAST("<stdin>", pre, post, *astFlag, *diffFlag))
+			return printAST("<stdin>", pre, post, *astFlag, *diffFlag, stdout, stderr)
 		}
 
 		out, err := fmtr.byContent("-", string(src))
 		if err != nil {
-			fatalf("%v", err)
+			die("%v", err)
 		}
 		if *pedanticFlag {
-			checkSrc := string(src)
-			if *tidyFlag {
-				checkSrc = out
+			if code := pedanticCheck("-", out, false, *diffFlag, stdout, stderr); code != 0 {
+				return code
 			}
-			os.Exit(pedanticCheck("-", checkSrc, false, *diffFlag))
 		}
 		if *diffFlag {
 			diff, err := computeDiff("<stdin>", string(src), out)
 			if err != nil {
-				fatalf("diff: %v", err)
+				die("diff: %v", err)
 			}
 			if len(diff) > 0 {
-				os.Stdout.Write(diff)
-				os.Exit(1)
+				stdout.Write(diff)
+				return 1
 			}
-			return
+			return 0
 		}
-		fmt.Print(out)
-		return
+		fmt.Fprint(stdout, out)
+		return 0
 	}
 
-	exitCode := 0
-	for _, path := range args {
+	for _, path := range fileArgs {
 		src, err := os.ReadFile(path)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "tianonfmt: %s: %v\n", path, err)
+			fmt.Fprintf(stderr, "tianonfmt: %s: %v\n", path, err)
 			exitCode = 1
 			continue
 		}
@@ -129,11 +156,11 @@ func main() {
 		if *astFlag != "" {
 			pre, post, err := astByPath(path, string(src))
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "tianonfmt: %s: %v\n", path, err)
+				fmt.Fprintf(stderr, "tianonfmt: %s: %v\n", path, err)
 				exitCode = 1
 				continue
 			}
-			if code := printAST(path, pre, post, *astFlag, *diffFlag); code != 0 {
+			if code := printAST(path, pre, post, *astFlag, *diffFlag, stdout, stderr); code != 0 {
 				exitCode = code
 			}
 			continue
@@ -141,31 +168,27 @@ func main() {
 
 		out, err := fmtr.byPath(path, string(src))
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "tianonfmt: %s: %v\n", path, err)
+			fmt.Fprintf(stderr, "tianonfmt: %s: %v\n", path, err)
 			exitCode = 1
 			continue
 		}
 
 		if *pedanticFlag {
-			checkSrc := string(src)
-			if *tidyFlag {
-				checkSrc = out
-			}
-			if code := pedanticCheck(path, checkSrc, true, *diffFlag); code != 0 {
+			if code := pedanticCheck(path, out, true, *diffFlag, stdout, stderr); code != 0 {
 				exitCode = code
+				continue
 			}
-			continue
 		}
 
 		if *diffFlag {
 			diff, err := computeDiff(path, string(src), out)
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "tianonfmt: %s: diff: %v\n", path, err)
+				fmt.Fprintf(stderr, "tianonfmt: %s: diff: %v\n", path, err)
 				exitCode = 1
 				continue
 			}
 			if len(diff) > 0 {
-				os.Stdout.Write(diff)
+				stdout.Write(diff)
 				exitCode = 1
 			}
 			continue
@@ -174,59 +197,48 @@ func main() {
 		if *writeFlag {
 			if out != string(src) {
 				if err := os.WriteFile(path, []byte(out), 0o666); err != nil {
-					fmt.Fprintf(os.Stderr, "tianonfmt: %s: %v\n", path, err)
+					fmt.Fprintf(stderr, "tianonfmt: %s: %v\n", path, err)
 					exitCode = 1
 					continue
 				}
-				fmt.Println(path)
+				fmt.Fprintln(stdout, path)
 			}
 			continue
 		}
 
-		// Default: print to stdout.
-		fmt.Print(out)
+		fmt.Fprint(stdout, out)
 	}
-	os.Exit(exitCode)
+	return exitCode
 }
 
 // ── formatter ─────────────────────────────────────────────────────────────────
 
 // formatter holds formatting options and dispatches to per-language formatters.
 type formatter struct {
-	tidy bool
+	tidy     bool
+	pedantic bool // pedantic implies tidy and adds stricter normalisations
 }
 
 func (f *formatter) byPath(path, src string) (string, error) {
-	base := filepath.Base(path)
-	ext := filepath.Ext(base)
-	switch {
-	case ext == ".jq":
-		return f.jq(src)
-	case isDockerfileName(base):
-		if template.IsTemplate(src) {
-			return f.template(src)
-		}
-		return f.dockerfile(src)
-	case ext == ".sh":
-		return f.shell(src)
-	default:
-		return f.byContent(path, src)
-	}
+	return f.byKind(kindByPath(path, src), src)
 }
 
 func (f *formatter) byContent(name, src string) (string, error) {
-	first, _, _ := strings.Cut(src, "\n")
-	first = strings.TrimSpace(first)
-	switch {
-	case strings.HasPrefix(first, "#!/") && (strings.Contains(first, "bash") || strings.Contains(first, "/sh")):
-		return f.shell(src)
-	case isDockerfileContent(src):
-		if template.IsTemplate(src) {
-			return f.template(src)
-		}
-		return f.dockerfile(src)
-	default:
+	return f.byKind(kindByContent(src), src)
+}
+
+func (f *formatter) byKind(k fileKind, src string) (string, error) {
+	switch k {
+	case kindJQ:
 		return f.jq(src)
+	case kindMarkdown:
+		return f.md(src)
+	case kindTemplate:
+		return f.template(src)
+	case kindDockerfile:
+		return f.dockerfile(src)
+	default: // kindShell
+		return f.shell(src)
 	}
 }
 
@@ -246,7 +258,11 @@ func (f *formatter) dockerfile(src string) (string, error) {
 		return "", fmt.Errorf("dockerfile parse: %w", err)
 	}
 	if f.tidy {
-		dockerfile.TidyFile(parsed, tidyRUN)
+		dockerfile.TidyFile(parsed, tidyRUN, normalizeSetFlags)
+		dockerfile.TidyCmdEntrypoint(parsed)
+	}
+	if f.pedantic {
+		dockerfile.PedanticCmdEntrypoint(parsed)
 	}
 	dfFmt := &dockerfile.Formatter{
 		JQFmt:       jqFmtFunc,
@@ -255,20 +271,26 @@ func (f *formatter) dockerfile(src string) (string, error) {
 	return dockerfile.FormatWith(parsed, dfFmt), nil
 }
 
+func (f *formatter) md(src string) (string, error) {
+	return markdown.Format(src), nil
+}
+
 func (f *formatter) template(src string) (string, error) {
 	return template.Format(src, jqFmtFunc), nil
 }
 
 func (f *formatter) shell(src string) (string, error) {
 	lang := shell.DetectLang(src)
-	if f.tidy {
-		out, err := shell.FormatWithTidy(src, lang, jqFmtFunc)
-		if err != nil {
-			return "", fmt.Errorf("shell format: %w", err)
-		}
-		return out, nil
+	var out string
+	var err error
+	switch {
+	case f.pedantic:
+		out, err = shell.FormatWithPedantic(src, lang, jqFmtFunc)
+	case f.tidy:
+		out, err = shell.FormatWithTidy(src, lang, jqFmtFunc)
+	default:
+		out, err = shell.Format(src, lang, jqFmtFunc)
 	}
-	out, err := shell.Format(src, lang, jqFmtFunc)
 	if err != nil {
 		return "", fmt.Errorf("shell format: %w", err)
 	}
@@ -279,6 +301,7 @@ func (f *formatter) shell(src string) (string, error) {
 
 // jqFmtFunc reformats a jq expression for embedding in another language.
 // If inline is true, a single-line compact format is returned.
+// Returns "" on any parse failure so that callers preserve the original.
 func jqFmtFunc(expr string, inline bool) string {
 	node, err := jq.ParseExpr(strings.TrimSpace(expr))
 	if err != nil {
@@ -294,7 +317,54 @@ func jqFmtFunc(expr string, inline bool) string {
 	return jq.FormatNode(node)
 }
 
-// ── type detection ────────────────────────────────────────────────────────────
+// ── file-type detection ───────────────────────────────────────────────────────
+
+type fileKind int
+
+const (
+	kindJQ fileKind = iota
+	kindMarkdown
+	kindDockerfile
+	kindTemplate // Dockerfile.template with {{ }} jq syntax
+	kindShell
+)
+
+// kindByPath detects the file type from the path extension/name.
+func kindByPath(path, src string) fileKind {
+	base := filepath.Base(path)
+	ext := filepath.Ext(base)
+	switch {
+	case ext == ".jq":
+		return kindJQ
+	case ext == ".md":
+		return kindMarkdown
+	case ext == ".sh":
+		return kindShell
+	case isDockerfileName(base):
+		if template.IsTemplate(src) {
+			return kindTemplate
+		}
+		return kindDockerfile
+	default:
+		return kindByContent(src)
+	}
+}
+
+// kindByContent detects the file type from content when the path is unknown.
+func kindByContent(src string) fileKind {
+	first, _, _ := strings.Cut(src, "\n")
+	first = strings.TrimSpace(first)
+	switch {
+	case strings.HasPrefix(first, "#!/"):
+		return kindShell
+	case template.IsTemplate(src):
+		return kindTemplate
+	case isDockerfileContent(src):
+		return kindDockerfile
+	default:
+		return kindJQ
+	}
+}
 
 func isDockerfileName(base string) bool {
 	return base == "Dockerfile" || strings.HasPrefix(base, "Dockerfile.")
@@ -345,70 +415,349 @@ func tidyRUN(args string) []string {
 	}
 	if !strings.HasPrefix(strings.TrimSpace(cmdStrs[0]), "set -") {
 		cmdStrs = append([]string{"set -eux"}, cmdStrs...)
+	} else {
+		// Normalise any "set" variant to "set -eux": bash-only flags like
+		// -E and -o pipefail are Wrong in Dockerfile RUN (which uses /bin/sh).
+		cmdStrs[0] = normalizeSetFlags(cmdStrs[0])
 	}
 	return cmdStrs
 }
 
+// normalizeSetFlags rewrites a "set ..." command to "set -eux", preserving
+// only the flags Tianon uses in Dockerfile RUN blocks (which run under /bin/sh,
+// not bash, so -E and -o pipefail are unavailable and wrong).
+func normalizeSetFlags(s string) string {
+	if strings.TrimSpace(s) == "set -eux" {
+		return s // already correct
+	}
+	if strings.HasPrefix(strings.TrimSpace(s), "set -") {
+		return "set -eux"
+	}
+	return s
+}
+
 // ── pedantic check ───────────────────────────────────────────────────────────
 
-// pedanticCheck checks whether checkSrc contains Wrong constructs that --tidy
-// would fix.  byPath controls whether to dispatch by filename (byPath=true)
-// or by content sniffing (byPath=false).  showDiff controls whether the diff
-// between checkSrc and the tidy result is printed to stdout.
+// pedanticCheck checks whether out (already tidy-applied) has any Wrong
+// constructs that --tidy could not auto-fix.  byPath controls dispatch;
+// showDiff controls whether second-tidy diffs are printed to stdout.
 //
-// Returns 0 (clean) or 1 (Wrong constructs found).
-func pedanticCheck(name, checkSrc string, byPath, showDiff bool) int {
+// Returns 0 (clean) or 1 (Wrong constructs remain).
+func pedanticCheck(name, out string, byPath, showDiff bool, stdout, stderr io.Writer) int {
+	code := 0
+
 	tidyFmtr := &formatter{tidy: true}
-	var tidied string
+	var further string
 	var err error
 	if byPath {
-		tidied, err = tidyFmtr.byPath(name, checkSrc)
+		further, err = tidyFmtr.byPath(name, out)
 	} else {
-		tidied, err = tidyFmtr.byContent(name, checkSrc)
+		further, err = tidyFmtr.byContent(name, out)
 	}
-	if err != nil || tidied == checkSrc {
-		return 0
+	if err == nil && further != out {
+		code = 1
+		if showDiff {
+			diff, _ := computeDiff(name, out, further)
+			stdout.Write(diff)
+		} else {
+			fmt.Fprintf(stderr, "tianonfmt: %s: Wrong constructs remain after --tidy\n", name)
+		}
 	}
-	if showDiff {
-		diff, _ := computeDiff(name, checkSrc, tidied)
-		os.Stdout.Write(diff)
+
+	for _, v := range lintViolations(name, out, byPath) {
+		fmt.Fprintf(stderr, "tianonfmt: %s:%d: %s\n", name, v.Line, v.Msg)
+		code = 1
+	}
+
+	return code
+}
+
+// lintViolations returns pedantic lint violations for src, dispatching by
+// file type using the same detection logic as the formatter.
+func lintViolations(name, src string, byPathMode bool) []jq.Violation {
+	var k fileKind
+	if byPathMode {
+		k = kindByPath(name, src)
 	} else {
-		fmt.Fprintf(os.Stderr, "tianonfmt: %s: Wrong constructs (use --tidy --diff to see what needs changing)\n", name)
+		k = kindByContent(src)
 	}
-	return 1
+	switch k {
+	case kindMarkdown, kindTemplate:
+		return lintMarkdown(src)
+	case kindDockerfile:
+		return lintDockerfile(src)
+	case kindShell:
+		return lintShell(src)
+	default: // kindJQ
+		return lintJQ(src)
+	}
+}
+
+// lintMarkdown checks markdown src for pedantic violations.
+func lintMarkdown(src string) []jq.Violation {
+	vs := markdown.Lint(src)
+	out := make([]jq.Violation, len(vs))
+	for i, v := range vs {
+		out[i] = jq.Violation{Line: v.Line, Msg: v.Msg}
+	}
+	return out
+}
+
+// lintJQ parses src as jq and returns any pedantic violations.
+func lintJQ(src string) []jq.Violation {
+	f, err := jq.ParseFile(src)
+	if err != nil {
+		return nil // parse error already caught by format step
+	}
+	return jq.LintFile(f, src)
+}
+
+// lintShell checks shell src for pedantic violations:
+//   - echo -e / echo -n: use printf instead
+//   - shebang: #!/bin/bash or #!/bin/sh should be #!/usr/bin/env bash
+func lintShell(src string) []jq.Violation {
+	var out []jq.Violation
+	// Shebang check (line 1 only — TidyShebang would fix this).
+	firstLine, _, _ := strings.Cut(src, "\n")
+	switch strings.TrimSpace(firstLine) {
+	case "#!/bin/bash", "#!/bin/sh":
+		out = append(out, jq.Violation{Line: 1, Msg: fmt.Sprintf("%q: use \"#!/usr/bin/env bash\" instead", strings.TrimSpace(firstLine))})
+	}
+	// Line-by-line checks.
+	setEuxFound := false
+	for i, line := range strings.Split(src, "\n") {
+		trimmed := strings.TrimSpace(line)
+		if strings.HasPrefix(trimmed, "#") {
+			continue
+		}
+		if echoFlag := echoFlagViolation(trimmed); echoFlag != "" {
+			out = append(out, jq.Violation{Line: i + 1, Msg: echoFlag})
+		}
+		if strings.HasPrefix(trimmed, "which ") || trimmed == "which" {
+			out = append(out, jq.Violation{Line: i + 1, Msg: `"which": use "command -v" instead (which is non-standard; use --tidy to auto-fix flag-free calls)`})
+		}
+		// set -x at the global level is Wrong; only use locally around specific blocks.
+		// Check after normalization: any global set with -x in the flags is Wrong.
+		if strings.HasPrefix(trimmed, "set -") && strings.Contains(trimmed, "x") &&
+			!strings.HasPrefix(line, "\t") {
+			// Flag if this looks like a top-level set (no leading tab = depth 0).
+			// Exclude "set --" and "set -o" forms.
+			parts := strings.Fields(trimmed)
+			if len(parts) >= 2 && strings.HasPrefix(parts[1], "-") && parts[1] != "--" {
+				out = append(out, jq.Violation{
+					Line: i + 1,
+					Msg:  `"set -x" at the global level is Wrong; use "set +x" / "set -x" pairs around specific blocks only`,
+				})
+			}
+		}
+		if strings.HasPrefix(trimmed, "let ") || trimmed == "let" {
+			out = append(out, jq.Violation{Line: i + 1, Msg: `"let" is Wrong: use $((...)) or var=$((expr)) instead`})
+		}
+		if strings.Contains(trimmed, "declare -i") {
+			out = append(out, jq.Violation{Line: i + 1, Msg: `"declare -i" is Wrong: use untyped variables with arithmetic instead`})
+		}
+		// <<- (tab-stripping heredoc) is always preferred over << (bash.md §Heredocs).
+		// Must not match <<< (here-strings, which are fine) or <<- (already correct).
+		if idx := strings.Index(trimmed, "<<"); idx >= 0 {
+			after := ""
+			if idx+2 < len(trimmed) {
+				after = trimmed[idx+2:]
+			}
+			isBareHeredoc := after == "" || (after[0] != '-' && after[0] != '<')
+			if isBareHeredoc && !strings.HasPrefix(trimmed, "#") {
+				out = append(out, jq.Violation{Line: i + 1, Msg: `"<<" heredoc: use "<<-" (tab-stripping) instead (bash.md §Heredocs)`})
+			}
+		}
+		// Standalone scripts should use set -Eeuo pipefail (bash.md §Setup).
+		// Simpler forms (set -eu, set -eux, set -ex) appear in Tianon's corpus
+		// for entrypoints and utility scripts and are not flagged.
+		// Only flag "set -e" alone — the absolute minimum with no -u or pipefail.
+		if strings.HasPrefix(trimmed, "set -") {
+			if strings.Contains(trimmed, "E") && strings.Contains(trimmed, "pipefail") {
+				setEuxFound = true // canonical form
+			} else if trimmed == "set -e" && !setEuxFound {
+				out = append(out, jq.Violation{
+					Line: i + 1,
+					Msg:  `"set -e": standalone scripts should use at least "set -eu" or ideally "set -Eeuo pipefail" (bash.md §Setup)`,
+				})
+			}
+		}
+	}
+	return out
+}
+
+// echoFlagViolation returns a violation message if the line uses echo -e or
+// echo -n; returns "" if no violation.
+func echoFlagViolation(line string) string {
+	fields := strings.Fields(line)
+	if len(fields) < 2 {
+		return ""
+	}
+	// Allow "echo" to appear anywhere in a pipeline; just check the token itself.
+	for i, f := range fields {
+		if f != "echo" {
+			continue
+		}
+		if i+1 >= len(fields) {
+			break
+		}
+		next := fields[i+1]
+		switch {
+		case next == "-e" || strings.HasPrefix(next, "-e"):
+			return `"echo -e": use printf for escape sequences`
+		case next == "-n" || next == "-ne" || next == "-en":
+			return `"echo -n": use printf for literal output without newline`
+		}
+	}
+	return ""
+}
+
+// lintDockerfile checks Dockerfile src for pedantic violations.
+func lintDockerfile(src string) []jq.Violation {
+	f, err := dockerfile.Parse(src)
+	if err != nil {
+		return nil
+	}
+	var out []jq.Violation
+	for _, instr := range f.Instructions {
+		switch instr.Keyword {
+		case "FROM":
+			// FROM image:latest is Wrong — pinned versions should be used.
+			// Exception: FROM scratch (always fine) and multi-stage refs (stage names, not tags).
+			ref, _, _ := strings.Cut(strings.TrimSpace(instr.Args), " ") // strip AS alias
+			if _, afterColon, hasTag := strings.Cut(ref, ":"); hasTag && afterColon == "latest" {
+				out = append(out, jq.Violation{
+					Line: instr.StartLine,
+					Msg:  fmt.Sprintf(`FROM %s: using ":latest" tag is Wrong; pin to a specific version`, ref),
+				})
+			}
+
+		case "MAINTAINER":
+			out = append(out, jq.Violation{
+				Line: instr.StartLine,
+				Msg:  `MAINTAINER is deprecated and Wrong: remove it (there is no replacement in Tianon's style)`,
+			})
+
+		case "HEALTHCHECK":
+			// HEALTHCHECK NONE (disabling an inherited check) is acceptable.
+			// HEALTHCHECK CMD ... is Wrong: Tianon never adds health checks.
+			if !strings.HasPrefix(strings.TrimSpace(instr.Args), "NONE") {
+				out = append(out, jq.Violation{
+					Line: instr.StartLine,
+					Msg:  `HEALTHCHECK CMD is Wrong: use HEALTHCHECK NONE to disable inherited checks; never add health checks in Tianon's Dockerfiles`,
+				})
+			}
+
+		case "ONBUILD":
+			out = append(out, jq.Violation{
+				Line: instr.StartLine,
+				Msg:  `ONBUILD is Wrong: never used in Tianon's Dockerfiles`,
+			})
+
+		case "LABEL":
+			// Exactly two LABEL keys appear in Tianon's corpus, both in
+			// dockerfiles/buildkit/ where BuildKit itself requires them:
+			//   moby.buildkit.frontend.caps
+			//   moby.buildkit.frontend.network.none
+			// All other LABEL usage is Wrong.
+			key, _, _ := strings.Cut(strings.TrimSpace(instr.Args), "=")
+			key = strings.TrimSpace(key)
+			if key != "moby.buildkit.frontend.caps" && key != "moby.buildkit.frontend.network.none" {
+				out = append(out, jq.Violation{
+					Line: instr.StartLine,
+					Msg:  `LABEL is Wrong: not used in Tianon's Dockerfiles (exception: moby.buildkit.frontend.caps and moby.buildkit.frontend.network.none in BuildKit images)`,
+				})
+			}
+
+		case "RUN":
+			// Flag set commands using bash-only flags (-E, -o pipefail) in /bin/sh RUN.
+			// Simpler forms like set -ex and set -eux are acceptable (docs §RUN shell style).
+			firstCmd, _, _ := strings.Cut(instr.Args, ";")
+			firstCmd = strings.TrimSpace(firstCmd)
+			if strings.HasPrefix(firstCmd, "set -") &&
+				(strings.Contains(firstCmd, "E") || strings.Contains(firstCmd, "pipefail")) {
+				out = append(out, jq.Violation{
+					Line: instr.StartLine,
+					Msg:  fmt.Sprintf("%q in Dockerfile RUN uses bash-only flags; use \"set -eux\" (RUN runs under /bin/sh)", firstCmd),
+				})
+			}
+			// Flag apt-get install without -y or --no-install-recommends.
+			if v := aptGetInstallViolation(instr.Args, instr.StartLine); v != nil {
+				out = append(out, *v)
+			}
+		}
+	}
+	return out
+}
+
+// aptGetInstallViolation returns a violation if the RUN args contain an
+// apt-get install call missing -y or --no-install-recommends.
+// Skips local file installs (e.g. ./pkg.deb, /path/to/pkg.deb) which may
+// intentionally omit --no-install-recommends.
+func aptGetInstallViolation(args string, line int) *jq.Violation {
+	idx := strings.Index(args, "apt-get install")
+	if idx < 0 {
+		return nil
+	}
+	segment := args[idx:]
+	// Skip local file installs: the first non-flag package-like token starts with . or /
+	// e.g. "apt-get install -y ./pkg.deb" — recommends may be intentional.
+	afterInstall := strings.TrimPrefix(segment, "apt-get install")
+	for _, field := range strings.Fields(afterInstall) {
+		if strings.HasPrefix(field, "-") {
+			continue
+		}
+		// First non-flag argument: if it looks like a path, skip the check.
+		if strings.HasPrefix(field, "./") || strings.HasPrefix(field, "/") || strings.HasSuffix(field, ".deb") {
+			return nil
+		}
+		break
+	}
+	if !strings.Contains(segment, " -y") && !strings.Contains(segment, "\t-y") {
+		return &jq.Violation{Line: line, Msg: `apt-get install missing "-y" flag`}
+	}
+	if !strings.Contains(segment, "--no-install-recommends") {
+		return &jq.Violation{Line: line, Msg: `apt-get install missing "--no-install-recommends" flag`}
+	}
+	return nil
 }
 
 // ── AST dump ─────────────────────────────────────────────────────────────────
 
 // astByPath computes the pre- and post-format AST JSON for a named file.
 func astByPath(path, src string) (pre, post string, err error) {
-	base := filepath.Base(path)
-	ext := filepath.Ext(base)
-	switch {
-	case ext == ".jq":
-		return jqASTPair(path, src)
-	case isDockerfileName(base):
-		return dockerfileASTPair(path, src)
-	case ext == ".sh":
-		return "", "", fmt.Errorf("--ast not yet supported for shell files")
-	default:
-		return jqASTPair(path, src)
-	}
+	return astByKind(path, src, kindByPath(path, src))
 }
 
 // astByContent is like astByPath but uses content-based detection.
 // name should be "-" for stdin.
 func astByContent(name, src string) (pre, post string, err error) {
-	first, _, _ := strings.Cut(src, "\n")
-	first = strings.TrimSpace(first)
-	switch {
-	case strings.HasPrefix(first, "#!/") && (strings.Contains(first, "bash") || strings.Contains(first, "/sh")):
-		return "", "", fmt.Errorf("--ast not yet supported for shell files")
-	case isDockerfileContent(src):
-		return dockerfileASTPair(name, src)
-	default:
+	return astByKind(name, src, kindByContent(src))
+}
+
+func astByKind(name, src string, k fileKind) (pre, post string, err error) {
+	switch k {
+	case kindJQ, kindTemplate:
 		return jqASTPair(name, src)
+	case kindMarkdown:
+		return markdownASTPair(name, src)
+	case kindDockerfile:
+		return dockerfileASTPair(name, src)
+	default: // kindShell
+		return shellASTPair(name, src)
 	}
+}
+
+// markdownASTPair returns the pre- and post-format AST for a markdown file.
+// Markdown formatting is a sequence of normalizations (no re-parse like jq/shell).
+func markdownASTPair(name, src string) (pre, post string, err error) {
+	pre, err = marshalASTJSON(markdown.MarshalFile(src, name))
+	if err != nil {
+		return "", "", err
+	}
+	formatted := markdown.Format(src)
+	post, err = marshalASTJSON(markdown.MarshalFile(formatted, name))
+	return pre, post, err
 }
 
 // jqASTPair parses src as jq and returns both the pre-format and post-format
@@ -433,6 +782,30 @@ func jqASTPair(name, src string) (pre, post string, err error) {
 		return "", "", err
 	}
 	return pre, post, nil
+}
+
+// shellASTPair parses src as a shell script and returns both the pre- and
+// post-format AST as JSON strings.
+func shellASTPair(name, src string) (pre, post string, err error) {
+	lang := shell.DetectLang(src)
+	f, err := shell.ParseFile(src, lang)
+	if err != nil {
+		return "", "", fmt.Errorf("shell parse: %w", err)
+	}
+	pre, err = marshalASTJSON(shell.MarshalFile(f, name))
+	if err != nil {
+		return "", "", err
+	}
+	formatted, err := shell.Format(src, lang, jqFmtFunc)
+	if err != nil {
+		return "", "", fmt.Errorf("shell format: %w", err)
+	}
+	g, err := shell.ParseFile(formatted, lang)
+	if err != nil {
+		return "", "", fmt.Errorf("shell re-parse after format: %w", err)
+	}
+	post, err = marshalASTJSON(shell.MarshalFile(g, name))
+	return pre, post, err
 }
 
 // dockerfileASTPair parses src as a Dockerfile and returns both the pre- and
@@ -471,23 +844,23 @@ func marshalASTJSON(v any) (string, error) {
 
 // printAST selects and prints the right AST output based on mode and diffMode.
 // Returns an exit code: 0 for no difference, 1 if --diff found differences.
-func printAST(name, pre, post, mode string, diffMode bool) int {
+func printAST(name, pre, post, mode string, diffMode bool, stdout, stderr io.Writer) int {
 	if diffMode {
 		diff, err := computeDiff(name+".ast", pre, post)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "tianonfmt: %s: ast diff: %v\n", name, err)
+			fmt.Fprintf(stderr, "tianonfmt: %s: ast diff: %v\n", name, err)
 			return 1
 		}
 		if len(diff) > 0 {
-			os.Stdout.Write(diff)
+			stdout.Write(diff)
 			return 1
 		}
 		return 0
 	}
 	if mode == "format" {
-		fmt.Print(post)
+		fmt.Fprint(stdout, post)
 	} else {
-		fmt.Print(pre)
+		fmt.Fprint(stdout, pre)
 	}
 	return 0
 }
@@ -543,9 +916,5 @@ func computeDiff(name, before, after string) ([]byte, error) {
 	return buf.Bytes(), err
 }
 
-// fatalf prints to stderr and exits 1.
-func fatalf(format string, args ...interface{}) {
-	fmt.Fprintf(os.Stderr, "tianonfmt: "+format+"\n", args...)
-	os.Exit(1)
-}
+
 

@@ -23,6 +23,7 @@ package jq
 //     (gofmt rule; corpus ref: deb822.jq "# inject a synthetic blank line…")
 
 import (
+	"regexp"
 	"strings"
 )
 
@@ -622,11 +623,29 @@ func (p *printer) binOp(v *BinOp) {
 // Inline when everything fits; multi-line otherwise.
 // Style refs: dpkg-version.jq:22-29 (multi), :35 (inline); deb822.jq:18-35
 func (p *printer) ifExpr(v *IfExpr) {
-	// Any comment in any branch forces multi-line.
+	// Any comment forces multi-line.
 	forcedMulti := hasAnyComment(v.Then) || hasAnyComment(v.Else)
 	for _, ei := range v.ElseIfs {
 		if hasAnyComment(ei.Then) {
 			forcedMulti = true
+		}
+	}
+
+	// If the condition has leading comments, they belong BEFORE the `if` keyword
+	// (they appeared before `if` in the source).  Stripping them from the
+	// condition and emitting them first prevents non-idempotency: without this,
+	// the comment ends up between `if ` and the condition on the first format
+	// pass, and the second pass re-parses it as a comment inside the condition's
+	// first argument — making the output diverge.
+	var condLeadingComments []*Comment
+	cond := v.Cond
+	if ce, ok := v.Cond.(*CommentedExpr); ok && len(ce.LeadingComments) > 0 {
+		condLeadingComments = ce.LeadingComments
+		forcedMulti = true
+		if ce.TrailingComment != nil {
+			cond = &CommentedExpr{At: ce.At, Expr: ce.Expr, TrailingComment: ce.TrailingComment}
+		} else {
+			cond = ce.Expr
 		}
 	}
 
@@ -638,8 +657,16 @@ func (p *printer) ifExpr(v *IfExpr) {
 		}
 	}
 
+	for _, c := range condLeadingComments {
+		if !p.atLineStart() {
+			p.nl()
+			p.write(p.tab())
+		}
+		p.writeln(c.Text)
+		p.write(p.tab())
+	}
 	p.write("if ")
-	p.node(v.Cond)
+	p.node(cond)
 	p.write(" then")
 	p.indent()
 	p.newline()
@@ -915,6 +942,22 @@ func (p *printer) objectField(f *ObjectField) *Comment {
 		// {$foo} shorthand
 		p.write(v.Name)
 		return nil
+	}
+	// Unquote string keys that are valid bare identifiers: {"foo": .} → {foo: .}
+	if sl, ok := f.Key.(*StrLit); ok {
+		if bare := bareKey(sl.Raw); bare != "" {
+			p.write(bare)
+			if f.KeyOptional {
+				p.write("?")
+			}
+			if f.Value != nil {
+				p.write(": ")
+				val, tc := stripTrailing(f.Value)
+				p.node(val)
+				return tc
+			}
+			return nil
+		}
 	}
 	p.node(f.Key)
 	if f.KeyOptional {
@@ -1204,4 +1247,25 @@ func (p *printer) nodeInline(n Node) {
 	default:
 		p.node(n)
 	}
+}
+
+// ── key helpers ───────────────────────────────────────────────────────────────
+
+var jqIdentRe = regexp.MustCompile(`^[a-zA-Z_][a-zA-Z0-9_]*$`)
+
+// bareKey returns the unquoted form of a double-quoted string literal key if
+// it is a valid jq identifier with no escape sequences (e.g. "foo" → foo).
+// Returns "" if the key must stay quoted.
+func bareKey(raw string) string {
+	if len(raw) < 2 || raw[0] != '"' || raw[len(raw)-1] != '"' {
+		return ""
+	}
+	inner := raw[1 : len(raw)-1]
+	if strings.ContainsRune(inner, '\\') {
+		return "" // escape sequences — keep quoted
+	}
+	if !jqIdentRe.MatchString(inner) {
+		return "" // not a bare identifier (contains dots, hyphens, etc.)
+	}
+	return inner
 }

@@ -44,8 +44,9 @@ func Format(src string, lang syntax.LangVariant, jqFmt func(expr string, inline 
 }
 
 // FormatWithTidy formats a shell script with idiomatic rewrites applied first.
-// Currently rewrites: "|| true" → "|| :".
+// Currently rewrites: shebang normalisation; "|| true" → "|| :"; "which" → "command -v".
 func FormatWithTidy(src string, lang syntax.LangVariant, jqFmt func(expr string, inline bool) string) (string, error) {
+	src = TidyShebang(src)
 	f, err := parseShell(src, lang)
 	if err != nil {
 		return "", err
@@ -55,6 +56,29 @@ func FormatWithTidy(src string, lang syntax.LangVariant, jqFmt func(expr string,
 		formatJQInAST(f, jqFmt)
 	}
 	return printShell(f)
+}
+
+// FormatWithPedantic applies pedantic-level rewrites on top of tidy.
+// Adds set flag normalisation (set -e → set -eu for sh; → set -Eeuo pipefail for bash).
+// NormalizeSetFlags runs on source text before parsing (same pattern as TidyShebang)
+// to preserve correct position info in the parsed AST.
+func FormatWithPedantic(src string, lang syntax.LangVariant, jqFmt func(expr string, inline bool) string) (string, error) {
+	src = TidyShebang(src)
+	src = NormalizeSetFlags(src, lang)
+	f, err := parseShell(src, lang)
+	if err != nil {
+		return "", err
+	}
+	ApplyTidy(f)
+	if jqFmt != nil {
+		formatJQInAST(f, jqFmt)
+	}
+	return printShell(f)
+}
+
+// ParseFile parses src as a shell script of the given language variant.
+func ParseFile(src string, lang syntax.LangVariant) (*syntax.File, error) {
+	return parseShell(src, lang)
 }
 
 func parseShell(src string, lang syntax.LangVariant) (*syntax.File, error) {
@@ -76,8 +100,8 @@ func printShell(f *syntax.File) (string, error) {
 
 func newPrinter() *syntax.Printer {
 	return syntax.NewPrinter(
-		syntax.Indent(0),             // 0 = tabs (corpus: all .sh files use tabs)
-		syntax.BinaryNextLine(false), // binary ops stay on current line
+		syntax.Indent(0),            // 0 = tabs (corpus: all .sh files use tabs)
+		syntax.BinaryNextLine(true), // && / || at start of continuation line (bash.md §Notable omissions)
 		syntax.SwitchCaseIndent(true),
 		syntax.KeepPadding(false),
 	)
@@ -391,8 +415,17 @@ func reformatSglQuoted(sgl *syntax.SglQuoted, jqFmt func(expr string, inline boo
 // reformatJQInLine reformats any `jq '...'` expression on a single shell line.
 // Used by FormatRUN for jq inside Dockerfile RUN blocks.
 func reformatJQInLine(line string, jqFmt func(expr string, inline bool) string) string {
-	// Find 'jq' followed by optional flags followed by a single-quoted expression.
-	// Simple heuristic: look for a single-quoted string at end of line.
+	// Only attempt jq reformatting if the line actually contains a jq invocation.
+	// Without this guard, PowerShell single-quoted strings (and other non-jq
+	// constructs) would be incorrectly passed to the jq formatter.
+	trimmed := strings.TrimLeft(line, "\t ")
+	if !strings.HasPrefix(trimmed, "jq ") && !strings.HasPrefix(trimmed, "jq'") {
+		// Also allow jq appearing inside a pipeline: "... | jq '..."
+		if !strings.Contains(line, " jq '") && !strings.Contains(line, "\tjq '") {
+			return line
+		}
+	}
+
 	sq := strings.LastIndex(line, "'")
 	if sq < 1 {
 		return line

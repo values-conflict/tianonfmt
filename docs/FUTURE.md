@@ -72,6 +72,56 @@ are added to the corpus.
 
 These are tool-configuration preferences rather than file-format or code-style choices, so they are out of scope for the current docs.  Worth revisiting if the documentation scope expands to cover Tianon's general development workflow.
 
+## Known formatter limitations
+
+### mvdan/sh printer non-idempotency on heredoc-in-complex-nesting
+
+The `shell.Format` function wraps `mvdan.cc/sh/v3`'s printer. In rare cases involving heredoc redirects (`<<-`) inside deeply nested constructs (functions within functions, multiple heredocs in the same file, specific SQL content with space indentation), the printer is not idempotent: formatting the output a second time produces slightly different heredoc-body indentation.
+
+Confirmed affected file: the mariadb docker-entrypoint.sh — line 631 changes from 2 to 3 leading tabs between the first and second format pass.  The root cause is in the mvdan/sh library, not in `tianonfmt`.
+
+**Impact**: rare in practice; only affects files with many heredocs in deep nesting that use space-indented SQL.  The `TestFormatIdempotent` tests explicitly avoid such files.
+
+**Resolution path**: file an issue upstream in `mvdan.cc/sh`; or add a "run twice and diff" check to `tianonfmt --diff` to surface the issue.
+
+### ~~jq formatter non-idempotency: comment between `if` and condition~~ FIXED
+
+The fix: strip leading comments from the condition `CommentedExpr` and emit them BEFORE the `if` keyword in `ifExpr()`.  The second parse then attaches the comment to the outer expression rather than inside the condition.
+
+### jq template formatter non-idempotency: partial jq across template markers
+
+The jq formatter is not idempotent when an `if` keyword is separated from its condition by a comment line:
+
+```jq
+if
+# appease tooling
+IN($args; ...) then
+```
+
+On the first format pass the structure is preserved; on the second pass the formatter re-joins `if` and `IN(` as `if IN(`. Discovered via `hylang/generate-stackbrew-library.jq` from the Docker Official Images anticorpus.
+
+**Root cause**: the jq parser incorrectly attaches the comment as a leading comment on the `if`'s *condition* rather than on the `if` expression itself.  The formatter then outputs the comment between `if ` and the condition.  On re-parse, the comment is now inside the argument list of the first function call in the condition (e.g. inside `IN(`), which changes the AST again.
+
+Minimal reproduction:
+```jq
+(
+    # leading comment
+    if IN($a; [], ["x"]) then . else error("x") end
+    | .latest
+)
+```
+Pass 1 → `if \n# comment\nIN(...)`.  Pass 2 → `if IN(\n    # comment\n    $a;\n    ...)`.
+
+**Resolution path**: fix the `ifExpr` formatter to preserve comments between `if` and its condition on re-parse.
+
+### Template formatter non-idempotency: partial jq across template markers
+
+In `Dockerfile.template` files, jq expressions that span multiple `{{ -}}` / `{{ }}` template markers can have their indentation changed by the formatter across passes.  Specifically, a `) | add` closing a parenthesized jq expression can shift from 2 to 3 leading tabs when reformatted a second time.
+
+Discovered via `tianon-dockerfiles/buildkit/Dockerfile.template`, where `) | add` in a `RUN` block containing jq template expressions is non-idempotent.
+
+**Root cause**: the template formatter calls `jqFmtFunc` on partial jq expressions; when the expression is only a fragment (e.g. `) | add`) it round-trips correctly but the surrounding context indentation is recalculated differently.
+
 ## Vimscript
 
 The [`home/vimrc.d/`](https://github.com/tianon/home/tree/720c476e79a50ab0dd133f7187bd046b32cd5b73/vimrc.d) and [`home/vim-tianon/`](https://github.com/tianon/home/tree/720c476e79a50ab0dd133f7187bd046b32cd5b73/vim-tianon) directories contain

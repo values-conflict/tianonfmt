@@ -66,7 +66,7 @@ type execFormAST struct {
 	EndLine   int       `json:"endLine"`
 }
 
-// copyAST covers COPY and ADD with flags extracted and exec/shell form detected.
+// copyAST covers COPY and ADD with flags extracted and json/plain path form detected.
 type copyAST struct {
 	Type      string    `json:"type"`
 	From      string    `json:"from,omitempty"`
@@ -120,7 +120,8 @@ func marshalInstruction(instr *Instruction) any {
 			EndLine:   instr.EndLine,
 		}
 
-	case "CMD", "ENTRYPOINT", "SHELL", "RUN", "VOLUME":
+	case "CMD", "ENTRYPOINT", "SHELL", "RUN":
+		// exec form = exec'd directly; shell form = run through /bin/sh -c.
 		form, execArgs, shellArgs := parseExecForm(instr.Args)
 		var args any
 		if form == "exec" {
@@ -136,6 +137,65 @@ func marshalInstruction(instr *Instruction) any {
 			StartLine: instr.StartLine,
 			EndLine:   instr.EndLine,
 		}
+
+	case "VOLUME":
+		// json form = ["path1","path2"]; plain form = path1 path2 (no shell involved).
+		form, jsonPaths, plainPaths := parseJsonForm(instr.Args)
+		var args any
+		if form == "json" {
+			args = jsonPaths
+		} else {
+			args = plainPaths
+		}
+		return execFormAST{
+			Type:      kw,
+			Form:      form,
+			Args:      args,
+			Lines:     lines,
+			StartLine: instr.StartLine,
+			EndLine:   instr.EndLine,
+		}
+
+	case "HEALTHCHECK":
+		// HEALTHCHECK NONE → no args; HEALTHCHECK [flags] CMD ... → exec/shell form
+		if strings.TrimSpace(instr.Args) == "NONE" {
+			return map[string]any{
+				"type": "HEALTHCHECK", "check": "none",
+				"lines": lines, "startLine": instr.StartLine, "endLine": instr.EndLine,
+			}
+		}
+		// Strip flags (--interval=, --timeout=, --retries=, --start-period=)
+		rest := strings.TrimSpace(instr.Args)
+		flags := map[string]string{}
+		for strings.HasPrefix(rest, "--") {
+			i := strings.IndexByte(rest, ' ')
+			if i < 0 {
+				break
+			}
+			flag := rest[:i]
+			rest = strings.TrimSpace(rest[i:])
+			if k, v, ok := strings.Cut(flag, "="); ok {
+				flags[strings.TrimPrefix(k, "--")] = v
+			}
+		}
+		// rest should now be "CMD ..." — parse the CMD part
+		cmdKw, cmdArgs, _ := strings.Cut(rest, " ")
+		form, execArgs, shellArgs := parseExecForm(cmdArgs)
+		var args any
+		if form == "exec" {
+			args = execArgs
+		} else {
+			args = shellArgs
+		}
+		m := map[string]any{
+			"type": "HEALTHCHECK", "check": strings.ToUpper(cmdKw),
+			"form": form, "cmd": args,
+			"lines": lines, "startLine": instr.StartLine, "endLine": instr.EndLine,
+		}
+		for k, v := range flags {
+			m[k] = v
+		}
+		return m
 
 	case "COPY", "ADD":
 		from, form, paths := parseCOPYArgs(instr.Args)
@@ -196,7 +256,9 @@ func parseFROMArgs(args string) (platform, ref, alias string) {
 	return
 }
 
-// parseExecForm detects JSON exec form ("[...]") vs shell form.
+// parseExecForm detects JSON exec form ("[...]") vs shell form for instructions
+// where the distinction is semantic — the command either runs through a shell
+// (/bin/sh -c) or is exec'd directly.  Used for CMD, ENTRYPOINT, SHELL, RUN.
 func parseExecForm(args string) (form string, execArgs []string, shellArgs string) {
 	trimmed := strings.TrimSpace(args)
 	if strings.HasPrefix(trimmed, "[") {
@@ -208,21 +270,34 @@ func parseExecForm(args string) (form string, execArgs []string, shellArgs strin
 	return "shell", nil, args
 }
 
-// parseCOPYArgs strips COPY/ADD flags and detects exec vs shell form.
+// parseJsonForm detects JSON array syntax ("[...]") vs plain path syntax for
+// instructions where the difference is purely syntactic (no shell involved).
+// Used for VOLUME, COPY, and ADD.
+func parseJsonForm(s string) (form string, jsonPaths []string, plainPaths string) {
+	trimmed := strings.TrimSpace(s)
+	if strings.HasPrefix(trimmed, "[") {
+		var paths []string
+		if err := json.Unmarshal([]byte(trimmed), &paths); err == nil {
+			return "json", paths, ""
+		}
+	}
+	return "plain", nil, s
+}
+
+// parseCOPYArgs strips COPY/ADD flags and detects json vs plain path form.
 // All COPY/ADD flags use = syntax (--from=, --chown=, --chmod=, --link, etc.),
 // so we can split on spaces to advance past flags without ambiguity.
 // The path spec is then the remaining string; if it starts with "[" and is
-// valid JSON it is exec form, otherwise shell form.
+// valid JSON it is json form, otherwise plain form.
 func parseCOPYArgs(args string) (from, form string, paths any) {
 	s := strings.TrimSpace(args)
 	for strings.HasPrefix(s, "--") {
 		i := strings.IndexByte(s, ' ')
 		if i < 0 {
-			// Only flags, no path spec.
 			if val, ok := strings.CutPrefix(s, "--from="); ok {
 				from = val
 			}
-			return from, "shell", ""
+			return from, "plain", ""
 		}
 		flag := s[:i]
 		if val, ok := strings.CutPrefix(flag, "--from="); ok {
@@ -230,12 +305,10 @@ func parseCOPYArgs(args string) (from, form string, paths any) {
 		}
 		s = strings.TrimSpace(s[i:])
 	}
-	// s is now the path spec; may contain spaces (exec form paths like "C:\Program Files").
-	if strings.HasPrefix(s, "[") {
-		var exec []string
-		if err := json.Unmarshal([]byte(s), &exec); err == nil {
-			return from, "exec", exec
-		}
+	// s is now the path spec; may contain spaces in JSON array paths.
+	jsonForm, jsonPaths, plainPaths := parseJsonForm(s)
+	if jsonForm == "json" {
+		return from, "json", jsonPaths
 	}
-	return from, "shell", s
+	return from, "plain", plainPaths
 }

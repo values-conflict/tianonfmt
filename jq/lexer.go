@@ -1,7 +1,6 @@
 package jq
 
 import (
-	"fmt"
 	"strings"
 	"unicode/utf8"
 )
@@ -101,7 +100,7 @@ func (l *Lexer) next() Token {
 	l.pos++
 	k, ok := singleChar[ch]
 	if !ok {
-		panic(fmt.Sprintf("jq lexer: unexpected character %q at offset %d", ch, at))
+		return Token{Kind: INVALID, Text: string(ch), At: Pos(at), Line: line}
 	}
 
 	// A bare dot followed by a digit is a leading-decimal number: .5, .25e3, etc.

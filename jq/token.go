@@ -24,6 +24,11 @@ type Kind int
 const (
 	EOF Kind = iota
 
+	// INVALID is returned by the lexer when it encounters a character that is
+	// not part of the jq grammar.  The Text field holds the offending character.
+	// This allows the parser to surface a clean error rather than panicking.
+	INVALID
+
 	COMMENT // # ...  (text includes # but not the trailing newline)
 
 	IDENT   // foo, empty, not, …
@@ -95,6 +100,7 @@ const (
 
 var kindNames = map[Kind]string{
 	EOF:       "EOF",
+	INVALID:   "Invalid",
 	COMMENT:   "Comment",
 	IDENT:     "Ident",
 	FIELD:     "Field",

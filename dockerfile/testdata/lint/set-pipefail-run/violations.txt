@@ -1,0 +1,1 @@
+2: "set -Eeuo pipefail" in Dockerfile RUN uses bash-only flags; use "set -eux"

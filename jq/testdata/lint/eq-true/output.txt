@@ -1,0 +1,1 @@
+1: "== true": use the expression directly or "| . == true" for strict boolean check
