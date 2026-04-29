@@ -419,11 +419,11 @@ func reformatJQInLine(line string, jqFmt func(expr string, inline bool) string) 
 	// Without this guard, PowerShell single-quoted strings (and other non-jq
 	// constructs) would be incorrectly passed to the jq formatter.
 	trimmed := strings.TrimLeft(line, "\t ")
-	if !strings.HasPrefix(trimmed, "jq ") && !strings.HasPrefix(trimmed, "jq'") {
-		// Also allow jq appearing inside a pipeline: "... | jq '..."
-		if !strings.Contains(line, " jq '") && !strings.Contains(line, "\tjq '") {
-			return line
-		}
+	hasJQ := strings.HasPrefix(trimmed, "jq ") || strings.HasPrefix(trimmed, "jq'") ||
+		strings.Contains(line, " jq '") || strings.Contains(line, "\tjq '") ||
+		strings.Contains(line, "$(jq '") || strings.Contains(line, "$(jq -")
+	if !hasJQ {
+		return line
 	}
 
 	sq := strings.LastIndex(line, "'")
@@ -443,7 +443,8 @@ func reformatJQInLine(line string, jqFmt func(expr string, inline bool) string) 
 	if formatted == "" || strings.Contains(formatted, "\n") {
 		return line
 	}
-	return line[:firstSQ+1] + formatted + "'"
+	// Preserve everything after the closing quote (e.g. filename args, redirects).
+	return line[:firstSQ+1] + formatted + "'" + line[sq+1:]
 }
 
 // leadingTabs returns the leading tab characters of s.
