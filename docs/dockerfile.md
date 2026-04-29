@@ -64,7 +64,9 @@ ENV LANG en_US.utf8
 ENV HOME /home/steam
 ```
 
-The old `ENV key value` form (with a space separator, no `=`) is used.  The `key=value` form with `=` is not used for single-value ENV.
+The `ENV key value` form (space separator, no `=`) is used.  The `key=value` form with `=` is not used for single-value ENV.
+
+**Community divergence note**: The `ENV KEY=VALUE` form is the default in virtually every non-Tianon Dockerfile (it mirrors shell assignment syntax and is accepted by all Docker versions).  `tianonfmt` normalises it to `ENV KEY VALUE` automatically as a formatting rule — no flag needed, it happens on every format pass.
 
 Multi-value `ENV` uses the continuation form:
 
@@ -90,6 +92,8 @@ RUN set -eux; \
 ```
 
 Some simpler scripts use `set -ex` (without `-u`).  In Dockerfiles specifically — unlike standalone shell scripts — `set -eux` is the norm, not `set -Eeuo pipefail`, because Docker's default shell is `/bin/sh` (not bash), and `-E`, `-o pipefail` are bash-specific.
+
+**Community divergence note**: The majority of Docker Official Image Dockerfiles (those not authored by Tianon) use `&&` chains without `set -eux` — this is the default community convention.  `tianonfmt --tidy` normalises those chains to Tianon's `set -eux; \` form.  The `&&`-chain style is Wrong in Tianon's opinion but widespread, which is why it is a `--tidy` target rather than a formatting error.
 
 Corpus refs: [`debuerreotype/Dockerfile#L14`](https://github.com/debuerreotype/debuerreotype/blob/3c3272fa743e0257ae64081987c500c2923ea963/Dockerfile#L14), [`tianon-dockerfiles/steam/Dockerfile#L3`](https://github.com/tianon/dockerfiles/blob/2118a1979eff7545e06570d1eefc6434d691e68d/steam/Dockerfile#L3).
 
@@ -197,6 +201,30 @@ CMD ["bash", "-c", "..."]
 
 The combinatory behaviour of mixing exec-form and shell-form `CMD`/`ENTRYPOINT` is too difficult to reason about.  If a script's worth of shell is needed, the right answer is a dedicated shell `ENTRYPOINT` script rather than shell-form `CMD`.
 
+**`--tidy` normalisation**: shell-form `CMD`/`ENTRYPOINT` that contain no shell features (`$`, `|`, `;`, `&`, `*`, `?`, quotes, …) are automatically converted to exec form by whitespace-splitting:
+
+```dockerfile
+# Before --tidy:
+CMD echo hello
+ENTRYPOINT /usr/local/bin/server --port 8080
+
+# After --tidy:
+CMD ["echo","hello"]
+ENTRYPOINT ["/usr/local/bin/server","--port","8080"]
+```
+
+**`--pedantic` normalisation**: any remaining shell-form (commands that *do* use shell features) is wrapped in an explicit `/bin/sh -c` invocation.  `ENTRYPOINT` gets a trailing `"--"` so that `CMD` arguments are forwarded as positional parameters rather than flags to `/bin/sh`:
+
+```dockerfile
+# Before --pedantic (after --tidy has run):
+CMD echo $HOME
+ENTRYPOINT exec "$@"
+
+# After --pedantic:
+CMD ["/bin/sh","-c","echo $HOME"]
+ENTRYPOINT ["/bin/sh","-c","exec \"$@\"","--"]
+```
+
 ## `STOPSIGNAL`, `EXPOSE`, `WORKDIR`
 
 Each on its own line, no trailing characters:
@@ -224,7 +252,12 @@ Generated Dockerfiles (produced from `Dockerfile.template` sources) carry the ge
 
 ## Notable omissions
 
-- `set -Eeuo pipefail` inside `RUN` — the simpler `set -eux` is used (POSIX sh, no `-E` or pipefail)
+- `set -Eeuo pipefail` inside `RUN` — the simpler `set -eux` is used (POSIX sh, no `-E` or pipefail); `--tidy` normalises any `set` variant to `set -eux` automatically
+- `apt-get install` without `-y` and `--no-install-recommends` — both flags are mandatory in every corpus `apt-get install` call; `--pedantic` flags missing flags
+- `MAINTAINER` — deprecated instruction; `--pedantic` flags it
+- `HEALTHCHECK CMD ...` — never used; `HEALTHCHECK NONE` (disabling an inherited check) is acceptable; `--pedantic` flags CMD form
+- `ONBUILD` — never used; `--pedantic` flags it
+- `LABEL` — never used in normal Dockerfiles; `--pedantic` flags it.  Exception: `moby.buildkit.frontend.*` labels required by the BuildKit frontend protocol are whitelisted — Tianon uses these in his BuildKit-specific Dockerfiles because BuildKit itself requires them.
 - Heredoc syntax inside `RUN` — not used (only `\` continuation style)
 - `ARG` before `FROM` for multi-stage builds — not seen in corpus
 - `LABEL` instructions — not common in corpus Dockerfiles

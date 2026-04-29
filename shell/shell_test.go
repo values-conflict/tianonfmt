@@ -1,0 +1,538 @@
+package shell_test
+
+import (
+	"encoding/json"
+	"flag"
+	"fmt"
+	"os"
+	"strings"
+	"testing"
+
+	"github.com/tianon/fmt/tianonfmt/internal/testutil"
+
+	"github.com/tianon/fmt/tianonfmt/shell"
+	"mvdan.cc/sh/v3/syntax"
+)
+
+
+func TestMain(m *testing.M) {
+	flag.Parse()
+	os.Exit(m.Run())
+}
+
+// ── format ────────────────────────────────────────────────────────────────────
+
+func TestFormat(t *testing.T) {
+	testutil.Golden(t, "testdata/format", ".sh", ".sh", func(input string) (string, error) {
+		return shell.Format(input, shell.DetectLang(input), nil)
+	})
+}
+
+func TestFormatIdempotent(t *testing.T) {
+	testutil.Golden(t, "testdata/format", ".sh", ".sh", func(input string) (string, error) {
+		lang := shell.DetectLang(input)
+		first, err := shell.Format(input, lang, nil)
+		if err != nil {
+			return "", err
+		}
+		return shell.Format(first, lang, nil)
+	})
+}
+
+// ── tidy ──────────────────────────────────────────────────────────────────────
+
+func TestTidy(t *testing.T) {
+	testutil.Golden(t, "testdata/tidy", ".sh", ".sh", func(input string) (string, error) {
+		return shell.FormatWithTidy(input, shell.DetectLang(input), nil)
+	})
+}
+
+func TestTidyIdempotent(t *testing.T) {
+	testutil.Golden(t, "testdata/tidy", ".sh", ".sh", func(input string) (string, error) {
+		lang := shell.DetectLang(input)
+		first, err := shell.FormatWithTidy(input, lang, nil)
+		if err != nil {
+			return "", err
+		}
+		return shell.FormatWithTidy(first, lang, nil)
+	})
+}
+
+// ── DetectLang ────────────────────────────────────────────────────────────────
+
+func TestDetectLang(t *testing.T) {
+	tests := []struct {
+		src  string
+		want syntax.LangVariant
+	}{
+		{"#!/bin/sh\necho hi\n", syntax.LangPOSIX},
+		{"#!/usr/bin/env bash\n", syntax.LangBash},
+		{"#!/bin/bash\n", syntax.LangBash},
+		{"#!/usr/bin/env mksh\n", syntax.LangMirBSDKorn},
+		{"no shebang\n", syntax.LangBash},
+	}
+	for _, tt := range tests {
+		t.Run(tt.src[:min(len(tt.src), 20)], func(t *testing.T) {
+			if got := shell.DetectLang(tt.src); got != tt.want {
+				t.Errorf("DetectLang(%q) = %v, want %v", tt.src, got, tt.want)
+			}
+		})
+	}
+}
+
+// ── TidyShebang ───────────────────────────────────────────────────────────────
+
+func TestTidyShebang(t *testing.T) {
+	tests := []struct{ in, want string }{
+		{"#!/bin/bash\necho hi\n", "#!/usr/bin/env bash\necho hi\n"},
+		{"#!/bin/sh\necho hi\n", "#!/usr/bin/env bash\necho hi\n"},
+		{"#!/usr/bin/env bash\necho hi\n", "#!/usr/bin/env bash\necho hi\n"},
+		{"#!/bin/bash", "#!/usr/bin/env bash"},
+		{"no shebang\n", "no shebang\n"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.in[:min(len(tt.in), 20)], func(t *testing.T) {
+			if got := shell.TidyShebang(tt.in); got != tt.want {
+				t.Errorf("TidyShebang(%q) = %q, want %q", tt.in, got, tt.want)
+			}
+		})
+	}
+}
+
+// ── FlattenAndChain ───────────────────────────────────────────────────────────
+
+func TestFlattenAndChain(t *testing.T) {
+	tests := []struct {
+		src   string
+		count int // expected len; -1 = nil
+	}{
+		{"cmd1 && cmd2 && cmd3", 3},
+		{"cmd1 && cmd2", 2},
+		{"cmd1", 1},          // single command: returns [stmt]
+		{"cmd1 || cmd2", -1}, // || at root: nil
+		{"cmd1 | cmd2", -1},  // pipeline is a BinaryCmd with pipe op, not &&: nil
+	}
+	for _, tt := range tests {
+		t.Run(tt.src, func(t *testing.T) {
+			f, err := shell.ParseFile(tt.src, syntax.LangBash)
+			if err != nil || len(f.Stmts) != 1 {
+				t.Skip("parse error or multiple stmts")
+			}
+			got := shell.FlattenAndChain(f.Stmts[0])
+			if tt.count < 0 {
+				if got != nil {
+					t.Errorf("expected nil, got %d stmts", len(got))
+				}
+			} else if len(got) != tt.count {
+				t.Errorf("expected %d stmts, got %d", tt.count, len(got))
+			}
+		})
+	}
+}
+
+// ── ApplyTidy ─────────────────────────────────────────────────────────────────
+
+func TestApplyTidy_Backtick(t *testing.T) {
+	f, _ := shell.ParseFile("result=`date`\n", syntax.LangBash)
+	shell.ApplyTidy(f)
+	out, _ := shell.FormatStmtOneLine(f.Stmts[0])
+	if !strings.Contains(out, "$(") || strings.Contains(out, "`") {
+		t.Errorf("backtick not converted to $(): %q", out)
+	}
+}
+
+func TestApplyTidy_FunctionKeyword(t *testing.T) {
+	f, _ := shell.ParseFile("function greet { echo hi; }\n", syntax.LangBash)
+	shell.ApplyTidy(f)
+	var buf strings.Builder
+	_ = buf
+	out, _ := shell.FormatStmtOneLine(f.Stmts[0])
+	if strings.Contains(out, "function") {
+		t.Errorf("function keyword not removed: %q", out)
+	}
+}
+
+func TestApplyTidy_BracketDoubleEquals(t *testing.T) {
+	f, _ := shell.ParseFile(`if [ "$a" == "$b" ]; then echo same; fi`+"\n", syntax.LangBash)
+	shell.ApplyTidy(f)
+	out, _ := shell.FormatStmtOneLine(f.Stmts[0])
+	if strings.Contains(out, "==") {
+		t.Errorf("[ == ] not converted to [ = ]: %q", out)
+	}
+	if !strings.Contains(out, `"$a" = "$b"`) {
+		t.Errorf("expected [ = ] in: %q", out)
+	}
+}
+
+func TestApplyTidy_OrTrue(t *testing.T) {
+	f, _ := shell.ParseFile("cmd || true\n", syntax.LangBash)
+	shell.ApplyTidy(f)
+	out, _ := shell.FormatStmtOneLine(f.Stmts[0])
+	if out != "cmd || :" {
+		t.Errorf("got %q, want %q", out, "cmd || :")
+	}
+}
+
+func TestApplyTidy_Which(t *testing.T) {
+	f, _ := shell.ParseFile("which docker\n", syntax.LangBash)
+	shell.ApplyTidy(f)
+	out, _ := shell.FormatStmtOneLine(f.Stmts[0])
+	if out != "command -v docker" {
+		t.Errorf("got %q, want %q", out, "command -v docker")
+	}
+}
+
+func TestApplyTidy_WhichWithFlags_Unchanged(t *testing.T) {
+	// which -a has no command -v equivalent; must not be modified
+	f, _ := shell.ParseFile("which -a docker\n", syntax.LangBash)
+	shell.ApplyTidy(f)
+	out, _ := shell.FormatStmtOneLine(f.Stmts[0])
+	if out != "which -a docker" {
+		t.Errorf("got %q, want unchanged %q", out, "which -a docker")
+	}
+}
+
+// ── MarshalFile ───────────────────────────────────────────────────────────────
+
+func TestMarshalFile(t *testing.T) {
+	f, err := shell.ParseFile("#!/usr/bin/env bash\necho hi\n", syntax.LangBash)
+	if err != nil {
+		t.Fatal(err)
+	}
+	v := shell.MarshalFile(f, "test.sh")
+	b, err := json.Marshal(v)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := string(b)
+	for _, want := range []string{`"type":"shell"`, `"file":"test.sh"`, `"stmts"`} {
+		if !strings.Contains(got, want) {
+			t.Errorf("MarshalFile JSON missing %q\ngot: %s", want, got)
+		}
+	}
+}
+
+func TestMarshalFile_DeclClause(t *testing.T) {
+	f, err := shell.ParseFile("local x=\"$1\"\n", syntax.LangBash)
+	if err != nil {
+		t.Fatal(err)
+	}
+	v := shell.MarshalFile(f, "-")
+	b, _ := json.Marshal(v)
+	got := string(b)
+	if !strings.Contains(got, `"type":"local"`) {
+		t.Errorf("DeclClause (local) not serialized correctly\ngot: %s", got)
+	}
+}
+
+// ── FormatRUN ─────────────────────────────────────────────────────────────────
+
+func TestFormatRUN_BasicIndent(t *testing.T) {
+	// Continuation lines at depth 0 get 1 tab.
+	lines := []string{"\tapt-get update; \\", "\tapt-get install -y curl"}
+	got := shell.FormatRUN(lines, nil)
+	for _, l := range got {
+		trimmed := strings.TrimRight(l, " \\")
+		if !strings.HasPrefix(trimmed, "\t") {
+			t.Errorf("expected 1-tab indent, got %q", l)
+		}
+	}
+}
+
+func TestFormatRUN_IfBlock(t *testing.T) {
+	// Commands inside if/then get 2 tabs; fi gets 1 tab.
+	lines := []string{
+		"\tif [ \"$x\" = \"foo\" ]; then \\",
+		"\t\techo ok; \\",
+		"\tfi",
+	}
+	got := shell.FormatRUN(lines, nil)
+	if len(got) < 3 {
+		t.Fatalf("expected 3 lines, got %d", len(got))
+	}
+	// if line: 1 tab
+	if !strings.HasPrefix(got[0], "\tif ") {
+		t.Errorf("if line wrong indent: %q", got[0])
+	}
+	// echo line inside then: 2 tabs
+	if !strings.HasPrefix(strings.TrimRight(got[1], " \\"), "\t\techo") {
+		t.Errorf("echo line wrong indent: %q", got[1])
+	}
+	// fi: 1 tab
+	if !strings.HasPrefix(got[2], "\tfi") {
+		t.Errorf("fi line wrong indent: %q", got[2])
+	}
+}
+
+func TestFormatRUN_CommentAtColumnZero(t *testing.T) {
+	lines := []string{"\tapt-get update; \\", "# a comment", "\tapt-get install -y curl"}
+	got := shell.FormatRUN(lines, nil)
+	for _, l := range got {
+		if strings.HasPrefix(l, "#") {
+			// Comment lines must be at column 0 (no tab prefix).
+			return
+		}
+	}
+	t.Error("no comment line found at column 0")
+}
+
+func TestFormatRUN_Empty(t *testing.T) {
+	got := shell.FormatRUN(nil, nil)
+	if got != nil {
+		t.Errorf("empty input should return nil, got %v", got)
+	}
+}
+
+func TestFormatRUN_Idempotent(t *testing.T) {
+	lines := []string{"\tapt-get update; \\", "# comment", "\tapt-get install -y curl"}
+	first := shell.FormatRUN(lines, nil)
+	second := shell.FormatRUN(first, nil)
+	if fmt.Sprint(first) != fmt.Sprint(second) {
+		t.Errorf("FormatRUN not idempotent\nfirst:  %v\nsecond: %v", first, second)
+	}
+}
+
+// ── NormalizeSetFlags / FormatWithPedantic ────────────────────────────────────
+
+func TestNormalizeSetFlags_Bash(t *testing.T) {
+	cases := []struct{ in, want string }{
+		{"set -e", "set -Eeuo pipefail"},
+		{"set -eu", "set -Eeuo pipefail"},
+		{"set -eux", "set -Eeuo pipefail"},    // top-level: -x stripped
+		{"set -ex", "set -Eeuo pipefail"},    // top-level: -x stripped (global set -x is Wrong)
+		{"\tset -ex", "\tset -Eeuxo pipefail"}, // indented (inside block): -x preserved
+		{"set -Eeuo pipefail", "set -Eeuo pipefail"}, // already canonical
+		{"echo hi", "echo hi"},             // not a set command
+		{"set --", "set --"},               // positional args reset, leave alone
+	}
+	for _, tt := range cases {
+		t.Run(tt.in, func(t *testing.T) {
+			got := shell.NormalizeSetFlags(tt.in, syntax.LangBash)
+			if got != tt.want {
+				t.Errorf("NormalizeSetFlags(%q, bash) = %q, want %q", tt.in, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestNormalizeSetFlags_POSIX(t *testing.T) {
+	cases := []struct{ in, want string }{
+		{"set -e", "set -eu"},
+		{"set -eu", "set -eu"},             // already canonical
+		{"set -ex", "set -eu"},             // top-level: -x stripped (global set -x is Wrong)
+		{"set -Eeuo pipefail", "set -eu"},  // strips bash-only flags
+		{"\tset -ex", "\tset -eux"},        // indented (inside block): -x preserved
+	}
+	for _, tt := range cases {
+		t.Run(tt.in, func(t *testing.T) {
+			got := shell.NormalizeSetFlags(tt.in, syntax.LangPOSIX)
+			if got != tt.want {
+				t.Errorf("NormalizeSetFlags(%q, posix) = %q, want %q", tt.in, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestFormatWithPedantic_SetNormalization(t *testing.T) {
+	src := "#!/usr/bin/env bash\nset -e\necho hi\n"
+	out, err := shell.FormatWithPedantic(src, syntax.LangBash, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, "set -Eeuo pipefail") {
+		t.Errorf("expected set -Eeuo pipefail in output, got: %q", out)
+	}
+}
+
+func TestFormatWithPedantic_AlreadyCanonical(t *testing.T) {
+	src := "#!/usr/bin/env bash\nset -Eeuo pipefail\necho hi\n"
+	out, err := shell.FormatWithPedantic(src, syntax.LangBash, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, "set -Eeuo pipefail") {
+		t.Errorf("canonical form should be preserved: %q", out)
+	}
+}
+
+// ── Format with jq callback ───────────────────────────────────────────────────
+
+func TestFormatWithJQCallback_NoChange(t *testing.T) {
+	// When jqFmt returns the same expression (already canonical), reformatSglQuoted
+	// must leave the value unchanged — exercises the "formatted == expr" no-op path.
+	src := "#!/usr/bin/env bash\nresult=$(jq '.foo' <<<\"$input\")\n"
+	jqFmt := func(expr string, inline bool) string {
+		return expr // passthrough — always returns the same value
+	}
+	out, err := shell.Format(src, syntax.LangBash, jqFmt)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// The jq expression should be unchanged in the output.
+	if !strings.Contains(out, "'.foo'") {
+		t.Errorf("expression changed unexpectedly: %q", out)
+	}
+}
+
+func TestFormatWithJQCallback_Empty(t *testing.T) {
+	// Empty single-quoted jq expression: jq '' — triggers the empty-string early return
+	src := "#!/usr/bin/env bash\nresult=$(jq '' <<<\"$input\")\n"
+	jqFmt := func(expr string, inline bool) string { return expr }
+	out, err := shell.Format(src, syntax.LangBash, jqFmt)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, "jq") {
+		t.Errorf("unexpected output: %q", out)
+	}
+}
+
+func TestFormatWithJQCallback_Multiline(t *testing.T) {
+	// A multi-line single-quoted jq expression triggers reformatSglQuoted's
+	// multi-line path (the one that strips and re-adds indentation).
+	src := "#!/usr/bin/env bash\nresult=$(jq '\n\t.foo\n\t| .bar\n' <<<\"$input\")\n"
+	jqFmt := func(expr string, inline bool) string {
+		if inline {
+			return strings.TrimSpace(expr)
+		}
+		return expr // passthrough for multi-line
+	}
+	out, err := shell.Format(src, syntax.LangBash, jqFmt)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, ".foo") {
+		t.Errorf("jq expr not in output: %q", out)
+	}
+}
+
+func TestFormatWithJQCallback(t *testing.T) {
+	src := "#!/usr/bin/env bash\nresult=$(jq -r '.foo' <<<\"$input\")\n"
+	jqFmt := func(expr string, inline bool) string {
+		if expr == ".foo" {
+			return ".foo" // passthrough
+		}
+		return ""
+	}
+	out, err := shell.Format(src, syntax.LangBash, jqFmt)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, ".foo") {
+		t.Errorf("jq expr not preserved: %q", out)
+	}
+}
+
+// ── Marshal: all command types ────────────────────────────────────────────────
+
+func TestMarshalFile_IfClause(t *testing.T) {
+	f, _ := shell.ParseFile("if [ \"$x\" = a ]; then echo yes; elif [ \"$x\" = b ]; then echo maybe; else echo no; fi\n", syntax.LangBash)
+	b, _ := json.Marshal(shell.MarshalFile(f, "-"))
+	got := string(b)
+	for _, want := range []string{`"type":"if"`, `"elifs"`, `"else"`} {
+		if !strings.Contains(got, want) {
+			t.Errorf("missing %q in:\n%s", want, got)
+		}
+	}
+}
+
+func TestMarshalFile_WhileLoop(t *testing.T) {
+	f, _ := shell.ParseFile("while read -r line; do echo \"$line\"; done\n", syntax.LangBash)
+	b, _ := json.Marshal(shell.MarshalFile(f, "-"))
+	if !strings.Contains(string(b), `"type":"while"`) {
+		t.Errorf("while not serialized: %s", string(b))
+	}
+}
+
+func TestMarshalFile_ForLoop(t *testing.T) {
+	f, _ := shell.ParseFile("for x in a b c; do echo \"$x\"; done\n", syntax.LangBash)
+	b, _ := json.Marshal(shell.MarshalFile(f, "-"))
+	got := string(b)
+	if !strings.Contains(got, `"type":"for"`) || !strings.Contains(got, `"type":"wordIter"`) {
+		t.Errorf("for/wordIter not serialized: %s", got)
+	}
+}
+
+func TestMarshalFile_CaseStatement(t *testing.T) {
+	f, _ := shell.ParseFile("case \"$x\" in a) echo a ;; b) echo b ;; *) echo other ;; esac\n", syntax.LangBash)
+	b, _ := json.Marshal(shell.MarshalFile(f, "-"))
+	if !strings.Contains(string(b), `"type":"case"`) {
+		t.Errorf("case not serialized: %s", string(b))
+	}
+}
+
+func TestMarshalFile_Subshell(t *testing.T) {
+	f, _ := shell.ParseFile("(cd /tmp && echo hi)\n", syntax.LangBash)
+	b, _ := json.Marshal(shell.MarshalFile(f, "-"))
+	if !strings.Contains(string(b), `"type":"subshell"`) {
+		t.Errorf("subshell not serialized: %s", string(b))
+	}
+}
+
+func TestMarshalFile_Block(t *testing.T) {
+	f, _ := shell.ParseFile("{ echo a; echo b; }\n", syntax.LangBash)
+	b, _ := json.Marshal(shell.MarshalFile(f, "-"))
+	if !strings.Contains(string(b), `"type":"block"`) {
+		t.Errorf("block not serialized: %s", string(b))
+	}
+}
+
+func TestMarshalFile_Redirect(t *testing.T) {
+	f, _ := shell.ParseFile("echo hi > /dev/null\n", syntax.LangBash)
+	b, _ := json.Marshal(shell.MarshalFile(f, "-"))
+	if !strings.Contains(string(b), `"redirs"`) {
+		t.Errorf("redirect not serialized: %s", string(b))
+	}
+}
+
+func TestMarshalFile_ArithmCmd(t *testing.T) {
+	f, _ := shell.ParseFile("(( x++ ))\n", syntax.LangBash)
+	b, _ := json.Marshal(shell.MarshalFile(f, "-"))
+	if !strings.Contains(string(b), `"type":"arithmCmd"`) {
+		t.Errorf("ArithmCmd not serialized: %s", string(b))
+	}
+}
+
+func TestMarshalFile_TestClause(t *testing.T) {
+	f, _ := shell.ParseFile("[[ -f /etc/foo ]]\n", syntax.LangBash)
+	b, _ := json.Marshal(shell.MarshalFile(f, "-"))
+	if !strings.Contains(string(b), `"type":"testClause"`) {
+		t.Errorf("TestClause not serialized: %s", string(b))
+	}
+}
+
+func TestMarshalFile_LetClause(t *testing.T) {
+	f, _ := shell.ParseFile("let x=5 y=x+1\n", syntax.LangBash)
+	b, _ := json.Marshal(shell.MarshalFile(f, "-"))
+	if !strings.Contains(string(b), `"type":"let"`) {
+		t.Errorf("LetClause not serialized: %s", string(b))
+	}
+}
+
+func TestMarshalFile_TimeClause(t *testing.T) {
+	f, _ := shell.ParseFile("time sleep 1\n", syntax.LangBash)
+	b, _ := json.Marshal(shell.MarshalFile(f, "-"))
+	if !strings.Contains(string(b), `"type":"time"`) {
+		t.Errorf("TimeClause not serialized: %s", string(b))
+	}
+}
+
+func TestMarshalFile_NegatedBackground(t *testing.T) {
+	f, _ := shell.ParseFile("! false &\n", syntax.LangBash)
+	b, _ := json.Marshal(shell.MarshalFile(f, "-"))
+	got := string(b)
+	if !strings.Contains(got, `"negated"`) || !strings.Contains(got, `"background"`) {
+		t.Errorf("negated/background not serialized: %s", got)
+	}
+}
+
+// ── golden helper ─────────────────────────────────────────────────────────────
+
+
+func min(n, max int) int {
+	if n > max {
+		return max
+	}
+	return n
+}
+
