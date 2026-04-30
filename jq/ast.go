@@ -48,11 +48,12 @@ func (m *ModuleStmt) nodePos() Pos { return m.At }
 
 // ImportStmt: import "path" as $name; OR include "path";
 type ImportStmt struct {
-	At      Pos
-	Include bool   // true for "include", false for "import"
-	Path    string // the string literal text (raw, with quotes)
-	Binding string // "$name" for import; empty for include
-	Meta    Node   // optional trailing object metadata
+	At              Pos
+	Include         bool       // true for "include", false for "import"
+	Path            string     // the string literal text (raw, with quotes)
+	Binding         string     // "$name" for import; empty for include
+	Meta            Node       // optional trailing object metadata
+	LeadingComments []*Comment // comments immediately preceding this statement
 }
 
 func (i *ImportStmt) jqNode()      {}

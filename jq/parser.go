@@ -137,10 +137,12 @@ func (p *parser) parseFile() (*File, error) {
 	}
 
 	for p.peek().Kind == KWIMPORT || p.peek().Kind == KWINCLUDE {
+		leading := p.drainComments()
 		imp, err := p.parseImportStmt()
 		if err != nil {
 			return nil, err
 		}
+		imp.LeadingComments = append(leading, imp.LeadingComments...)
 		f.Imports = append(f.Imports, imp)
 	}
 

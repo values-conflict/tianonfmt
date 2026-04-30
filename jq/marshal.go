@@ -127,6 +127,9 @@ func (i *ImportStmt) MarshalAST() OrderedMap {
 	if i.Meta != nil {
 		m = append(m, MapEntry{"meta", marshalNode(i.Meta)})
 	}
+	if len(i.LeadingComments) > 0 {
+		m = append(m, MapEntry{"leadingComments", marshalComments(i.LeadingComments)})
+	}
 	return m
 }
 

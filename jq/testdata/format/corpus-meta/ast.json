@@ -4,7 +4,10 @@
 		{
 			"type": "import",
 			"include": true,
-			"path": "\"doi\""
+			"path": "\"doi\"",
+			"leadingComments": [
+				"# \"build_should_sbom\", etc."
+			]
 		}
 	],
 	"funcDefs": [
@@ -12,7 +15,6 @@
 			"type": "funcDef",
 			"name": "needs_build",
 			"leadingComments": [
-				"# \"build_should_sbom\", etc.",
 				"# input: \"build\" object (with \"buildId\" top level key)",
 				"# output: boolean"
 			],
