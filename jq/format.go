@@ -109,8 +109,12 @@ func (p *printer) newline() {
 	p.write(p.tab())
 }
 
-// nl writes just a bare newline.
-func (p *printer) nl() { p.out.WriteByte('\n') }
+// nl writes just a bare newline and clears lastWasTrailing (moving to a new
+// line means any trailing-comment state from the previous line is done).
+func (p *printer) nl() {
+	p.lastWasTrailing = false
+	p.out.WriteByte('\n')
+}
 
 // atLineStart reports whether the printer is logically at the start of a line:
 // either the buffer is empty, or everything after the last newline is whitespace.
@@ -176,11 +180,14 @@ func (p *printer) file(f *File) {
 	if len(f.Imports) > 0 && (len(f.FuncDefs) > 0 || f.Query != nil) {
 		p.nl()
 	}
-	for _, fd := range f.FuncDefs {
+	for i, fd := range f.FuncDefs {
 		p.comments(fd.LeadingComments)
 		p.funcDef(fd)
 		p.nl()
-		p.nl()
+		// Blank line separator between defs, but not a trailing blank line at EOF.
+		if i < len(f.FuncDefs)-1 || f.Query != nil {
+			p.nl()
+		}
 	}
 	if f.Query != nil {
 		p.node(f.Query)
@@ -361,19 +368,35 @@ func (p *printer) node(n Node) {
 	case *Object:
 		p.objectExpr(v)
 	case *Paren:
-		inner := p.inlineSafe(v.Expr)
+		// If the ( line had a trailing comment, there are closing comments, or
+		// the content contains any MultiLine operator (source was written
+		// multi-line), we must use multi-line format.
+		forcedMulti := v.OpenComment != nil || len(v.ClosingComments) > 0 || contentHasMultiLine(v.Expr)
+		inner := ""
+		if !forcedMulti {
+			inner = p.inlineSafe(v.Expr)
+		}
 		if inner != "" && len(inner) <= shortThreshold && !strings.Contains(inner, "\n") && !hasAnyComment(v.Expr) {
 			p.write("(")
 			p.write(inner)
 			p.write(")")
 		} else {
 			p.write("(")
+			if v.OpenComment != nil {
+				p.write(" ")
+				p.write(v.OpenComment.Text)
+				p.lastWasTrailing = true
+			}
 			p.indent()
 			p.newline()
 			p.node(v.Expr)
+			for _, c := range v.ClosingComments {
+				p.newline()
+				p.write(c.Text)
+			}
 			p.dedent()
 			p.newline()
-	p.write(")")
+			p.write(")")
 		}
 	case *Optional:
 		p.node(v.Expr)
@@ -454,6 +477,14 @@ func (p *printer) pipeChain(v *Pipe) {
 		return
 	}
 
+	// Force multi-line if the source was written multi-line.  The parser sets
+	// MultiLine=true on any Pipe node where the | token appeared on a
+	// different line than the left operand.
+	if pipeChainHasMultiLine(v) {
+		p.pipeChainMultiLine(parts)
+		return
+	}
+
 	inline := p.inlineSafe(v)
 	if inline != "" && len(inline) <= shortThreshold && !strings.Contains(inline, "\n") {
 		p.write(inline)
@@ -464,35 +495,73 @@ func (p *printer) pipeChain(v *Pipe) {
 
 func (p *printer) pipeChainMultiLine(parts []Node) {
 	for i, part := range parts {
-		if i > 0 {
-			// If this part has leading comments, emit them BEFORE the |.
-			// This matches the corpus style where comments between pipe
-			// elements appear on their own line before the | :
-			//   prev_expr
-			//   # comment
-			//   | next_expr
-			// (corpus: version-components.jq lines 13-14)
-			if ce, ok := part.(*CommentedExpr); ok && len(ce.LeadingComments) > 0 {
-				for _, c := range ce.LeadingComments {
-					p.newline()
-					p.write(c.Text)
-				}
+		if i == 0 {
+			p.node(part)
+			continue
+		}
+		// If this part has leading comments, emit them BEFORE the |.
+		// This matches the corpus style where comments between pipe
+		// elements appear on their own line before the | :
+		//   prev_expr
+		//   # comment
+		//   | next_expr
+		// (corpus: version-components.jq lines 13-14)
+		if ce, ok := part.(*CommentedExpr); ok && len(ce.LeadingComments) > 0 {
+			for _, c := range ce.LeadingComments {
 				p.newline()
-				p.write("| ")
-				// Emit the rest of the CommentedExpr (expr + trailing comment)
-				// without repeating the leading comments.
-				p.node(ce.Expr)
-				if ce.TrailingComment != nil {
-					p.write(" ")
-					p.write(ce.TrailingComment.Text)
-				}
-				continue
+				p.write(c.Text)
 			}
 			p.newline()
 			p.write("| ")
+			// Emit the rest of the CommentedExpr (expr + trailing comment)
+			// without repeating the leading comments.
+			if pipePartIsMultiLineComma(ce.Expr) {
+				p.indent()
+				p.node(ce.Expr)
+				p.dedent()
+			} else {
+				p.node(ce.Expr)
+			}
+			if ce.TrailingComment != nil {
+				p.write(" ")
+				p.write(ce.TrailingComment.Text)
+			}
+			continue
 		}
-		p.node(part)
+		// When a pipe continuation step is a multi-line comma, indent its
+		// continuation lines one extra level so they are visually
+		// distinguishable from the next pipe step.
+		// Style ref: corpus-meta pull_command "@sh "docker pull", @sh "docker tag""
+		p.newline()
+		p.write("| ")
+		if pipePartIsMultiLineComma(part) {
+			p.indent()
+			p.node(part)
+			p.dedent()
+		} else {
+			p.node(part)
+		}
 	}
+}
+
+// pipePartIsMultiLineComma reports whether n is (or wraps) a Comma that will
+// use multi-line layout, so that pipeChainMultiLine can add the extra indent.
+func pipePartIsMultiLineComma(n Node) bool {
+	switch v := n.(type) {
+	case *Comma:
+		if commaChainHasMultiLine(v) || commaChainContainsEmpty(v) {
+			return true
+		}
+		cparts := flattenCommaParts(v)
+		parts := make([]Node, len(cparts))
+		for i, cp := range cparts {
+			parts[i] = cp.node
+		}
+		return anyPartHasComment(parts)
+	case *CommentedExpr:
+		return pipePartIsMultiLineComma(v.Expr)
+	}
+	return false
 }
 
 func flattenPipe(v *Pipe) []Node {
@@ -515,9 +584,34 @@ func flattenPipe(v *Pipe) []Node {
 // , at END of line; forced multi-line if any part has a trailing comment.
 // Style ref: https://github.com/tianon/dockerfiles/blob/2118a1979eff7545e06570d1eefc6434d691e68d/scratch/multiarch.jq#L6-L20
 func (p *printer) commaExpr(v *Comma) {
-	parts := flattenComma(v)
+	cparts := flattenCommaParts(v)
+	hasBlank := false
+	for _, cp := range cparts {
+		if cp.blankLine {
+			hasBlank = true
+			break
+		}
+	}
+	parts := make([]Node, len(cparts))
+	for i, cp := range cparts {
+		parts[i] = cp.node
+	}
 
 	if anyPartHasComment(parts) {
+		p.commaExprMultiLine(parts)
+		return
+	}
+
+	// Force multi-line if the source was written multi-line (right operand
+	// on a different line than the comma token).
+	if commaChainHasMultiLine(v) {
+		p.commaExprMultiLine(parts)
+		return
+	}
+
+	// A comma chain ending with `empty` uses the trailing-comma idiom and must
+	// always be multi-line so each real element gets its own line.
+	if commaChainContainsEmpty(v) {
 		p.commaExprMultiLine(parts)
 		return
 	}
@@ -527,7 +621,11 @@ func (p *printer) commaExpr(v *Comma) {
 		p.write(inline)
 		return
 	}
-	p.commaExprMultiLine(parts)
+	if hasBlank {
+		p.commaExprMultiLineWithBlanks(cparts)
+	} else {
+		p.commaExprMultiLine(parts)
+	}
 }
 
 func (p *printer) commaExprMultiLine(parts []Node) {
@@ -549,6 +647,29 @@ func (p *printer) commaExprMultiLine(parts []Node) {
 	}
 }
 
+func (p *printer) commaExprMultiLineWithBlanks(cparts []commaPart) {
+	for i, cp := range cparts {
+		if i > 0 {
+			if cp.blankLine {
+				p.nl() // blank line before this element
+			}
+			p.newline()
+		}
+		if i < len(cparts)-1 {
+			inner, tc := stripTrailing(cp.node)
+			p.node(inner)
+			p.writeAfterPunct(",", tc)
+		} else {
+			p.node(cp.node)
+		}
+	}
+}
+
+type commaPart struct {
+	node      Node
+	blankLine bool // blank line precedes this element in the source
+}
+
 func flattenComma(v *Comma) []Node {
 	var parts []Node
 	var walk func(n Node)
@@ -565,6 +686,22 @@ func flattenComma(v *Comma) []Node {
 	return parts
 }
 
+func flattenCommaParts(v *Comma) []commaPart {
+	var parts []commaPart
+	var walk func(n Node)
+	walk = func(n Node) {
+		if c, ok := n.(*Comma); ok {
+			walk(c.Left)
+			parts = append(parts, commaPart{node: c.Right, blankLine: c.BlankLineAfter})
+		} else {
+			parts = append(parts, commaPart{node: n})
+		}
+	}
+	walk(v.Left)
+	parts = append(parts, commaPart{node: v.Right, blankLine: v.BlankLineAfter})
+	return parts
+}
+
 // asExpr formats: expr as $pat\n| body
 // Style ref: https://github.com/tianon/debian-bin/blob/d508ea34f15e88b8ac63d71ffb1938fccbc21206/jq/deb822.jq#L24
 func (p *printer) asExpr(v *AsExpr) {
@@ -573,7 +710,13 @@ func (p *printer) asExpr(v *AsExpr) {
 	p.node(v.Pattern)
 	p.newline()
 	p.write("| ")
-	p.node(v.Body)
+	if pipePartIsMultiLineComma(v.Body) {
+		p.indent()
+		p.node(v.Body)
+		p.dedent()
+	} else {
+		p.node(v.Body)
+	}
 }
 
 // binOp formats a binary expression.
@@ -599,8 +742,43 @@ func (p *printer) binOp(v *BinOp) {
 		return
 	}
 
-	inline := p.inlineSafe(v)
-	if inline != "" && len(inline) <= shortThreshold && !strings.Contains(inline, "\n") {
+	// If the left operand is a CommentedExpr with only leading comments (no
+	// trailing), hoist those comments out so they don't prevent inlining the
+	// arithmetic expression.  `. + ".git"` should stay on one line even when
+	// preceded by a `# comment` that the parser attached to the Identity `.`.
+	hoistedLeading := ([]*Comment)(nil)
+	effectiveLeft := v.Left
+	if ce, ok := v.Left.(*CommentedExpr); ok && len(ce.LeadingComments) > 0 && ce.TrailingComment == nil {
+		// Only hoist when the unwrapped left expression has no further
+		// leading comments.  If ce.Expr is itself a CommentedExpr, inlining
+		// would write the inner comments a second time via nodeInline's
+		// p.node() fallback.
+		if _, innerCE := ce.Expr.(*CommentedExpr); !innerCE {
+			hoistedLeading = ce.LeadingComments
+			effectiveLeft = ce.Expr
+		}
+	}
+	strippedV := v
+	if hoistedLeading != nil {
+		strippedV = &BinOp{At: v.At, Op: v.Op, Left: effectiveLeft, Right: v.Right}
+	}
+
+	// If the source had this chain multi-line (operator on a new line), skip
+	// inline — preserve the original multi-line structure.
+	skipInline := strippedV.MultiLine
+	var inline string
+	if !skipInline {
+		inline = p.inlineSafe(strippedV)
+	}
+	if !skipInline && inline != "" && len(inline) <= shortThreshold && !strings.Contains(inline, "\n") {
+		for _, c := range hoistedLeading {
+			if !p.atLineStart() {
+				p.nl()
+				p.write(p.tab())
+			}
+			p.writeln(c.Text)
+			p.write(p.tab())
+		}
 		p.write(inline)
 		return
 	}
@@ -622,13 +800,89 @@ func (p *printer) binOp(v *BinOp) {
 	}
 	flatten(v)
 
+	// Compute whether the tail (parts[1:]) is short enough to place on the
+	// same line as the closing delimiter of a multi-line first operand.
+	// e.g. after ")" from a multi-line Paren: ) + "#" + .GitCommit + ...
+	// Only applies to arithmetic/string operators (+, -, etc.) — not logical
+	// or boolean operators (or, and, //) which always break to their own line.
+	isArithOp := func(op string) bool {
+		switch op {
+		case "+", "-", "*", "/", "%":
+			return true
+		}
+		return false
+	}
+	tailIsArith := len(parts) > 1 && isArithOp(parts[1].op)
+	var tailInline string
+	if len(parts) > 1 && tailIsArith {
+		tp := &printer{tidy: p.tidy}
+		for _, pt := range parts[1:] {
+			tp.write(" ")
+			tp.write(pt.op)
+			tp.write(" ")
+			tp.nodeInline(pt.node)
+		}
+		s := tp.out.String()
+		if len(s) <= shortThreshold && !strings.Contains(s, "\n") {
+			tailInline = s
+		}
+	}
+
+	// Head-inline: if all parts except the last are short, and the last part
+	// is a multi-line Paren or complex expression, emit the head parts on
+	// one line and let the tail expand.  e.g.: | .key + "prefix" + (paren)
+	// Only applies when the source was NOT written multi-line — if MultiLine
+	// is set, every operand must be on its own line per the source structure.
+	if len(parts) > 1 && tailInline == "" && !skipInline {
+		// Compute head (all but last) inline form.
+		tp := &printer{tidy: p.tidy}
+		for j, pt := range parts[:len(parts)-1] {
+			if j > 0 {
+				tp.write(" ")
+				tp.write(pt.op)
+				tp.write(" ")
+			}
+			tp.nodeInline(pt.node)
+		}
+		headStr := tp.out.String()
+		lastPt := parts[len(parts)-1]
+		if len(headStr) <= shortThreshold && !strings.Contains(headStr, "\n") {
+			// Check last part inline.
+			lastInline := p.shortInline(lastPt.node)
+			if lastInline == "" || len(headStr+" "+lastPt.op+" "+lastInline) > shortThreshold {
+				// Head fits; last part expands — emit head then let tail go on same line
+				// by writing the head inline, then the last operator+paren on same line.
+				p.write(headStr)
+				p.write(" ")
+				p.write(lastPt.op)
+				p.write(" ")
+				p.node(lastPt.node)
+				return
+			}
+		}
+	}
+
+	firstPartWasMultiLine := false
 	for i, pt := range parts {
+		if i == 1 && tailInline != "" && firstPartWasMultiLine && !p.atLineStart() {
+			// First part ended on a non-empty line (e.g. closing ')') after
+			// having been formatted multi-line.  Emit all remaining parts on
+			// that same line.  Do NOT apply this when the first part was
+			// formatted inline (e.g. an `and` condition) — that would
+			// incorrectly collapse a chain that exceeded the threshold.
+			p.write(tailInline)
+			break
+		}
 		if i > 0 {
 			p.newline()
 			p.write(pt.op)
 			p.write(" ")
 		}
+		nlBefore := strings.Count(p.out.String(), "\n")
 		p.node(pt.node)
+		if i == 0 {
+			firstPartWasMultiLine = strings.Count(p.out.String(), "\n") > nlBefore
+		}
 	}
 }
 
@@ -700,7 +954,11 @@ func (p *printer) ifExpr(v *IfExpr) {
 	if v.Else != nil {
 		p.newline()
 		elseInline := p.shortInline(v.Else)
-		if len(elseInline) <= 30 && !strings.Contains(elseInline, "\n") && !hasAnyComment(v.Else) {
+		// Short-else form (else VALUE end) only when both the then body and the
+		// else body are each a single visual line with no comments.  If the then
+		// body has any comment (making it span comment-line + value-line), the
+		// else must also be multi-line for visual symmetry.
+		if len(elseInline) <= 30 && !strings.Contains(elseInline, "\n") && !hasAnyComment(v.Else) && !hasAnyComment(v.Then) {
 			p.write("else ")
 			p.write(elseInline)
 			p.write(" end")
@@ -886,15 +1144,38 @@ func (p *printer) sliceExpr(v *Slice) {
 }
 
 func (p *printer) callExpr(v *Call) {
-	p.write(v.Name)
 	if len(v.Args) == 0 {
+		p.write(v.Name)
 		return
 	}
+
+	// If the first argument has leading comments, those comments belong BEFORE
+	// the call (the parser attached them to the first arg because parseTerm
+	// picked them up before the call name was fully parsed).  Hoist them out
+	// so they appear as a leading comment before the call, not inside the args.
+	args := v.Args
+	if ce, ok := args[0].(*CommentedExpr); ok && len(ce.LeadingComments) > 0 && ce.TrailingComment == nil {
+		for _, c := range ce.LeadingComments {
+			if !p.atLineStart() {
+				p.nl()
+				p.write(p.tab())
+			}
+			p.writeln(c.Text)
+			p.write(p.tab())
+		}
+		// Strip the leading comments from the arg so they aren't double-emitted.
+		stripped := make([]Node, len(args))
+		stripped[0] = ce.Expr
+		copy(stripped[1:], args[1:])
+		args = stripped
+	}
+
+	p.write(v.Name)
 
 	// If any argument has comments, use multi-line call format so each argument
 	// starts on its own line (ensuring leading comments are at line start).
 	anyCommented := false
-	for _, arg := range v.Args {
+	for _, arg := range args {
 		if hasAnyComment(arg) {
 			anyCommented = true
 			break
@@ -904,7 +1185,7 @@ func (p *printer) callExpr(v *Call) {
 	if anyCommented {
 		p.write("(")
 		p.indent()
-		for i, arg := range v.Args {
+		for i, arg := range args {
 			if i > 0 {
 				p.write(";")
 			}
@@ -918,13 +1199,20 @@ func (p *printer) callExpr(v *Call) {
 	}
 
 	p.write("(")
-	for i, arg := range v.Args {
+	for i, arg := range args {
 		if i > 0 {
 			p.write("; ")
 		}
 		p.node(arg)
 	}
-	p.closeDelimiter(")")
+	// Single simple argument: close on the same line as the argument.
+	// Only use closeDelimiter (which may add a newline) for multi-arg or
+	// complex-arg calls where the closer needs to respect trailing comments.
+	if len(args) == 1 && !hasAnyComment(args[0]) {
+		p.write(")")
+	} else {
+		p.closeDelimiter(")")
+	}
 }
 
 // arrayExpr: multi-line when element is complex.
@@ -944,14 +1232,39 @@ func (p *printer) arrayExpr(v *Array) {
 		return
 	}
 	elemInline := p.inlineSafe(v.Elem)
-	if elemInline != "" && len("["+elemInline+"]") <= shortThreshold && !strings.Contains(elemInline, "\n") {
+	// Arrays containing `empty` (the trailing-comma idiom) use a tighter
+	// inline threshold: only keep them on one line when very short.  Longer
+	// arrays with `empty` are always multi-line — the `empty` signals intent
+	// to keep each real element visually distinct.
+	// Arrays ending with `empty` use the trailing-comma idiom and must always
+	// be multi-line — `empty` signals that each real element deserves its own
+	// line.  The fixture all-node-types had [.j, .k, empty] on one line, but
+	// that was a mechanical test fixture, not representative of Tianon's style.
+	if elemInline != "" && !strings.Contains(elemInline, "\n") && !commaChainContainsEmpty(v.Elem) && len("["+elemInline+"]") <= shortThreshold {
 		p.write("[" + elemInline + "]")
 		return
 	}
 	p.write("[")
 	p.indent()
 	p.newline()
-	p.node(v.Elem)
+	// Use blank-line-aware formatting when the array elements had blank lines.
+	if c, ok := v.Elem.(*Comma); ok {
+		cparts := flattenCommaParts(c)
+		hasBlank := false
+		for _, cp := range cparts {
+			if cp.blankLine {
+				hasBlank = true
+				break
+			}
+		}
+		if hasBlank {
+			p.commaExprMultiLineWithBlanks(cparts)
+		} else {
+			p.node(v.Elem)
+		}
+	} else {
+		p.node(v.Elem)
+	}
 	p.dedent()
 	p.newline()
 	p.write("]")
@@ -964,14 +1277,20 @@ func (p *printer) objectExpr(v *Object) {
 		p.write("{}")
 		return
 	}
-	inline := p.shortInlineObject(v)
-	if inline != "" && len(inline) <= shortThreshold && !strings.Contains(inline, "\n") {
-		p.write(inline)
-		return
+	// Never inline an object that was written multi-line in source.
+	if !v.MultiLine {
+		inline := p.shortInlineObject(v)
+		if inline != "" && len(inline) <= shortThreshold && !strings.Contains(inline, "\n") {
+			p.write(inline)
+			return
+		}
 	}
 	p.write("{")
 	p.indent()
 	for _, f := range v.Fields {
+		if f.BlankLineBefore {
+			p.nl() // blank line before this field (before leading comments or key)
+		}
 		p.newline()
 		tc := p.objectField(f)
 		// Comma must come BEFORE the trailing comment so it isn't eaten:
@@ -990,12 +1309,17 @@ func (p *printer) objectExpr(v *Object) {
 // be written before the comment rather than after it.
 func (p *printer) objectField(f *ObjectField) *Comment {
 	// Emit field-level leading comments (e.g. comment before the key).
-	for _, c := range f.LeadingComments {
+	for i, c := range f.LeadingComments {
 		if !p.atLineStart() {
 			p.nl()
 			p.write(p.tab())
 		}
 		p.writeln(c.Text)
+		// Blank line between last comment and the key: bare newline only
+		// (no preceding tabs), so the blank line has no trailing whitespace.
+		if i == len(f.LeadingComments)-1 && f.BlankAfterComments {
+			p.nl()
+		}
 		p.write(p.tab())
 	}
 
@@ -1101,10 +1425,21 @@ func anyNodeHasTrailingComment(n Node) bool {
 		// so any CommentedExpr with leading comments cannot be safely inlined.
 		return v.TrailingComment != nil || len(v.LeadingComments) > 0 || anyNodeHasTrailingComment(v.Expr)
 	case *Pipe:
+		// MultiLine pipes cannot be safely inlined — their source intent was multi-line.
+		if v.MultiLine || pipeChainHasMultiLine(v) {
+			return true
+		}
 		return anyNodeHasTrailingComment(v.Left) || anyNodeHasTrailingComment(v.Right)
 	case *Comma:
+		// MultiLine commas cannot be safely inlined.
+		if v.MultiLine || commaChainHasMultiLine(v) {
+			return true
+		}
 		return anyNodeHasTrailingComment(v.Left) || anyNodeHasTrailingComment(v.Right)
 	case *BinOp:
+		if v.MultiLine {
+			return true
+		}
 		return anyNodeHasTrailingComment(v.Left) || anyNodeHasTrailingComment(v.Right)
 	case *AsExpr:
 		return anyNodeHasTrailingComment(v.Expr) || anyNodeHasTrailingComment(v.Body)
@@ -1127,7 +1462,10 @@ func anyNodeHasTrailingComment(n Node) bool {
 			}
 		}
 	case *Paren:
-		return anyNodeHasTrailingComment(v.Expr)
+		// A Paren's contents are self-contained: any trailing comments inside
+		// are handled by the paren's own closeDelimiter and do not "escape" to
+		// affect the token that follows the closing ).
+		return false
 	case *Optional:
 		return anyNodeHasTrailingComment(v.Expr)
 	case *Index:
@@ -1289,6 +1627,11 @@ func (p *printer) nodeInline(n Node) {
 			p.write("[]")
 			return
 		}
+		// Arrays with `empty` use the trailing-comma idiom — never inline.
+		if commaChainContainsEmpty(v.Elem) {
+			p.node(n)
+			return
+		}
 		p.write("[")
 		p.nodeInline(v.Elem)
 		p.write("]")
@@ -1312,6 +1655,79 @@ func (p *printer) nodeInline(n Node) {
 }
 
 // ── key helpers ───────────────────────────────────────────────────────────────
+
+// pipeChainHasMultiLine reports whether any Pipe node in the chain has MultiLine=true.
+func pipeChainHasMultiLine(v *Pipe) bool {
+	var check func(n Node) bool
+	check = func(n Node) bool {
+		if pp, ok := n.(*Pipe); ok {
+			if pp.MultiLine {
+				return true
+			}
+			return check(pp.Left)
+		}
+		return false
+	}
+	return check(v)
+}
+
+// commaChainHasMultiLine reports whether any Comma node in the chain has MultiLine=true.
+func commaChainHasMultiLine(v *Comma) bool {
+	var check func(n Node) bool
+	check = func(n Node) bool {
+		if c, ok := n.(*Comma); ok {
+			if c.MultiLine {
+				return true
+			}
+			return check(c.Left)
+		}
+		return false
+	}
+	return check(v)
+}
+
+// contentHasMultiLine reports whether n or any of its descendants contains a
+// Pipe, Comma, or BinOp with MultiLine=true, indicating the source was written
+// multi-line.  Used to prevent inlining parens whose content was intentionally
+// written on multiple lines.
+func contentHasMultiLine(n Node) bool {
+	found := false
+	Walk(n, func(node Node) bool {
+		if found {
+			return false
+		}
+		switch v := node.(type) {
+		case *Pipe:
+			if v.MultiLine {
+				found = true
+			}
+		case *Comma:
+			if v.MultiLine {
+				found = true
+			}
+		case *BinOp:
+			if v.MultiLine {
+				found = true
+			}
+		}
+		return !found
+	})
+	return found
+}
+
+// commaChainContainsEmpty reports whether a comma chain has `empty` as any
+// element.  Used to detect the trailing-comma idiom: [..., empty].
+func commaChainContainsEmpty(n Node) bool {
+	switch v := n.(type) {
+	case *Comma:
+		return commaChainContainsEmpty(v.Left) || commaChainContainsEmpty(v.Right)
+	case *CommentedExpr:
+		return commaChainContainsEmpty(v.Expr)
+	case *Call:
+		return v.Name == "empty" && len(v.Args) == 0
+	}
+	return false
+}
 
 var jqIdentRe = regexp.MustCompile(`^[a-zA-Z_][a-zA-Z0-9_]*$`)
 

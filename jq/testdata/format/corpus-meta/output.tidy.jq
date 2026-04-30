@@ -16,14 +16,17 @@ def normalized_builder:
 		if $arch | startswith("windows-") then
 			# https://github.com/microsoft/Windows-Containers/issues/34
 			"classic"
-		else "buildkit" end
+		else
+			"buildkit"
+		end
 	else . end
 ;
 
 # input: "docker.io/library/foo:bar"
 # output: "foo:bar"
 def normalize_ref_to_docker:
-	ltrimstr("docker.io/") | ltrimstr("library/")
+	ltrimstr("docker.io/")
+	| ltrimstr("library/")
 ;
 
 # input: "build" object (with "buildId" top level key)
@@ -41,7 +44,8 @@ def pull_command:
 					// error("parent \(.key) missing ref")
 					| normalize_ref_to_docker
 				) as $ref
-				| @sh "docker pull \($ref)", @sh "docker tag \($ref) \(.key)"
+				| @sh "docker pull \($ref)",
+					@sh "docker tag \($ref) \(.key)"
 			),
 			empty
 		]
@@ -66,17 +70,12 @@ def git_build_url:
 				# without ".git" in the url "docker buildx build url" fails and tries to build the html repo page as a Dockerfile
 				# https://github.com/moby/buildkit/blob/0e1e36ba9eb8142968b2c5cfa2f12549bf9246d9/util/gitutil/git_ref.go#L81-L87
 				# https://github.com/docker/cli/issues/1738
-				.
-				+ ".git"
+				. + ".git"
 			else
 				error("\(.) does not end in '.git' so build will fail to recognize it as a Git URL")
 			end
 		else . end
-	)
-	+ "#"
-	+ .GitCommit
-	+ ":"
-	+ .Directory
+	) + "#" + .GitCommit + ":" + .Directory
 ;
 
 # input: "build" object (with "buildId" top level key)
@@ -90,33 +89,36 @@ def build_annotations($buildUrl):
 			if .source.entries[0].Builder == "oci-import" then
 				.source.entries[0].SOURCE_DATE_EPOCH
 			else
-				env.SOURCE_DATE_EPOCH // now | tonumber
+				env.SOURCE_DATE_EPOCH // now
+				| tonumber
 			end
 			| strftime("%FT%TZ")
 		),
+
 		# TODO come up with less assuming values here? (Docker Hub assumption, tag ordering assumption)
-		"org.opencontainers.image.version": (
-			first(.source.arches[.build.arch # value of the first image tag
-			].tags[]
-			| select(contains(":")))
+		"org.opencontainers.image.version": ( # value of the first image tag
+			first(.source.arches[.build.arch].tags[] | select(contains(":")))
 			| sub("^.*:"; "")
+			# TODO maybe we should do the first, longest, non-latest tag instead of just the first tag?
 		),
-		"org.opencontainers.image.url": (
-			first(.source.arches[.build.arch # URL to Docker Hub
-			].tags[]
-			| select(contains(":")))
+		"org.opencontainers.image.url": ( # URL to Docker Hub
+			first(.source.arches[.build.arch].tags[] | select(contains(":")))
 			| sub(":.*$"; "")
 			| if contains("/") then "r/" + . else "_/" + . end
 			| "https://hub.docker.com/" + .
 		),
+
 		# TODO org.opencontainers.image.vendor ? (feels leaky to put "Docker Official Images" here when this is all otherwise mostly generic)
+
 		"com.docker.official-images.bashbrew.arch": .build.arch,
 	}
 	+ (
 		.source.arches[.build.arch].lastStageFrom as $lastStageFrom
 		| if $lastStageFrom then
 			.build.parents[$lastStageFrom] as $lastStageDigest
-			| { "org.opencontainers.image.base.name": $lastStageFrom }
+			| {
+				"org.opencontainers.image.base.name": $lastStageFrom,
+			}
 			+ if $lastStageDigest then
 				{
 					"org.opencontainers.image.base.digest": .build.parents[$lastStageFrom],
@@ -128,18 +130,14 @@ def build_annotations($buildUrl):
 ;
 
 def build_annotations:
-	build_annotations(git_build_url
-	)
+	build_annotations(git_build_url)
 ;
 
 # input: multi-line string with indentation and comments
 # output: multi-line string with less indentation and no comments
 def unindent_and_decomment_jq($indents):
-	gsub(
-		# trim out comment lines and unnecessary indentation
-		"(?m)^(\t+#[^\n]*\n?|\t{\($indents)}(?<extra>.*)$)";
-		"\(.extra // "")"
-	)
+	# trim out comment lines and unnecessary indentation
+	gsub("(?m)^(\t+#[^\n]*\n?|\t{\($indents)}(?<extra>.*)$)"; "\(.extra // "")")
 	# trim out empty lines
 	| gsub("\n\n+"; "\n")
 ;
@@ -159,15 +157,25 @@ def build_command:
 					if build_should_sbom then
 						"--sbom=generator=\"$BASHBREW_BUILDKIT_SBOM_GENERATOR\""
 					else empty end,
-					"--output "
-					+ (["type=oci", "dest=temp.tar", empty] | @csv | @sh),
+					"--output " + (
+						[
+							"type=oci",
+							"dest=temp.tar",
+							empty
+						]
+						| @csv
+						| @sh
+					),
 					(
 						build_annotations($buildUrl)
 						| to_entries[]
 						| @sh "--annotation \("manifest,manifest-descriptor:\(.key + "=" + .value)")"
 					),
 					(
-						(.source.arches[.build.arch] | .tags[], .archTags[]),
+						(
+							.source.arches[.build.arch]
+							| .tags[], .archTags[]
+						),
 						.build.img
 						| "--tag " + @sh
 					),
@@ -175,9 +183,7 @@ def build_command:
 					(
 						.build.resolvedParents
 						| to_entries[]
-						| .key
-						+ "=docker-image://"
-						+ (
+						| .key + "=docker-image://" + (
 							.value.manifests[0].annotations."org.opencontainers.image.ref.name"
 							// .value.annotations."org.opencontainers.image.ref.name"
 							// error("parent \(.key) missing ref")
@@ -193,10 +199,12 @@ def build_command:
 				]
 				| join(" \\\n\t")
 			),
+
 			# munge the tarball into a suitable "oci layout" directory (ready for "crane push")
 			"mkdir temp",
 			"tar -xvf temp.tar -C temp",
 			"rm temp.tar",
+
 			# TODO munge the image config here to remove any label that doesn't have a "." in the name (https://github.com/docker-library/official-images/pull/18692#issuecomment-2797149554; "thanks UBI/OpenShift/RedHat!")
 			# munge the index to what crane wants ("Error: layout contains 5 entries, consider --index")
 			@sh "jq \("
@@ -208,6 +216,7 @@ def build_command:
 				)
 			" | unindent_and_decomment_jq(3)) temp/index.json > temp/index.json.new",
 			"mv temp/index.json.new temp/index.json",
+
 			# possible improvements in buildkit/buildx that could help us:
 			# - allowing OCI output directly to a directory instead of a tar (thus getting symmetry with the oci-layout:// inputs it can take)
 			# - allowing tag as one thing and push as something else, potentially mutually exclusive
@@ -224,7 +233,10 @@ def build_command:
 					"DOCKER_BUILDKIT=0",
 					"docker build",
 					(
-						(.source.arches[.build.arch] | .tags[], .archTags[]),
+						(
+							.source.arches[.build.arch]
+							| .tags[], .archTags[]
+						),
 						.build.img
 						| "--tag " + @sh
 					),
@@ -242,6 +254,7 @@ def build_command:
 		[
 			@sh "build=\(tojson)",
 			"\"$BASHBREW_META_SCRIPTS/helpers/oci-import.sh\" <<<\"$build\" temp",
+
 			if build_should_sbom then
 				"# SBOM",
 				"mv temp temp.orig",
@@ -263,7 +276,11 @@ def push_command:
 	| if $builder == "classic" then
 		@sh "docker push \(.build.img)"
 	elif IN($builder; "buildkit", "oci-import") then
-		[@sh "crane push temp \(.build.img)", "rm -rf temp", empty]
+		[
+			@sh "crane push temp \(.build.img)",
+			"rm -rf temp",
+			empty
+		]
 		| join("\n")
 	else
 		error("unknown/unimplemented Builder: \($builder)")
@@ -279,4 +296,3 @@ def commands:
 		push: push_command,
 	}
 ;
-

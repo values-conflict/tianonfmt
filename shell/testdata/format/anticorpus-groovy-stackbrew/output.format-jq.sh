@@ -28,7 +28,8 @@ mapfile -t directories < <(
 		[
 			# convert "git ls-tree" output to a list of directories that contain a Dockerfile
 			inputs
-			| select(endswith("/Dockerfile")) | rtrimstr("/Dockerfile")
+			| select(endswith("/Dockerfile"))
+			| rtrimstr("/Dockerfile")
 		]
 		| sort_by(
 		# sort the list:
@@ -38,24 +39,35 @@ mapfile -t directories < <(
 		# - plain (temurin) variants above alpine
 		# - Ubuntu versions in descending release order
 		# (presorting the list makes tag calculation easier later because we can simply generate a list of tags each combination *could* have and let the first one to try get it, being careful not to reuse any)
-		(split("/")[0] | split("-")[1] | tonumber) as $groovy
-		| (split("/")[1] | ltrimstr("jdk") | split("-")[0] | tonumber) as $jdk
+		(
+			split("/")[0]
+			| split("-")[1]
+			| tonumber
+		) as $groovy
+		| (
+			split("/")[1]
+			| ltrimstr("jdk")
+			| split("-")[0]
+			| tonumber
+		) as $jdk
 		| [
 			(-$groovy),
+
 			# LTS JDK versions above non-LTS
 			(if $jdk | IN(21, 17, 11, 8) then 0 else 1 end),
+
 			# JDK versions in descending version order
 			(
 				-$jdk # negative so they sort in reverse order
 			),
+
 			# plain vs alpine
 			(if contains("alpine") then 1 else 0 end),
+
 			# ubuntu versions in descending order
 			(
 				# if unspecified, we assume "latest" (currently "noble")
-				if contains("jammy") then
-					-1
-				else -2 end
+				if contains("jammy") then -1 else -2 end
 			),
 			. # if all else fails, sort lexicographically
 		])

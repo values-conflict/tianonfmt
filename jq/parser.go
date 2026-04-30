@@ -68,7 +68,7 @@ func (p *parser) peek() Token {
 }
 
 func (p *parser) absorbComment(t Token) {
-	c := &Comment{At: t.At, Text: t.Text}
+	c := &Comment{At: t.At, Line: t.Line, Text: t.Text}
 	if p.lastLine > 0 && t.Line == p.lastLine {
 		// Trailing: on the same line as the last non-comment token.
 		p.pendingTrailing = c
@@ -346,6 +346,7 @@ func (p *parser) parseExpr(minPrec int) (Node, error) {
 		if !ok || prec < minPrec {
 			break
 		}
+		prevLine := p.lastLine
 		opTok := p.next()
 
 		// For comma: a comment on the SAME LINE as the comma is a trailing
@@ -372,6 +373,10 @@ func (p *parser) parseExpr(minPrec int) (Node, error) {
 		// Drain leading comments between the operator and the right operand.
 		rightLeading := p.drainComments()
 
+		// Capture the line of the right side's first token BEFORE parsing it,
+		// so we can detect multi-line / blank-line separators accurately.
+		rightFirstLine := p.peek().Line
+
 		right, err := p.parseExpr(rightPrec)
 		if err != nil {
 			return nil, err
@@ -379,9 +384,10 @@ func (p *parser) parseExpr(minPrec int) (Node, error) {
 
 		// Trailing comment immediately after the right operand.
 		rightTC := p.takePendingTrailing()
-		// Also drain any new leading comments that followed the trailing comment.
-		rightLeading2 := p.drainComments()
-		_ = rightLeading2 // these will be picked up on the next iteration
+		// Leave any remaining p.pending entries in place: they are leading
+		// comments for the next operand or closing comments for the enclosing
+		// delimiter.  They will be picked up by the next rightLeading drain or
+		// by the caller's drainComments() call if no next iteration.
 
 		if len(rightLeading) > 0 || rightTC != nil {
 			right = &CommentedExpr{
@@ -394,11 +400,19 @@ func (p *parser) parseExpr(minPrec int) (Node, error) {
 
 		switch opText {
 		case "|":
-			left = &Pipe{At: opTok.At, Left: left, Right: right}
+			// MultiLine: the | token appeared on a different line than the
+			// last token of the left operand — source was written multi-line.
+			left = &Pipe{At: opTok.At, Left: left, Right: right, MultiLine: opTok.Line > prevLine}
 		case ",":
-			left = &Comma{At: opTok.At, Left: left, Right: right}
+			// MultiLine: the right operand's first real token is on a
+			// different line than the , token — source was multi-line.
+			// BlankLineAfter: there was a blank line after the comma.
+			isML := rightFirstLine > opTok.Line
+			hasBlank := rightFirstLine > opTok.Line+1
+			left = &Comma{At: opTok.At, Left: left, Right: right, MultiLine: isML, BlankLineAfter: hasBlank}
 		default:
-			left = &BinOp{At: opTok.At, Op: opText, Left: left, Right: right}
+			// MultiLine: operator appeared on a different line than the left operand.
+			left = &BinOp{At: opTok.At, Op: opText, Left: left, Right: right, MultiLine: opTok.Line > prevLine}
 		}
 	}
 	return left, nil
@@ -927,14 +941,22 @@ func (p *parser) parseBreak() (*BreakExpr, error) {
 
 func (p *parser) parseParen() (*Paren, error) {
 	tok, _ := p.expect(LPAREN)
+	// Peek once so that a trailing comment on the ( line is absorbed into
+	// pendingTrailing before we take it.  Without this, the comment isn't
+	// absorbed until the first peek() inside parseQuery, which is too late.
+	p.peek()
+	openComment := p.takePendingTrailing()
 	inner, err := p.parseQuery(0)
 	if err != nil {
 		return nil, err
 	}
+	// Drain any comments that appeared before the closing ) — they were
+	// absorbed by the last peek() inside parseQuery but never attached.
+	closingComments := p.drainComments()
 	if _, err := p.expect(RPAREN); err != nil {
 		return nil, err
 	}
-	return &Paren{At: tok.At, Expr: inner}, nil
+	return &Paren{At: tok.At, Expr: inner, OpenComment: openComment, ClosingComments: closingComments}, nil
 }
 
 func (p *parser) parseArray() (*Array, error) {
@@ -957,14 +979,34 @@ func (p *parser) parseArray() (*Array, error) {
 func (p *parser) parseObject() (*Object, error) {
 	tok, _ := p.expect(LBRACE)
 	obj := &Object{At: tok.At}
-	for p.peek().Kind != RBRACE {
+	lastFieldLine := tok.Line // line of the { token
+	isFirst := true
+	for {
+		// Check the raw next token (before comment absorption) to detect blank
+		// lines: if the first upcoming token (comment or key) is 2+ lines after
+		// the last consumed token, there was an intentional blank line.
+		rawNext := p.lex.Peek()
+		blankBefore := rawNext.Line > lastFieldLine+1 && rawNext.Kind != EOF
+		// Now absorb comments and check for closing brace.
+		if p.peek().Kind == RBRACE {
+			break
+		}
 		field, err := p.parseObjectField()
 		if err != nil {
 			return nil, err
 		}
+		field.BlankLineBefore = blankBefore
+		// Set Object.MultiLine if the first field is on a different line than {.
+		if isFirst {
+			if rawNext.Line > tok.Line {
+				obj.MultiLine = true
+			}
+			isFirst = false
+		}
 		obj.Fields = append(obj.Fields, field)
 		if p.peek().Kind == COMMA {
-			p.next() // consume ","
+			commaTok := p.next() // consume ","
+			lastFieldLine = commaTok.Line
 			// Peek once so that any trailing comment on the SAME LINE as the
 			// comma is absorbed into pendingTrailing.  That comment belongs to
 			// the PREVIOUS field's value — not the next field.
@@ -972,6 +1014,7 @@ func (p *parser) parseObject() (*Object, error) {
 			if tc := p.takePendingTrailing(); tc != nil {
 				p.attachTrailingToField(field, tc)
 			}
+			lastFieldLine = p.lastLine
 		} else {
 			// No comma: peek so any trailing comment on the last field's line
 			// is absorbed.  It belongs to the last field's value.
@@ -979,6 +1022,7 @@ func (p *parser) parseObject() (*Object, error) {
 			if tc := p.takePendingTrailing(); tc != nil {
 				p.attachTrailingToField(field, tc)
 			}
+			lastFieldLine = p.lastLine
 			break
 		}
 	}
@@ -1013,6 +1057,15 @@ func (p *parser) parseObjectField() (*ObjectField, error) {
 	// parsing and get misplaced on the value instead of the field.
 	leading := p.drainComments()
 
+	// BlankAfterComments: blank line between last leading comment and the key.
+	// p.peek() here returns the key token (no comments left to absorb since
+	// parseObject's p.peek() already drained them into leading above).
+	blankAfterComments := false
+	if len(leading) > 0 {
+		lastCmt := leading[len(leading)-1]
+		blankAfterComments = p.peek().Line > lastCmt.Line+1
+	}
+
 	at := p.peek().At
 	var key Node
 
@@ -1044,7 +1097,7 @@ func (p *parser) parseObjectField() (*ObjectField, error) {
 	}
 
 	if p.peek().Kind != COLON {
-		return &ObjectField{At: at, LeadingComments: leading, Key: key, KeyOptional: keyOpt}, nil
+		return &ObjectField{At: at, LeadingComments: leading, BlankAfterComments: blankAfterComments, Key: key, KeyOptional: keyOpt}, nil
 	}
 	p.next()
 
@@ -1053,7 +1106,7 @@ func (p *parser) parseObjectField() (*ObjectField, error) {
 		return nil, err
 	}
 	val = p.wrapComments(val)
-	return &ObjectField{At: at, LeadingComments: leading, Key: key, KeyOptional: keyOpt, Value: val}, nil
+	return &ObjectField{At: at, LeadingComments: leading, BlankAfterComments: blankAfterComments, Key: key, KeyOptional: keyOpt, Value: val}, nil
 }
 
 // ── patterns ─────────────────────────────────────────────────────────────────

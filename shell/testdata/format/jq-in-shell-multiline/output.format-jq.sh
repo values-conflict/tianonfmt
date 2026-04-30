@@ -2,9 +2,13 @@
 set -Eeuo pipefail
 
 result=$(jq '
-	.foo | .bar
+	.foo
+	| .bar
 ' input.json)
 
 jq --arg name "world" '
-	{ greeting: ("Hello, " + $name), value: .data }
+	{
+		greeting: ("Hello, " + $name),
+		value: .data,
+	}
 ' input.json

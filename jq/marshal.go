@@ -189,7 +189,12 @@ func (l *LabelExpr) MarshalAST() OrderedMap {
 }
 
 func (b *BinOp) MarshalAST() OrderedMap {
-	return OrderedMap{{"type", "binOp"}, {"op", b.Op}, {"left", marshalNode(b.Left)}, {"right", marshalNode(b.Right)}}
+	m := OrderedMap{{"type", "binOp"}, {"op", b.Op}}
+	if b.MultiLine {
+		m = append(m, MapEntry{"multiLine", true})
+	}
+	m = append(m, MapEntry{"left", marshalNode(b.Left)}, MapEntry{"right", marshalNode(b.Right)})
+	return m
 }
 
 func (i *IfExpr) MarshalAST() OrderedMap {

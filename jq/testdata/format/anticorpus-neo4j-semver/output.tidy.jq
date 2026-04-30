@@ -11,9 +11,7 @@ def _semver_obj2obj($req):
 		false
 	elif $req.patch == null and (.patch == "x" or .patch == "*") then
 		false
-	elif $req.major == null
-	and $req.minor == null
-	and $req.patch == null then
+	elif $req.major == null and $req.minor == null and $req.patch == null then
 		false
 	else true end
 ;
@@ -21,8 +19,7 @@ def _semver_obj2obj($req):
 def _ver2obj:
 	if type == "object" then
 		.
-	elif type == "string"
-	and test("(?<major>[0-9]+)(\\.(?<minor>[0-9x*]+))?(\\.?(?<patch>[0-9x*]+))?") then
+	elif type == "string" and test("(?<major>[0-9]+)(\\.(?<minor>[0-9x*]+))?(\\.?(?<patch>[0-9x*]+))?") then
 		capture("(?<major>[0-9]+)(\\.(?<minor>[0-9x*]+))?(\\.?(?<patch>[0-9x*]+))?")
 	elif type == "string" and . == "" then
 		{ major: null, minor: null, patch: null }
@@ -41,4 +38,3 @@ def semver($req):
 		_ver2obj | _semver_obj2obj($req | _ver2obj)
 	end
 ;
-

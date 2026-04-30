@@ -28,9 +28,11 @@
 			"body": {
 				"type": "binOp",
 				"op": "+",
+				"multiLine": true,
 				"left": {
 					"type": "binOp",
 					"op": "+",
+					"multiLine": true,
 					"left": {
 						"type": "if",
 						"cond": {

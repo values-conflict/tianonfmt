@@ -19,6 +19,7 @@ func pos(n Node) Pos { return n.nodePos() }
 // token on the same line.
 type Comment struct {
 	At   Pos
+	Line int // 1-based source line number
 	Text string
 }
 
@@ -73,9 +74,10 @@ func (f *FuncDef) nodePos() Pos { return f.At }
 
 // Pipe: left | right
 type Pipe struct {
-	At    Pos
-	Left  Node
-	Right Node
+	At        Pos
+	Left      Node
+	Right     Node
+	MultiLine bool // | token appeared on a different line than the left operand
 }
 
 func (p *Pipe) jqNode()      {}
@@ -83,9 +85,11 @@ func (p *Pipe) nodePos() Pos { return p.At }
 
 // Comma: left , right (generator)
 type Comma struct {
-	At    Pos
-	Left  Node
-	Right Node
+	At              Pos
+	Left            Node
+	Right           Node
+	MultiLine       bool // right operand started on a different line than the , token
+	BlankLineAfter  bool // a blank line follows the comma (before the right operand)
 }
 
 func (c *Comma) jqNode()      {}
@@ -114,10 +118,11 @@ func (l *LabelExpr) nodePos() Pos { return l.At }
 
 // BinOp: arithmetic, comparison, logical, and update operators.
 type BinOp struct {
-	At    Pos
-	Op    string
-	Left  Node
-	Right Node
+	At        Pos
+	Op        string
+	Left      Node
+	Right     Node
+	MultiLine bool // operator token appeared on a different line than the left operand
 }
 
 func (b *BinOp) jqNode()      {}
@@ -303,8 +308,9 @@ func (a *Array) nodePos() Pos { return a.At }
 
 // Object: { field, … }
 type Object struct {
-	At     Pos
-	Fields []*ObjectField
+	At        Pos
+	Fields    []*ObjectField
+	MultiLine bool // first field was on a different line than { in source
 }
 
 func (o *Object) jqNode()      {}
@@ -313,11 +319,13 @@ func (o *Object) nodePos() Pos { return o.At }
 // ObjectField is a single key:value pair in an object literal.
 // If Value is nil, this is a shorthand field ({foo} == {foo: .foo}).
 type ObjectField struct {
-	At              Pos
-	LeadingComments []*Comment // comments that appear before the key
-	Key             Node       // StrLit, Ident, or Paren (for computed keys)
-	KeyOptional     bool       // key followed by ? inside the object
-	Value           Node       // nil for shorthand
+	At                 Pos
+	LeadingComments    []*Comment // comments that appear before the key
+	Key                Node       // StrLit, Ident, or Paren (for computed keys)
+	KeyOptional        bool       // key followed by ? inside the object
+	Value              Node       // nil for shorthand
+	BlankLineBefore    bool       // a blank line precedes this field (before leading comments or key)
+	BlankAfterComments bool       // a blank line between the last leading comment and the key
 }
 
 // CommentedExpr wraps an expression with attached comments.
@@ -364,8 +372,10 @@ func (l *LocalFuncDef) nodePos() Pos { return l.At }
 
 // Paren: (expr) — preserves explicit parentheses
 type Paren struct {
-	At   Pos
-	Expr Node
+	At              Pos
+	Expr            Node
+	OpenComment     *Comment   // trailing comment on the ( line (e.g. "( # label\n")
+	ClosingComments []*Comment // leading comments before the closing )
 }
 
 func (p *Paren) jqNode()      {}

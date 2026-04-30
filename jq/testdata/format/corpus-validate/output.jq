@@ -12,17 +12,20 @@ def validate(selector; condition; err):
 		.;
 		(if $bork then $maybepath else getpath($maybepath) end) as $val
 		| try (if $val | condition then . else error("") end) catch (
-			error(
 			# invalid .["foo"]["bar"]: ERROR MESSAGE HERE
 			# value: {"baz":"buzz"}
-			"\ninvalid "
+			error("\ninvalid "
 			+ if $bork then
 				"value"
 			else
 				".\($maybepath | map("[\(tojson)]") | add // "")"
 			end
 			+ ":\n\t\($val | tojson)"
-			+ ($val | err | if . and length > 0 then "\n\(.)" else "" end)
+			+ (
+				$val
+				| err
+				| if . and length > 0 then "\n\(.)" else "" end
+			)
 			+ (
 				ltrimstr("\n")
 				| if . and length > 0 then "\n\(.)" else "" end
@@ -51,6 +54,6 @@ def validate_length(selector; lengths):
 
 # usage: (jq --slurp) validate_one | .some.thing
 def validate_one:
-	validate_length(.; 1) | .[0]
+	validate_length(.; 1)
+	| .[0]
 ;
-

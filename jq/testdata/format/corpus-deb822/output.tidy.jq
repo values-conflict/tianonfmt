@@ -25,7 +25,8 @@ def deb822_stream(lines):
 				| not; .[1:])
 			;
 			def _trimend: until(endswith(" ") or endswith("\t") | not; .[:-1]);
-			del(.out) | ($line | _trimstart) as $ltrim
+			del(.out)
+			| ($line | _trimstart) as $ltrim
 			| ($ltrim | _trimend) as $trim
 			| if $ltrim != $line then
 				.accum[.cur] += "\n" + $trim
@@ -40,4 +41,3 @@ def deb822_stream(lines):
 		if .out and (.out | length) > 0 then .out else empty end
 	)
 ;
-
