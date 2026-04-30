@@ -33,6 +33,12 @@ func TestFormatIdempotent(t *testing.T) {
 	})
 }
 
+func TestFormatRoundTrip(t *testing.T) {
+	testutil.Golden(t, "testdata/format", "output.md", "output.md", func(src string) (string, error) {
+		return markdown.Format(src), nil
+	})
+}
+
 // ── Lint ──────────────────────────────────────────────────────────────────────
 
 func TestLint(t *testing.T) {

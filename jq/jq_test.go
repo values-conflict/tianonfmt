@@ -49,6 +49,48 @@ func TestFormatIdempotent(t *testing.T) {
 	})
 }
 
+// ── tidy ──────────────────────────────────────────────────────────────────────
+
+// TestFormatRoundTrip verifies that the formatter is a no-op on already-canonical
+// files.  If format(golden) != golden the AST is silently losing information.
+func TestFormatRoundTrip(t *testing.T) {
+	testutil.Golden(t, "testdata/format", "output.jq", "output.jq", func(src string) (string, error) {
+		f, err := jq.ParseFile(src)
+		if err != nil {
+			return "", err
+		}
+		return jq.FormatFile(f), nil
+	})
+}
+
+func TestTidy(t *testing.T) {
+	testutil.Golden(t, "testdata/tidy", "input.jq", "output.jq", func(src string) (string, error) {
+		f, err := jq.ParseFile(src)
+		if err != nil {
+			return "", err
+		}
+		jq.TidyFile(f)
+		return jq.FormatFileTidy(f), nil
+	})
+}
+
+func TestTidyIdempotent(t *testing.T) {
+	testutil.Golden(t, "testdata/tidy", "input.jq", "output.jq", func(src string) (string, error) {
+		f, err := jq.ParseFile(src)
+		if err != nil {
+			return "", err
+		}
+		jq.TidyFile(f)
+		first := jq.FormatFileTidy(f)
+		f2, err := jq.ParseFile(first)
+		if err != nil {
+			return "", fmt.Errorf("re-parse after tidy: %w", err)
+		}
+		jq.TidyFile(f2)
+		return jq.FormatFileTidy(f2), nil
+	})
+}
+
 // ── lint ──────────────────────────────────────────────────────────────────────
 
 // TestLint verifies the linter reports the expected violations.

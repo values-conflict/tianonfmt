@@ -41,6 +41,12 @@ func TestFormat(t *testing.T) {
 	})
 }
 
+func TestFormatRoundTrip(t *testing.T) {
+	testutil.Golden(t, "testdata/format", "output.template", "output.template", func(src string) (string, error) {
+		return template.Format(src, realJQFmt), nil
+	})
+}
+
 func TestFormatIdempotent(t *testing.T) {
 	testutil.Golden(t, "testdata/format", "input.template", "output.template", func(src string) (string, error) {
 		first := template.Format(src, realJQFmt)

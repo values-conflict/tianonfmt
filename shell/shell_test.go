@@ -88,6 +88,12 @@ func TestFormatIdempotent(t *testing.T) {
 
 // ── tidy ──────────────────────────────────────────────────────────────────────
 
+func TestFormatRoundTrip(t *testing.T) {
+	testutil.Golden(t, "testdata/format", "output.sh", "output.sh", func(src string) (string, error) {
+		return shell.Format(src, shell.DetectLang(src), nil)
+	})
+}
+
 func TestTidy(t *testing.T) {
 	testutil.Golden(t, "testdata/tidy", "input.sh", "output.sh", func(input string) (string, error) {
 		return shell.FormatWithTidy(input, shell.DetectLang(input), nil)
