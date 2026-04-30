@@ -1,0 +1,2 @@
+Source: https://github.com/tianon/docker-postgres-upgrade/blob/ffec3042572b093ab2c61310945f51d6d00fb09c/Dockerfile.template
+License: Expat

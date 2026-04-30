@@ -1,0 +1,2 @@
+Source: https://github.com/tianon/docker-qemu/blob/3ce36843e253ddb7f63a39a6d0a27a7a46762e8b/Dockerfile.template
+License: **WARNING:** UNKNOWN

@@ -1,0 +1,2 @@
+Source: https://github.com/tianon/docker-bash/blob/06430c8e1571aed8135cafb7a651afa1c8dc511c/Dockerfile.template
+License: GPL-3

@@ -1,0 +1,13 @@
+{{
+ # first comment line
+ # second comment line
+-}}
+FROM debian:trixie-slim
+
+RUN set -eux; \
+{{
+	# step one
+	# step two
+	# step three
+-}}
+	echo done
