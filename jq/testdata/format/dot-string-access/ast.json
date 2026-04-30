@@ -9,12 +9,14 @@
 				"key": {
 					"type": "string",
 					"raw": "\"foo\""
-				}
+				},
+				"dotAccess": true
 			},
 			"key": {
 				"type": "string",
 				"raw": "\"bar\""
-			}
+			},
+			"dotAccess": true
 		},
 		"right": {
 			"type": "pipe",
@@ -23,7 +25,8 @@
 				"key": {
 					"type": "string",
 					"raw": "\"baz-qux\""
-				}
+				},
+				"dotAccess": true
 			},
 			"right": {
 				"type": "index",
@@ -36,12 +39,14 @@
 					"key": {
 						"type": "string",
 						"raw": "\"b-c\""
-					}
+					},
+					"dotAccess": true
 				},
 				"key": {
 					"type": "string",
 					"raw": "\"d\""
-				}
+				},
+				"dotAccess": true
 			}
 		}
 	}

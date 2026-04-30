@@ -1,0 +1,28 @@
+{
+	"type": "shell",
+	"file": "input.sh",
+	"stmts": [
+		{
+			"type": "call",
+			"args": [
+				"set",
+				"-Eeuo",
+				"pipefail"
+			]
+		},
+		{
+			"type": "call",
+			"args": [
+				"which",
+				"jq"
+			]
+		},
+		{
+			"type": "call",
+			"args": [
+				"which",
+				"docker"
+			]
+		}
+	]
+}

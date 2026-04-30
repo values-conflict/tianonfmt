@@ -1,0 +1,76 @@
+{
+	"type": "jq",
+	"query": {
+		"type": "pipe",
+		"left": {
+			"type": "index",
+			"expr": {
+				"type": "identity"
+			},
+			"key": {
+				"type": "string",
+				"raw": "\"foo\""
+			}
+		},
+		"right": {
+			"type": "pipe",
+			"left": {
+				"type": "index",
+				"expr": {
+					"type": "identity"
+				},
+				"key": {
+					"type": "string",
+					"raw": "\"foo-bar\""
+				}
+			},
+			"right": {
+				"type": "pipe",
+				"left": {
+					"type": "index",
+					"expr": {
+						"type": "field",
+						"name": ".a"
+					},
+					"key": {
+						"type": "string",
+						"raw": "\"baz\""
+					}
+				},
+				"right": {
+					"type": "pipe",
+					"left": {
+						"type": "index",
+						"expr": {
+							"type": "field",
+							"name": ".a"
+						},
+						"key": {
+							"type": "string",
+							"raw": "\"baz-qux\""
+						}
+					},
+					"right": {
+						"type": "pipe",
+						"left": {
+							"type": "index",
+							"key": {
+								"type": "string",
+								"raw": "\"quoted\""
+							},
+							"dotAccess": true
+						},
+						"right": {
+							"type": "index",
+							"key": {
+								"type": "string",
+								"raw": "\"dash-name\""
+							},
+							"dotAccess": true
+						}
+					}
+				}
+			}
+		}
+	}
+}

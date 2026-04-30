@@ -1,0 +1,1453 @@
+{
+	"type": "dockerfile",
+	"file": "input.dockerfile",
+	"instructions": [
+		{
+			"type": "FROM",
+			"ref": "ubuntu:node",
+			"lines": [
+				{
+					"kind": "instruction",
+					"text": "FROM ubuntu:node"
+				}
+			],
+			"startLine": 1,
+			"endLine": 1
+		},
+		{
+			"type": "blank",
+			"lines": [
+				{
+					"kind": "blank"
+				}
+			],
+			"startLine": 2,
+			"endLine": 2
+		},
+		{
+			"type": "LABEL",
+			"args": "name=\"Silverpeas\"",
+			"lines": [
+				{
+					"kind": "instruction",
+					"text": "LABEL name=\"Silverpeas\""
+				}
+			],
+			"startLine": 3,
+			"endLine": 3
+		},
+		{
+			"type": "LABEL",
+			"args": "description=\"Image to install and to run the Silverpeas Collaborative Portal Application\"",
+			"lines": [
+				{
+					"kind": "instruction",
+					"text": "LABEL description=\"Image to install and to run the Silverpeas Collaborative Portal Application\""
+				}
+			],
+			"startLine": 4,
+			"endLine": 4
+		},
+		{
+			"type": "LABEL",
+			"args": "vendor=\"Silverpeas\"",
+			"lines": [
+				{
+					"kind": "instruction",
+					"text": "LABEL vendor=\"Silverpeas\""
+				}
+			],
+			"startLine": 5,
+			"endLine": 5
+		},
+		{
+			"type": "LABEL",
+			"args": "version=\"6.5\"",
+			"lines": [
+				{
+					"kind": "instruction",
+					"text": "LABEL version=\"6.5\""
+				}
+			],
+			"startLine": 6,
+			"endLine": 6
+		},
+		{
+			"type": "LABEL",
+			"args": "build=1",
+			"lines": [
+				{
+					"kind": "instruction",
+					"text": "LABEL build=1"
+				}
+			],
+			"startLine": 7,
+			"endLine": 7
+		},
+		{
+			"type": "blank",
+			"lines": [
+				{
+					"kind": "blank"
+				}
+			],
+			"startLine": 8,
+			"endLine": 8
+		},
+		{
+			"type": "LABEL",
+			"args": "org.opencontainers.image.title=\"Silverpeas\"",
+			"lines": [
+				{
+					"kind": "instruction",
+					"text": "LABEL org.opencontainers.image.title=\"Silverpeas\""
+				}
+			],
+			"startLine": 9,
+			"endLine": 9
+		},
+		{
+			"type": "LABEL",
+			"args": "org.opencontainers.image.description=\"Docker image providing a production-ready version of Silverpeas Collaborative Portal Application\"",
+			"lines": [
+				{
+					"kind": "instruction",
+					"text": "LABEL org.opencontainers.image.description=\"Docker image providing a production-ready version of Silverpeas Collaborative Portal Application\""
+				}
+			],
+			"startLine": 10,
+			"endLine": 10
+		},
+		{
+			"type": "LABEL",
+			"args": "org.opencontainers.image.vendor=\"Silverpeas\"",
+			"lines": [
+				{
+					"kind": "instruction",
+					"text": "LABEL org.opencontainers.image.vendor=\"Silverpeas\""
+				}
+			],
+			"startLine": 11,
+			"endLine": 11
+		},
+		{
+			"type": "LABEL",
+			"args": "org.opencontainers.image.version=\"6.5\"",
+			"lines": [
+				{
+					"kind": "instruction",
+					"text": "LABEL org.opencontainers.image.version=\"6.5\""
+				}
+			],
+			"startLine": 12,
+			"endLine": 12
+		},
+		{
+			"type": "LABEL",
+			"args": "org.opencontainers.image.authors=\"Miguel Moquillon \u003cmiguel.moquillon@silverpeas.org\u003e\"",
+			"lines": [
+				{
+					"kind": "instruction",
+					"text": "LABEL org.opencontainers.image.authors=\"Miguel Moquillon \u003cmiguel.moquillon@silverpeas.org\u003e\""
+				}
+			],
+			"startLine": 13,
+			"endLine": 13
+		},
+		{
+			"type": "LABEL",
+			"args": "org.opencontainers.image.licenses=\"AGPLv3\"",
+			"lines": [
+				{
+					"kind": "instruction",
+					"text": "LABEL org.opencontainers.image.licenses=\"AGPLv3\""
+				}
+			],
+			"startLine": 14,
+			"endLine": 14
+		},
+		{
+			"type": "blank",
+			"lines": [
+				{
+					"kind": "blank"
+				}
+			],
+			"startLine": 15,
+			"endLine": 15
+		},
+		{
+			"type": "ENV",
+			"args": "TERM=xterm",
+			"lines": [
+				{
+					"kind": "instruction",
+					"text": "ENV TERM=xterm"
+				}
+			],
+			"startLine": 16,
+			"endLine": 16
+		},
+		{
+			"type": "blank",
+			"lines": [
+				{
+					"kind": "blank"
+				}
+			],
+			"startLine": 17,
+			"endLine": 17
+		},
+		{
+			"type": "COMMENT",
+			"args": "#",
+			"lines": [
+				{
+					"kind": "comment",
+					"text": "#"
+				}
+			],
+			"startLine": 18,
+			"endLine": 18
+		},
+		{
+			"type": "COMMENT",
+			"args": "# Install required and recommended programs for Silverpeas",
+			"lines": [
+				{
+					"kind": "comment",
+					"text": "# Install required and recommended programs for Silverpeas"
+				}
+			],
+			"startLine": 19,
+			"endLine": 19
+		},
+		{
+			"type": "COMMENT",
+			"args": "#",
+			"lines": [
+				{
+					"kind": "comment",
+					"text": "#"
+				}
+			],
+			"startLine": 20,
+			"endLine": 20
+		},
+		{
+			"type": "blank",
+			"lines": [
+				{
+					"kind": "blank"
+				}
+			],
+			"startLine": 21,
+			"endLine": 21
+		},
+		{
+			"type": "COMMENT",
+			"args": "# Installation of LibreOffice, ImageMagick, Ghostscript, and then",
+			"lines": [
+				{
+					"kind": "comment",
+					"text": "# Installation of LibreOffice, ImageMagick, Ghostscript, and then"
+				}
+			],
+			"startLine": 22,
+			"endLine": 22
+		},
+		{
+			"type": "COMMENT",
+			"args": "# the dependencies required to run SWFTools and PDF2JSON",
+			"lines": [
+				{
+					"kind": "comment",
+					"text": "# the dependencies required to run SWFTools and PDF2JSON"
+				}
+			],
+			"startLine": 23,
+			"endLine": 23
+		},
+		{
+			"type": "RUN",
+			"form": "shell",
+			"args": "apt-get update   \u0026\u0026 apt-get install -y --no-install-recommends tzdata \\",
+			"lines": [
+				{
+					"kind": "instruction",
+					"text": "RUN apt-get update \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "  \u0026\u0026 apt-get install -y --no-install-recommends tzdata \\ "
+				}
+			],
+			"startLine": 24,
+			"endLine": 25
+		},
+		{
+			"type": "\u0026\u0026",
+			"args": "apt-get install -y --no-install-recommends     apt-utils     iputils-ping     curl     wget     vim     locales     language-pack-en     language-pack-fr     procps     net-tools     zip     unzip     openjdk-11-jdk     ffmpeg     imagemagick     ghostscript     libreoffice     ure     gpgv   \u0026\u0026 rm -rf /var/lib/apt/lists/*   \u0026\u0026 update-ca-certificates -f",
+			"lines": [
+				{
+					"kind": "instruction",
+					"text": "  \u0026\u0026 apt-get install -y --no-install-recommends \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "    apt-utils \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "    iputils-ping \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "    curl \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "    wget \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "    vim \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "    locales \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "    language-pack-en \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "    language-pack-fr \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "    procps \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "    net-tools \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "    zip \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "    unzip \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "    openjdk-11-jdk \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "    ffmpeg \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "    imagemagick \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "    ghostscript \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "    libreoffice \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "    ure \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "    gpgv \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "  \u0026\u0026 rm -rf /var/lib/apt/lists/* \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "  \u0026\u0026 update-ca-certificates -f"
+				}
+			],
+			"startLine": 26,
+			"endLine": 47
+		},
+		{
+			"type": "blank",
+			"lines": [
+				{
+					"kind": "blank"
+				}
+			],
+			"startLine": 48,
+			"endLine": 48
+		},
+		{
+			"type": "COMMENT",
+			"args": "# Fetch and install SWFTools",
+			"lines": [
+				{
+					"kind": "comment",
+					"text": "# Fetch and install SWFTools"
+				}
+			],
+			"startLine": 49,
+			"endLine": 49
+		},
+		{
+			"type": "RUN",
+			"form": "shell",
+			"args": "wget -nc https://www.silverpeas.org/files/swftools-bin-0.9.2.zip   \u0026\u0026 echo 'd40bd091c84bde2872f2733a3c767b3a686c8e8477a3af3a96ef347cf05c5e43 swftools-bin-0.9.2.zip' | sha256sum -c --status -   \u0026\u0026 unzip swftools-bin-0.9.2.zip -d /   \u0026\u0026 rm swftools-bin-0.9.2.zip",
+			"lines": [
+				{
+					"kind": "instruction",
+					"text": "RUN wget -nc https://www.silverpeas.org/files/swftools-bin-0.9.2.zip \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "  \u0026\u0026 echo 'd40bd091c84bde2872f2733a3c767b3a686c8e8477a3af3a96ef347cf05c5e43 swftools-bin-0.9.2.zip' | sha256sum -c --status - \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "  \u0026\u0026 unzip swftools-bin-0.9.2.zip -d / \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "  \u0026\u0026 rm swftools-bin-0.9.2.zip"
+				}
+			],
+			"startLine": 50,
+			"endLine": 53
+		},
+		{
+			"type": "blank",
+			"lines": [
+				{
+					"kind": "blank"
+				}
+			],
+			"startLine": 54,
+			"endLine": 54
+		},
+		{
+			"type": "COMMENT",
+			"args": "# Fetch and install PDF2JSON",
+			"lines": [
+				{
+					"kind": "comment",
+					"text": "# Fetch and install PDF2JSON"
+				}
+			],
+			"startLine": 55,
+			"endLine": 55
+		},
+		{
+			"type": "RUN",
+			"form": "shell",
+			"args": "wget -nc https://www.silverpeas.org/files/pdf2json-bin-0.68.zip   \u0026\u0026 echo 'eec849cdd75224f9d44c0999ed1fbe8764a773d8ab0cf7fff4bf922ab81c9f84 pdf2json-bin-0.68.zip' | sha256sum -c --status -   \u0026\u0026 unzip pdf2json-bin-0.68.zip -d /   \u0026\u0026 rm pdf2json-bin-0.68.zip",
+			"lines": [
+				{
+					"kind": "instruction",
+					"text": "RUN wget -nc https://www.silverpeas.org/files/pdf2json-bin-0.68.zip \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "  \u0026\u0026 echo 'eec849cdd75224f9d44c0999ed1fbe8764a773d8ab0cf7fff4bf922ab81c9f84 pdf2json-bin-0.68.zip' | sha256sum -c --status - \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "  \u0026\u0026 unzip pdf2json-bin-0.68.zip -d / \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "  \u0026\u0026 rm pdf2json-bin-0.68.zip"
+				}
+			],
+			"startLine": 56,
+			"endLine": 59
+		},
+		{
+			"type": "blank",
+			"lines": [
+				{
+					"kind": "blank"
+				}
+			],
+			"startLine": 60,
+			"endLine": 60
+		},
+		{
+			"type": "COMMENT",
+			"args": "#",
+			"lines": [
+				{
+					"kind": "comment",
+					"text": "#"
+				}
+			],
+			"startLine": 61,
+			"endLine": 61
+		},
+		{
+			"type": "COMMENT",
+			"args": "# Set up environment to install and to run Silverpeas",
+			"lines": [
+				{
+					"kind": "comment",
+					"text": "# Set up environment to install and to run Silverpeas"
+				}
+			],
+			"startLine": 62,
+			"endLine": 62
+		},
+		{
+			"type": "COMMENT",
+			"args": "#",
+			"lines": [
+				{
+					"kind": "comment",
+					"text": "#"
+				}
+			],
+			"startLine": 63,
+			"endLine": 63
+		},
+		{
+			"type": "blank",
+			"lines": [
+				{
+					"kind": "blank"
+				}
+			],
+			"startLine": 64,
+			"endLine": 64
+		},
+		{
+			"type": "COMMENT",
+			"args": "# Default locale of the platform. It can be overridden to build an image for a specific locale other than en_US.UTF-8.",
+			"lines": [
+				{
+					"kind": "comment",
+					"text": "# Default locale of the platform. It can be overridden to build an image for a specific locale other than en_US.UTF-8."
+				}
+			],
+			"startLine": 65,
+			"endLine": 65
+		},
+		{
+			"type": "ARG",
+			"args": "DEFAULT_LOCALE=en_US.UTF-8",
+			"lines": [
+				{
+					"kind": "instruction",
+					"text": "ARG DEFAULT_LOCALE=en_US.UTF-8"
+				}
+			],
+			"startLine": 66,
+			"endLine": 66
+		},
+		{
+			"type": "blank",
+			"lines": [
+				{
+					"kind": "blank"
+				}
+			],
+			"startLine": 67,
+			"endLine": 67
+		},
+		{
+			"type": "COMMENT",
+			"args": "# Generate locales and set the default one",
+			"lines": [
+				{
+					"kind": "comment",
+					"text": "# Generate locales and set the default one"
+				}
+			],
+			"startLine": 68,
+			"endLine": 68
+		},
+		{
+			"type": "RUN",
+			"form": "shell",
+			"args": "echo \"en_US.UTF-8 UTF-8\" \u003e\u003e /etc/locale.gen   \u0026\u0026 echo \"fr_FR.UTF-8 UTF-8\" \u003e\u003e /etc/locale.gen   \u0026\u0026 echo \"de_DE.UTF-8 UTF-8\" \u003e\u003e /etc/locale.gen   \u0026\u0026 locale-gen   \u0026\u0026 update-locale LANG=${DEFAULT_LOCALE} LANGUAGE=${DEFAULT_LOCALE} LC_ALL=${DEFAULT_LOCALE}",
+			"lines": [
+				{
+					"kind": "instruction",
+					"text": "RUN echo \"en_US.UTF-8 UTF-8\" \u003e\u003e /etc/locale.gen \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "  \u0026\u0026 echo \"fr_FR.UTF-8 UTF-8\" \u003e\u003e /etc/locale.gen \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "  \u0026\u0026 echo \"de_DE.UTF-8 UTF-8\" \u003e\u003e /etc/locale.gen \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "  \u0026\u0026 locale-gen \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "  \u0026\u0026 update-locale LANG=${DEFAULT_LOCALE} LANGUAGE=${DEFAULT_LOCALE} LC_ALL=${DEFAULT_LOCALE}"
+				}
+			],
+			"startLine": 69,
+			"endLine": 73
+		},
+		{
+			"type": "blank",
+			"lines": [
+				{
+					"kind": "blank"
+				}
+			],
+			"startLine": 74,
+			"endLine": 74
+		},
+		{
+			"type": "ENV",
+			"args": "LANG=${DEFAULT_LOCALE}",
+			"lines": [
+				{
+					"kind": "instruction",
+					"text": "ENV LANG=${DEFAULT_LOCALE}"
+				}
+			],
+			"startLine": 75,
+			"endLine": 75
+		},
+		{
+			"type": "ENV",
+			"args": "LANGUAGE=${DEFAULT_LOCALE}",
+			"lines": [
+				{
+					"kind": "instruction",
+					"text": "ENV LANGUAGE=${DEFAULT_LOCALE}"
+				}
+			],
+			"startLine": 76,
+			"endLine": 76
+		},
+		{
+			"type": "ENV",
+			"args": "LC_ALL=${DEFAULT_LOCALE}",
+			"lines": [
+				{
+					"kind": "instruction",
+					"text": "ENV LC_ALL=${DEFAULT_LOCALE}"
+				}
+			],
+			"startLine": 77,
+			"endLine": 77
+		},
+		{
+			"type": "blank",
+			"lines": [
+				{
+					"kind": "blank"
+				}
+			],
+			"startLine": 78,
+			"endLine": 78
+		},
+		{
+			"type": "COMMENT",
+			"args": "# Should a ping to be sent when running the first time the container?",
+			"lines": [
+				{
+					"kind": "comment",
+					"text": "# Should a ping to be sent when running the first time the container?"
+				}
+			],
+			"startLine": 79,
+			"endLine": 79
+		},
+		{
+			"type": "COMMENT",
+			"args": "# 1 : yes",
+			"lines": [
+				{
+					"kind": "comment",
+					"text": "# 1 : yes"
+				}
+			],
+			"startLine": 80,
+			"endLine": 80
+		},
+		{
+			"type": "COMMENT",
+			"args": "# any others values : no",
+			"lines": [
+				{
+					"kind": "comment",
+					"text": "# any others values : no"
+				}
+			],
+			"startLine": 81,
+			"endLine": 81
+		},
+		{
+			"type": "ENV",
+			"args": "PING_ON=1",
+			"lines": [
+				{
+					"kind": "instruction",
+					"text": "ENV PING_ON=1"
+				}
+			],
+			"startLine": 82,
+			"endLine": 82
+		},
+		{
+			"type": "blank",
+			"lines": [
+				{
+					"kind": "blank"
+				}
+			],
+			"startLine": 83,
+			"endLine": 83
+		},
+		{
+			"type": "COMMENT",
+			"args": "#",
+			"lines": [
+				{
+					"kind": "comment",
+					"text": "#"
+				}
+			],
+			"startLine": 84,
+			"endLine": 84
+		},
+		{
+			"type": "COMMENT",
+			"args": "# Install Silverpeas and Wildfly",
+			"lines": [
+				{
+					"kind": "comment",
+					"text": "# Install Silverpeas and Wildfly"
+				}
+			],
+			"startLine": 85,
+			"endLine": 85
+		},
+		{
+			"type": "COMMENT",
+			"args": "#",
+			"lines": [
+				{
+					"kind": "comment",
+					"text": "#"
+				}
+			],
+			"startLine": 86,
+			"endLine": 86
+		},
+		{
+			"type": "blank",
+			"lines": [
+				{
+					"kind": "blank"
+				}
+			],
+			"startLine": 87,
+			"endLine": 87
+		},
+		{
+			"type": "COMMENT",
+			"args": "# add a simple script that can auto-detect the appropriate JAVA_HOME value",
+			"lines": [
+				{
+					"kind": "comment",
+					"text": "# add a simple script that can auto-detect the appropriate JAVA_HOME value"
+				}
+			],
+			"startLine": 88,
+			"endLine": 88
+		},
+		{
+			"type": "COMMENT",
+			"args": "# based on whether the JDK or only the JRE is installed",
+			"lines": [
+				{
+					"kind": "comment",
+					"text": "# based on whether the JDK or only the JRE is installed"
+				}
+			],
+			"startLine": 89,
+			"endLine": 89
+		},
+		{
+			"type": "RUN",
+			"form": "shell",
+			"args": "{ \t\techo '#!/bin/sh'; \t\techo 'set -e'; \t\techo; \t\techo 'dirname \"$(dirname \"$(readlink -f \"$(which javac || which java)\")\")\"'; \t} \u003e /usr/local/bin/docker-java-home \t\u0026\u0026 chmod +x /usr/local/bin/docker-java-home",
+			"lines": [
+				{
+					"kind": "instruction",
+					"text": "RUN { \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "\t\techo '#!/bin/sh'; \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "\t\techo 'set -e'; \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "\t\techo; \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "\t\techo 'dirname \"$(dirname \"$(readlink -f \"$(which javac || which java)\")\")\"'; \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "\t} \u003e /usr/local/bin/docker-java-home \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "\t\u0026\u0026 chmod +x /usr/local/bin/docker-java-home"
+				}
+			],
+			"startLine": 90,
+			"endLine": 96
+		},
+		{
+			"type": "blank",
+			"lines": [
+				{
+					"kind": "blank"
+				}
+			],
+			"startLine": 97,
+			"endLine": 97
+		},
+		{
+			"type": "COMMENT",
+			"args": "# do some fancy footwork to create a JAVA_HOME that's cross-architecture-safe",
+			"lines": [
+				{
+					"kind": "comment",
+					"text": "# do some fancy footwork to create a JAVA_HOME that's cross-architecture-safe"
+				}
+			],
+			"startLine": 98,
+			"endLine": 98
+		},
+		{
+			"type": "RUN",
+			"form": "shell",
+			"args": "ln -svT \"/usr/lib/jvm/java-11-openjdk-$(dpkg --print-architecture)\" /docker-java-home",
+			"lines": [
+				{
+					"kind": "instruction",
+					"text": "RUN ln -svT \"/usr/lib/jvm/java-11-openjdk-$(dpkg --print-architecture)\" /docker-java-home"
+				}
+			],
+			"startLine": 99,
+			"endLine": 99
+		},
+		{
+			"type": "blank",
+			"lines": [
+				{
+					"kind": "blank"
+				}
+			],
+			"startLine": 100,
+			"endLine": 100
+		},
+		{
+			"type": "COMMENT",
+			"args": "# Set up environment variables for Silverpeas",
+			"lines": [
+				{
+					"kind": "comment",
+					"text": "# Set up environment variables for Silverpeas"
+				}
+			],
+			"startLine": 101,
+			"endLine": 101
+		},
+		{
+			"type": "ENV",
+			"args": "JAVA_HOME=/docker-java-home",
+			"lines": [
+				{
+					"kind": "instruction",
+					"text": "ENV JAVA_HOME=/docker-java-home"
+				}
+			],
+			"startLine": 102,
+			"endLine": 102
+		},
+		{
+			"type": "ENV",
+			"args": "SILVERPEAS_HOME=/opt/silverpeas",
+			"lines": [
+				{
+					"kind": "instruction",
+					"text": "ENV SILVERPEAS_HOME=/opt/silverpeas"
+				}
+			],
+			"startLine": 103,
+			"endLine": 103
+		},
+		{
+			"type": "ENV",
+			"args": "JBOSS_HOME=/opt/wildfly",
+			"lines": [
+				{
+					"kind": "instruction",
+					"text": "ENV JBOSS_HOME=/opt/wildfly"
+				}
+			],
+			"startLine": 104,
+			"endLine": 104
+		},
+		{
+			"type": "blank",
+			"lines": [
+				{
+					"kind": "blank"
+				}
+			],
+			"startLine": 105,
+			"endLine": 105
+		},
+		{
+			"type": "ENV",
+			"args": "SILVERPEAS_VERSION=6.5",
+			"lines": [
+				{
+					"kind": "instruction",
+					"text": "ENV SILVERPEAS_VERSION=6.5"
+				}
+			],
+			"startLine": 106,
+			"endLine": 106
+		},
+		{
+			"type": "ENV",
+			"args": "WILDFLY_VERSION=26.1.3",
+			"lines": [
+				{
+					"kind": "instruction",
+					"text": "ENV WILDFLY_VERSION=26.1.3"
+				}
+			],
+			"startLine": 107,
+			"endLine": 107
+		},
+		{
+			"type": "blank",
+			"lines": [
+				{
+					"kind": "blank"
+				}
+			],
+			"startLine": 108,
+			"endLine": 108
+		},
+		{
+			"type": "COMMENT",
+			"args": "# Fetch both Silverpeas, Wildfly, and the JCR migration script and unpack them into /opt",
+			"lines": [
+				{
+					"kind": "comment",
+					"text": "# Fetch both Silverpeas, Wildfly, and the JCR migration script and unpack them into /opt"
+				}
+			],
+			"startLine": 109,
+			"endLine": 109
+		},
+		{
+			"type": "RUN",
+			"form": "shell",
+			"args": "wget -nc https://www.silverpeas.org/files/silverpeas-${SILVERPEAS_VERSION}-wildfly${WILDFLY_VERSION%.?.?}.zip   \u0026\u0026 wget -nc https://www.silverpeas.org/files/silverpeas-${SILVERPEAS_VERSION}-wildfly${WILDFLY_VERSION%.?.?}.zip.asc   \u0026\u0026 gpg --keyserver keys.openpgp.org --recv-keys 3F4657EF9C591F2FEA458FEBC19391EB3DF442B6   \u0026\u0026 gpg --batch --verify silverpeas-${SILVERPEAS_VERSION}-wildfly${WILDFLY_VERSION%.?.?}.zip.asc silverpeas-${SILVERPEAS_VERSION}-wildfly${WILDFLY_VERSION%.?.?}.zip   \u0026\u0026 wget -nc https://www.silverpeas.org/files/wildfly-${WILDFLY_VERSION}.Final.zip   \u0026\u0026 unzip silverpeas-${SILVERPEAS_VERSION}-wildfly${WILDFLY_VERSION%.?.?}.zip -d /opt   \u0026\u0026 unzip wildfly-${WILDFLY_VERSION}.Final.zip -d /opt   \u0026\u0026 mv /opt/silverpeas-${SILVERPEAS_VERSION}-wildfly${WILDFLY_VERSION%.?.?} /opt/silverpeas   \u0026\u0026 mv /opt/wildfly-${WILDFLY_VERSION}.Final /opt/wildfly   \u0026\u0026 wget -nc https://www.silverpeas.org/files/oak-migrate.zip   \u0026\u0026 echo '87009e55520e74b5d2a386f4ebc843ee43cd1f25ca5138f342a94a31add3cfbd oak-migrate.zip' | sha256sum -c --status -   \u0026\u0026 mkdir -p /opt/oak-migration   \u0026\u0026 unzip oak-migrate.zip -d /opt/oak-migration/   \u0026\u0026 chmod +x /opt/oak-migration/oak-migrate.sh   \u0026\u0026 rm *.zip   \u0026\u0026 mkdir -p /root/.m2",
+			"lines": [
+				{
+					"kind": "instruction",
+					"text": "RUN wget -nc https://www.silverpeas.org/files/silverpeas-${SILVERPEAS_VERSION}-wildfly${WILDFLY_VERSION%.?.?}.zip \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "  \u0026\u0026 wget -nc https://www.silverpeas.org/files/silverpeas-${SILVERPEAS_VERSION}-wildfly${WILDFLY_VERSION%.?.?}.zip.asc \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "  \u0026\u0026 gpg --keyserver keys.openpgp.org --recv-keys 3F4657EF9C591F2FEA458FEBC19391EB3DF442B6 \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "  \u0026\u0026 gpg --batch --verify silverpeas-${SILVERPEAS_VERSION}-wildfly${WILDFLY_VERSION%.?.?}.zip.asc silverpeas-${SILVERPEAS_VERSION}-wildfly${WILDFLY_VERSION%.?.?}.zip \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "  \u0026\u0026 wget -nc https://www.silverpeas.org/files/wildfly-${WILDFLY_VERSION}.Final.zip \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "  \u0026\u0026 unzip silverpeas-${SILVERPEAS_VERSION}-wildfly${WILDFLY_VERSION%.?.?}.zip -d /opt \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "  \u0026\u0026 unzip wildfly-${WILDFLY_VERSION}.Final.zip -d /opt \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "  \u0026\u0026 mv /opt/silverpeas-${SILVERPEAS_VERSION}-wildfly${WILDFLY_VERSION%.?.?} /opt/silverpeas \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "  \u0026\u0026 mv /opt/wildfly-${WILDFLY_VERSION}.Final /opt/wildfly \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "  \u0026\u0026 wget -nc https://www.silverpeas.org/files/oak-migrate.zip \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "  \u0026\u0026 echo '87009e55520e74b5d2a386f4ebc843ee43cd1f25ca5138f342a94a31add3cfbd oak-migrate.zip' | sha256sum -c --status - \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "  \u0026\u0026 mkdir -p /opt/oak-migration \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "  \u0026\u0026 unzip oak-migrate.zip -d /opt/oak-migration/ \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "  \u0026\u0026 chmod +x /opt/oak-migration/oak-migrate.sh \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "  \u0026\u0026 rm *.zip \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "  \u0026\u0026 mkdir -p /root/.m2"
+				}
+			],
+			"startLine": 110,
+			"endLine": 125
+		},
+		{
+			"type": "blank",
+			"lines": [
+				{
+					"kind": "blank"
+				}
+			],
+			"startLine": 126,
+			"endLine": 126
+		},
+		{
+			"type": "COMMENT",
+			"args": "# Copy the Maven settings.xml required to install Silverpeas by fetching the software bundles from ",
+			"lines": [
+				{
+					"kind": "comment",
+					"text": "# Copy the Maven settings.xml required to install Silverpeas by fetching the software bundles from "
+				}
+			],
+			"startLine": 127,
+			"endLine": 127
+		},
+		{
+			"type": "COMMENT",
+			"args": "# the Silverpeas Nexus Repository",
+			"lines": [
+				{
+					"kind": "comment",
+					"text": "# the Silverpeas Nexus Repository"
+				}
+			],
+			"startLine": 128,
+			"endLine": 128
+		},
+		{
+			"type": "COPY",
+			"form": "plain",
+			"paths": "src/settings.xml /root/.m2/",
+			"lines": [
+				{
+					"kind": "instruction",
+					"text": "COPY src/settings.xml /root/.m2/"
+				}
+			],
+			"startLine": 129,
+			"endLine": 129
+		},
+		{
+			"type": "blank",
+			"lines": [
+				{
+					"kind": "blank"
+				}
+			],
+			"startLine": 130,
+			"endLine": 130
+		},
+		{
+			"type": "COMMENT",
+			"args": "# Copy the customized Silverpeas installation settings",
+			"lines": [
+				{
+					"kind": "comment",
+					"text": "# Copy the customized Silverpeas installation settings"
+				}
+			],
+			"startLine": 131,
+			"endLine": 131
+		},
+		{
+			"type": "COPY",
+			"form": "plain",
+			"paths": "src/silverpeas.gradle ${SILVERPEAS_HOME}/bin/",
+			"lines": [
+				{
+					"kind": "instruction",
+					"text": "COPY src/silverpeas.gradle ${SILVERPEAS_HOME}/bin/"
+				}
+			],
+			"startLine": 132,
+			"endLine": 132
+		},
+		{
+			"type": "blank",
+			"lines": [
+				{
+					"kind": "blank"
+				}
+			],
+			"startLine": 133,
+			"endLine": 133
+		},
+		{
+			"type": "COMMENT",
+			"args": "# Set the default working directory",
+			"lines": [
+				{
+					"kind": "comment",
+					"text": "# Set the default working directory"
+				}
+			],
+			"startLine": 134,
+			"endLine": 134
+		},
+		{
+			"type": "WORKDIR",
+			"args": "${SILVERPEAS_HOME}/bin",
+			"lines": [
+				{
+					"kind": "instruction",
+					"text": "WORKDIR ${SILVERPEAS_HOME}/bin"
+				}
+			],
+			"startLine": 135,
+			"endLine": 135
+		},
+		{
+			"type": "blank",
+			"lines": [
+				{
+					"kind": "blank"
+				}
+			],
+			"startLine": 136,
+			"endLine": 136
+		},
+		{
+			"type": "COMMENT",
+			"args": "# Copy this container init script that will be run each time the container is ran",
+			"lines": [
+				{
+					"kind": "comment",
+					"text": "# Copy this container init script that will be run each time the container is ran"
+				}
+			],
+			"startLine": 137,
+			"endLine": 137
+		},
+		{
+			"type": "COPY",
+			"form": "plain",
+			"paths": "src/run.sh /opt/",
+			"lines": [
+				{
+					"kind": "instruction",
+					"text": "COPY src/run.sh /opt/"
+				}
+			],
+			"startLine": 138,
+			"endLine": 138
+		},
+		{
+			"type": "COPY",
+			"form": "plain",
+			"paths": "src/converter.groovy ${SILVERPEAS_HOME}/configuration/silverpeas/",
+			"lines": [
+				{
+					"kind": "instruction",
+					"text": "COPY src/converter.groovy ${SILVERPEAS_HOME}/configuration/silverpeas/"
+				}
+			],
+			"startLine": 139,
+			"endLine": 139
+		},
+		{
+			"type": "blank",
+			"lines": [
+				{
+					"kind": "blank"
+				}
+			],
+			"startLine": 140,
+			"endLine": 140
+		},
+		{
+			"type": "COMMENT",
+			"args": "# Assemble Silverpeas",
+			"lines": [
+				{
+					"kind": "comment",
+					"text": "# Assemble Silverpeas"
+				}
+			],
+			"startLine": 141,
+			"endLine": 141
+		},
+		{
+			"type": "RUN",
+			"form": "shell",
+			"args": "set -eux;   sed -i -e \"s/SILVERPEAS_VERSION/${SILVERPEAS_VERSION}/g\" ${SILVERPEAS_HOME}/bin/silverpeas.gradle;   echo \"Construct Silverpeas ${SILVERPEAS_VERSION}\";   ./silverpeas assemble || (cat ../log/build-* \u0026\u0026 exit 1);   rm ../log/build-*;   touch .install;",
+			"lines": [
+				{
+					"kind": "instruction",
+					"text": "RUN set -eux; \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "  sed -i -e \"s/SILVERPEAS_VERSION/${SILVERPEAS_VERSION}/g\" ${SILVERPEAS_HOME}/bin/silverpeas.gradle; \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "  echo \"Construct Silverpeas ${SILVERPEAS_VERSION}\"; \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "  ./silverpeas assemble || (cat ../log/build-* \u0026\u0026 exit 1); \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "  rm ../log/build-*; \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "  touch .install;"
+				}
+			],
+			"startLine": 142,
+			"endLine": 147
+		},
+		{
+			"type": "blank",
+			"lines": [
+				{
+					"kind": "blank"
+				}
+			],
+			"startLine": 148,
+			"endLine": 148
+		},
+		{
+			"type": "COMMENT",
+			"args": "#",
+			"lines": [
+				{
+					"kind": "comment",
+					"text": "#"
+				}
+			],
+			"startLine": 149,
+			"endLine": 149
+		},
+		{
+			"type": "COMMENT",
+			"args": "# Expose image entries. By default, when running, the container will set up Silverpeas and Wildfly",
+			"lines": [
+				{
+					"kind": "comment",
+					"text": "# Expose image entries. By default, when running, the container will set up Silverpeas and Wildfly"
+				}
+			],
+			"startLine": 150,
+			"endLine": 150
+		},
+		{
+			"type": "COMMENT",
+			"args": "# according to the host environment.",
+			"lines": [
+				{
+					"kind": "comment",
+					"text": "# according to the host environment."
+				}
+			],
+			"startLine": 151,
+			"endLine": 151
+		},
+		{
+			"type": "COMMENT",
+			"args": "#",
+			"lines": [
+				{
+					"kind": "comment",
+					"text": "#"
+				}
+			],
+			"startLine": 152,
+			"endLine": 152
+		},
+		{
+			"type": "blank",
+			"lines": [
+				{
+					"kind": "blank"
+				}
+			],
+			"startLine": 153,
+			"endLine": 153
+		},
+		{
+			"type": "COMMENT",
+			"args": "# Silverpeas listens port 8000 by default",
+			"lines": [
+				{
+					"kind": "comment",
+					"text": "# Silverpeas listens port 8000 by default"
+				}
+			],
+			"startLine": 154,
+			"endLine": 154
+		},
+		{
+			"type": "EXPOSE",
+			"args": "8000 9990",
+			"lines": [
+				{
+					"kind": "instruction",
+					"text": "EXPOSE 8000 9990"
+				}
+			],
+			"startLine": 155,
+			"endLine": 155
+		},
+		{
+			"type": "blank",
+			"lines": [
+				{
+					"kind": "blank"
+				}
+			],
+			"startLine": 156,
+			"endLine": 156
+		},
+		{
+			"type": "COMMENT",
+			"args": "# The following Silverpeas folders are exposed by default so that you can access outside the container the logs, ",
+			"lines": [
+				{
+					"kind": "comment",
+					"text": "# The following Silverpeas folders are exposed by default so that you can access outside the container the logs, "
+				}
+			],
+			"startLine": 157,
+			"endLine": 157
+		},
+		{
+			"type": "COMMENT",
+			"args": "# the data, the properties and the workflow definitions that are produced in Silverpeas.",
+			"lines": [
+				{
+					"kind": "comment",
+					"text": "# the data, the properties and the workflow definitions that are produced in Silverpeas."
+				}
+			],
+			"startLine": 158,
+			"endLine": 158
+		},
+		{
+			"type": "VOLUME",
+			"form": "json",
+			"args": [
+				"/opt/silverpeas/log",
+				"/opt/silverpeas/data",
+				"/opt/silverpeas/properties",
+				"/opt/silverpeas/xmlcomponents/workflows"
+			],
+			"lines": [
+				{
+					"kind": "instruction",
+					"text": "VOLUME [\"/opt/silverpeas/log\", \"/opt/silverpeas/data\", \"/opt/silverpeas/properties\", \"/opt/silverpeas/xmlcomponents/workflows\"]"
+				}
+			],
+			"startLine": 159,
+			"endLine": 159
+		},
+		{
+			"type": "blank",
+			"lines": [
+				{
+					"kind": "blank"
+				}
+			],
+			"startLine": 160,
+			"endLine": 160
+		},
+		{
+			"type": "COMMENT",
+			"args": "# What to execute by default when running the container.",
+			"lines": [
+				{
+					"kind": "comment",
+					"text": "# What to execute by default when running the container."
+				}
+			],
+			"startLine": 161,
+			"endLine": 161
+		},
+		{
+			"type": "CMD",
+			"form": "exec",
+			"args": [
+				"/opt/run.sh"
+			],
+			"lines": [
+				{
+					"kind": "instruction",
+					"text": "CMD [\"/opt/run.sh\"]"
+				}
+			],
+			"startLine": 162,
+			"endLine": 162
+		}
+	]
+}

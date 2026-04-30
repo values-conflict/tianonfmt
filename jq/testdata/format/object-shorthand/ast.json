@@ -1,0 +1,90 @@
+{
+	"type": "jq",
+	"query": {
+		"type": "object",
+		"fields": [
+			{
+				"key": {
+					"type": "ident",
+					"name": "foo"
+				},
+				"value": {
+					"type": "field",
+					"name": ".foo"
+				}
+			},
+			{
+				"key": {
+					"type": "ident",
+					"name": "bar"
+				},
+				"value": {
+					"type": "var",
+					"name": "$bar"
+				}
+			},
+			{
+				"key": {
+					"type": "ident",
+					"name": "baz"
+				},
+				"value": {
+					"type": "field",
+					"name": ".qux"
+				}
+			},
+			{
+				"key": {
+					"type": "ident",
+					"name": "lit"
+				},
+				"value": {
+					"type": "string",
+					"raw": "\"lit\""
+				}
+			},
+			{
+				"key": {
+					"type": "ident",
+					"name": "x"
+				},
+				"value": {
+					"type": "field",
+					"name": ".x"
+				}
+			},
+			{
+				"key": {
+					"type": "string",
+					"raw": "\"foo-bar\""
+				},
+				"value": {
+					"type": "index",
+					"expr": {
+						"type": "identity"
+					},
+					"key": {
+						"type": "string",
+						"raw": "\"foo-bar\""
+					}
+				}
+			},
+			{
+				"key": {
+					"type": "string",
+					"raw": "\"baz-qux\""
+				},
+				"value": {
+					"type": "index",
+					"expr": {
+						"type": "identity"
+					},
+					"key": {
+						"type": "string",
+						"raw": "\"other\""
+					}
+				}
+			}
+		]
+	}
+}

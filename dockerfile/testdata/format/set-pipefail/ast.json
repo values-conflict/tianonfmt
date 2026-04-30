@@ -1,0 +1,43 @@
+{
+	"type": "dockerfile",
+	"file": "input.dockerfile",
+	"instructions": [
+		{
+			"type": "FROM",
+			"ref": "debian:bookworm-slim",
+			"lines": [
+				{
+					"kind": "instruction",
+					"text": "FROM debian:bookworm-slim"
+				}
+			],
+			"startLine": 1,
+			"endLine": 1
+		},
+		{
+			"type": "RUN",
+			"form": "shell",
+			"args": "set -Eeuo pipefail; \tapt-get update; \tapt-get install -y --no-install-recommends curl; \trm -rf /var/lib/apt/lists/*",
+			"lines": [
+				{
+					"kind": "instruction",
+					"text": "RUN set -Eeuo pipefail; \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "\tapt-get update; \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "\tapt-get install -y --no-install-recommends curl; \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "\trm -rf /var/lib/apt/lists/*"
+				}
+			],
+			"startLine": 2,
+			"endLine": 5
+		}
+	]
+}

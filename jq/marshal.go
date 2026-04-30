@@ -256,6 +256,9 @@ func (i *Index) MarshalAST() OrderedMap {
 	if i.Key != nil {
 		m = append(m, MapEntry{"key", marshalNode(i.Key)})
 	}
+	if i.DotAccess {
+		m = append(m, MapEntry{"dotAccess", true})
+	}
 	if i.Optional {
 		m = append(m, MapEntry{"optional", true})
 	}

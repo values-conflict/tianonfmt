@@ -18,50 +18,35 @@ func TestMain(m *testing.M) {
 	os.Exit(m.Run())
 }
 
-// ── Format ────────────────────────────────────────────────────────────────────
+// ── format / AST ─────────────────────────────────────────────────────────────
 
 func TestFormat(t *testing.T) {
-	testutil.Golden(t, "testdata/format", "input.md", "output.md", func(src string) (string, error) {
-		return markdown.Format(src), nil
+	testutil.Golden(t, "testdata/format", "input.md", []testutil.Case{
+		{Out: "output.md", Fn: func(src string) (string, error) {
+			return markdown.Format(src), nil
+		}, Idem: true},
+		{Out: "ast.json", Fn: func(src string) (string, error) {
+			b, err := json.MarshalIndent(markdown.MarshalFile(src, "input.md"), "", "\t")
+			if err != nil {
+				return "", err
+			}
+			return string(b) + "\n", nil
+		}},
 	})
 }
 
-func TestFormatIdempotent(t *testing.T) {
-	testutil.Golden(t, "testdata/format", "input.md", "output.md", func(src string) (string, error) {
-		p1 := markdown.Format(src)
-		return markdown.Format(p1), nil
-	})
-}
-
-func TestFormatRoundTrip(t *testing.T) {
-	testutil.Golden(t, "testdata/format", "output.md", "output.md", func(src string) (string, error) {
-		return markdown.Format(src), nil
-	})
-}
-
-// ── Lint ──────────────────────────────────────────────────────────────────────
+// ── lint ──────────────────────────────────────────────────────────────────────
 
 func TestLint(t *testing.T) {
-	testutil.Golden(t, "testdata/lint", "input.md", "output.txt", func(src string) (string, error) {
-		vs := markdown.Lint(src)
-		var sb strings.Builder
-		for _, v := range vs {
-			fmt.Fprintf(&sb, "%d: %s\n", v.Line, v.Msg)
-		}
-		return sb.String(), nil
-	})
-}
-
-// ── MarshalAST golden ─────────────────────────────────────────────────────────
-
-// TestMarshalAST pins the full JSON AST output for every format fixture.
-func TestMarshalAST(t *testing.T) {
-	testutil.Golden(t, "testdata/format", "input.md", "ast.json", func(src string) (string, error) {
-		b, err := json.MarshalIndent(markdown.MarshalFile(src, "input.md"), "", "\t")
-		if err != nil {
-			return "", err
-		}
-		return string(b) + "\n", nil
+	testutil.Golden(t, "testdata/lint", "input.md", []testutil.Case{
+		{Out: "output.txt", Fn: func(src string) (string, error) {
+			vs := markdown.Lint(src)
+			var sb strings.Builder
+			for _, v := range vs {
+				fmt.Fprintf(&sb, "%d: %s\n", v.Line, v.Msg)
+			}
+			return sb.String(), nil
+		}},
 	})
 }
 

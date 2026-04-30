@@ -1,0 +1,56 @@
+{
+	"type": "shell",
+	"file": "input.sh",
+	"stmts": [
+		{
+			"type": "call",
+			"args": [
+				"set",
+				"-Eeuo",
+				"pipefail"
+			]
+		},
+		{
+			"type": "binary",
+			"op": "||",
+			"x": {
+				"type": "call",
+				"args": [
+					"cmd1"
+				]
+			},
+			"y": {
+				"type": "call",
+				"args": [
+					"true"
+				]
+			}
+		},
+		{
+			"type": "binary",
+			"op": "||",
+			"x": {
+				"type": "binary",
+				"op": "\u0026\u0026",
+				"x": {
+					"type": "call",
+					"args": [
+						"cmd2"
+					]
+				},
+				"y": {
+					"type": "call",
+					"args": [
+						"cmd3"
+					]
+				}
+			},
+			"y": {
+				"type": "call",
+				"args": [
+					"true"
+				]
+			}
+		}
+	]
+}

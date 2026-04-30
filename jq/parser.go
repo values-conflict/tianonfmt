@@ -516,10 +516,9 @@ func (p *parser) parseSuffix(left Node) (Node, error) {
 				right := &Field{At: nameTok.At, Name: "." + nameTok.Text}
 				left = &BinOp{At: tok.At, Op: "", Left: left, Right: right}
 			case STR:
-				// expr."string" is syntactic sugar for expr["string"]
 				strTok := p.next()
 				key := &StrLit{At: strTok.At, Raw: strTok.Text}
-				left = &Index{At: tok.At, Expr: left, Key: key}
+				left = &Index{At: tok.At, Expr: left, Key: key, DotAccess: true}
 			default:
 				left = &BinOp{At: tok.At, Op: "", Left: left, Right: &Identity{At: tok.At}}
 			}
@@ -663,10 +662,9 @@ func (p *parser) parsePrimary() (Node, error) {
 			nameTok := p.next()
 			return &Field{At: tok.At, Name: "." + nameTok.Text}, nil
 		case STR:
-			// ."string" is syntactic sugar for .["string"]
 			strTok := p.next()
 			key := &StrLit{At: strTok.At, Raw: strTok.Text}
-			return &Index{At: tok.At, Key: key}, nil
+			return &Index{At: tok.At, Key: key, DotAccess: true}, nil
 		}
 		return &Identity{At: tok.At}, nil
 

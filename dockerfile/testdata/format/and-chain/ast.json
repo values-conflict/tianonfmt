@@ -1,0 +1,31 @@
+{
+	"type": "dockerfile",
+	"file": "input.dockerfile",
+	"instructions": [
+		{
+			"type": "FROM",
+			"ref": "debian:bookworm-slim",
+			"lines": [
+				{
+					"kind": "instruction",
+					"text": "FROM debian:bookworm-slim"
+				}
+			],
+			"startLine": 1,
+			"endLine": 1
+		},
+		{
+			"type": "RUN",
+			"form": "shell",
+			"args": "apt-get update \u0026\u0026 apt-get install -y --no-install-recommends curl \u0026\u0026 rm -rf /var/lib/apt/lists/*",
+			"lines": [
+				{
+					"kind": "instruction",
+					"text": "RUN apt-get update \u0026\u0026 apt-get install -y --no-install-recommends curl \u0026\u0026 rm -rf /var/lib/apt/lists/*"
+				}
+			],
+			"startLine": 2,
+			"endLine": 2
+		}
+	]
+}
