@@ -147,7 +147,7 @@ func Format(src string, jqFmt func(expr string, inline bool) string) string {
 
 	var b strings.Builder
 
-	for i, seg := range segs {
+	for _, seg := range segs {
 		switch v := seg.(type) {
 		case TextSeg:
 			b.WriteString(v.Text)
@@ -171,10 +171,12 @@ func Format(src string, jqFmt func(expr string, inline bool) string) string {
 			}
 
 			// Format the expression.
+			fmtOK := false
 			formatted := v.Expr
 			if jqFmt != nil && v.Expr != "" {
 				if result := jqFmt(v.Expr, inline); result != "" {
 					formatted = result
+					fmtOK = true
 				}
 			}
 
@@ -188,21 +190,38 @@ func Format(src string, jqFmt func(expr string, inline bool) string) string {
 				} else {
 					b.WriteString(" }}")
 				}
+			} else if !fmtOK {
+				// jqFmt couldn't parse the expression — emit verbatim so the
+				// block is preserved exactly and re-formatting is idempotent.
+				b.WriteString("{{")
+				b.WriteString(v.Expr)
+				if v.EatEOL {
+					b.WriteString("-}}")
+				} else {
+					b.WriteString("}}")
+				}
 			} else {
-				// Multi-line block: {{ on its own line, expr indented, -}} or }}
-				// on its own line.
-				// Detect the indentation context from the surrounding text.
-				indent := detectIndent(b.String(), i, segs)
+				// Multi-line block with a successfully formatted expression.
+				// The content is indented one level deeper than the {{ opener;
+				// the closing }} sits at the same level as the opener.
+				acc := b.String()
+				lastNL := strings.LastIndex(acc, "\n")
+				var openerIndent string
+				if lastNL >= 0 {
+					openerIndent = leadingTabs(acc[lastNL+1:])
+				}
+				contentIndent := openerIndent + "\t"
 				b.WriteString("{{\n")
 				for _, line := range strings.Split(strings.TrimRight(formatted, "\n"), "\n") {
 					if strings.TrimSpace(line) == "" {
 						b.WriteByte('\n')
 					} else {
-						b.WriteString(indent)
+						b.WriteString(contentIndent)
 						b.WriteString(line)
 						b.WriteByte('\n')
 					}
 				}
+				b.WriteString(openerIndent)
 				if v.EatEOL {
 					b.WriteString("-}}")
 				} else {
@@ -232,27 +251,6 @@ func isInlineContext(acc string) bool {
 		linesSoFar = acc[lastNL+1:]
 	}
 	return strings.TrimSpace(linesSoFar) != ""
-}
-
-// detectIndent returns the indentation to use for a multi-line jq block,
-// based on the surrounding Dockerfile content.
-// Falls back to a single tab if nothing useful is found.
-func detectIndent(acc string, _ int, _ []Segment) string {
-	// Look at the last non-empty line of the accumulated output and use its
-	// leading whitespace as the base indent.
-	lines := strings.Split(acc, "\n")
-	for i := len(lines) - 1; i >= 0; i-- {
-		line := lines[i]
-		if strings.TrimSpace(line) == "" {
-			continue
-		}
-		indent := leadingTabs(line)
-		if indent == "" {
-			return "\t"
-		}
-		return indent
-	}
-	return "\t"
 }
 
 // leadingTabs returns the leading tab characters of s.

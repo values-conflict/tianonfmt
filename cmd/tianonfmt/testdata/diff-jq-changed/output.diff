@@ -1,0 +1,6 @@
+--- a/testdata/diff-jq-changed/input.jq
++++ b/testdata/diff-jq-changed/input.jq
+@@ -1 +1 @@
+-.foo | .bar
+\ No newline at end of file
++.foo | .bar

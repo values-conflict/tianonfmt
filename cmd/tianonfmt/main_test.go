@@ -11,9 +11,9 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
-)
 
-var update = flag.Bool("update", false, "update golden test files")
+	"github.com/tianon/fmt/tianonfmt/internal/testutil"
+)
 
 func TestMain(m *testing.M) {
 	flag.Parse()
@@ -1083,6 +1083,106 @@ func TestRun_MarkdownAST(t *testing.T) {
 	}
 	if !strings.Contains(stdout, `"type": "markdown"`) {
 		t.Errorf("expected markdown AST, got %q", stdout)
+	}
+}
+
+// ── file-based tests covering paths not exercised via stdin ──────────────────
+
+func TestRun_PedanticMarkdownFile(t *testing.T) {
+	// Exercises lintMarkdown (0% before this test) via --pedantic on a .md file.
+	_, stderr, code := runCLI(t, "", "--pedantic testdata/pedantic-markdown/input.md")
+	if code == 0 {
+		t.Error("expected non-zero exit for markdown with sh fence")
+	}
+	if !strings.Contains(stderr, "sh") {
+		t.Errorf("expected sh-language violation in stderr: %q", stderr)
+	}
+}
+
+func TestRun_DiffFileChanged(t *testing.T) {
+	// --diff on a file that needs formatting: stable golden output since
+	// go test always runs from the package source directory.
+	const path = "testdata/diff-jq-changed/input.jq"
+	const golden = "testdata/diff-jq-changed/output.diff"
+	stdout, _, code := runCLI(t, "", "--diff "+path)
+	if code == 0 {
+		t.Error("expected non-zero exit for changed file")
+	}
+	if *testutil.Update {
+		os.WriteFile(golden, []byte(stdout), 0o644)
+		return
+	}
+	want, err := os.ReadFile(golden)
+	if err != nil {
+		t.Fatalf("golden %s missing — run `go test -update` to create it: %v", golden, err)
+	}
+	if stdout != string(want) {
+		t.Errorf("diff mismatch\ngot:  %q\nwant: %q", stdout, string(want))
+	}
+}
+
+func TestRun_ASTDiffChanged(t *testing.T) {
+	// --ast --diff on a file whose AST changes after formatting (quoted key
+	// "foo" becomes unquoted foo).  Covers the len(diff)>0 branch in printAST.
+	const path = "testdata/ast-diff-changed/input.jq"
+	const golden = "testdata/ast-diff-changed/output.diff"
+	stdout, _, code := runCLI(t, "", "--ast --diff "+path)
+	if code == 0 {
+		t.Error("expected non-zero exit: AST differs before and after formatting")
+	}
+	if *testutil.Update {
+		os.WriteFile(golden, []byte(stdout), 0o644)
+		return
+	}
+	want, err := os.ReadFile(golden)
+	if err != nil {
+		t.Fatalf("golden %s missing — run `go test -update` to create it: %v", golden, err)
+	}
+	if stdout != string(want) {
+		t.Errorf("AST diff mismatch\ngot:  %q\nwant: %q", stdout, string(want))
+	}
+}
+
+func TestRun_DiffFileClean(t *testing.T) {
+	// --diff on an already-formatted file: exit 0, no output.
+	const path = "testdata/diff-jq-clean/input.jq"
+	stdout, _, code := runCLI(t, "", "--diff "+path)
+	if code != 0 {
+		t.Errorf("expected exit 0 for already-formatted file, got %d\nstdout: %q", code, stdout)
+	}
+	if stdout != "" {
+		t.Errorf("expected no diff output for clean file, got: %q", stdout)
+	}
+}
+
+func TestRun_PedanticFilePass(t *testing.T) {
+	// --pedantic on a well-formed jq file: exit 0.
+	f, err := os.CreateTemp(t.TempDir(), "*.jq")
+	if err != nil {
+		t.Fatal(err)
+	}
+	f.WriteString(".foo | not\n")
+	f.Close()
+	_, _, code := runCLI(t, "", "--pedantic "+f.Name())
+	if code != 0 {
+		t.Errorf("expected exit 0 for clean jq file, got %d", code)
+	}
+}
+
+func TestRun_FormatError_File(t *testing.T) {
+	// A malformed .jq file: exercises the format-error path in the file loop.
+	f, err := os.CreateTemp(t.TempDir(), "*.jq")
+	if err != nil {
+		t.Fatal(err)
+	}
+	f.WriteString("[[[invalid\n")
+	f.Close()
+	_, stderr, code := runCLI(t, "", f.Name())
+	if code == 0 {
+		t.Error("expected non-zero exit for malformed jq")
+	}
+	if !strings.Contains(stderr, "tianonfmt:") {
+		t.Errorf("expected error message in stderr: %q", stderr)
 	}
 }
 
