@@ -1,0 +1,48 @@
+{
+	"type": "jq",
+	"query": {
+		"type": "pipe",
+		"left": {
+			"type": "index",
+			"expr": {
+				"type": "index",
+				"key": {
+					"type": "string",
+					"raw": "\"foo\""
+				}
+			},
+			"key": {
+				"type": "string",
+				"raw": "\"bar\""
+			}
+		},
+		"right": {
+			"type": "pipe",
+			"left": {
+				"type": "index",
+				"key": {
+					"type": "string",
+					"raw": "\"baz-qux\""
+				}
+			},
+			"right": {
+				"type": "index",
+				"expr": {
+					"type": "index",
+					"expr": {
+						"type": "field",
+						"name": ".a"
+					},
+					"key": {
+						"type": "string",
+						"raw": "\"b-c\""
+					}
+				},
+				"key": {
+					"type": "string",
+					"raw": "\"d\""
+				}
+			}
+		}
+	}
+}

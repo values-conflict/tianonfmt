@@ -243,11 +243,13 @@ func (f *formatter) byKind(k fileKind, src string) (string, error) {
 }
 
 func (f *formatter) jq(src string) (string, error) {
-	// TODO: apply jq-specific tidy rewrites (e.g. == false → | not) when
-	// f.tidy is true, once jq AST transformation infrastructure exists.
 	parsed, err := jq.ParseFile(src)
 	if err != nil {
 		return "", fmt.Errorf("jq parse: %w", err)
+	}
+	if f.tidy {
+		jq.TidyFile(parsed)
+		return jq.FormatFileTidy(parsed), nil
 	}
 	return jq.FormatFile(parsed), nil
 }

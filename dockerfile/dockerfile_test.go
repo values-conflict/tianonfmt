@@ -49,6 +49,16 @@ func TestFormatIdempotent(t *testing.T) {
 
 // ── tidy ──────────────────────────────────────────────────────────────────────
 
+func TestFormatRoundTrip(t *testing.T) {
+	testutil.Golden(t, "testdata/format", "output.dockerfile", "output.dockerfile", func(src string) (string, error) {
+		f, err := dockerfile.Parse(src)
+		if err != nil {
+			return "", err
+		}
+		return dockerfile.Format(f), nil
+	})
+}
+
 func TestTidy(t *testing.T) {
 	testutil.Golden(t, "testdata/tidy", "input.dockerfile", "output.dockerfile", func(input string) (string, error) {
 		f, err := dockerfile.Parse(input)

@@ -36,6 +36,17 @@ func FormatFile(f *File) string {
 	return p.out.String()
 }
 
+// FormatFileTidy formats f with tidy-level index-notation normalisations:
+//
+//	.["foo"]  → .foo   (identifier-safe bracket key → dot notation)
+//	."foo"    → .foo   (dot-quoted identifier-safe key → dot notation)
+//	.["foo-bar"] → ."foo-bar"  (non-identifier bracket → dot-quoted)
+func FormatFileTidy(f *File) string {
+	p := &printer{tidy: true}
+	p.file(f)
+	return p.out.String()
+}
+
 // FormatNode formats a single AST node.
 func FormatNode(n Node) string {
 	p := &printer{}
@@ -53,9 +64,10 @@ func FormatNodeInline(n Node) string {
 
 // printer accumulates formatted output.
 type printer struct {
-	out              strings.Builder
-	depth            int
-	lastWasTrailing  bool // true immediately after emitting a trailing comment
+	out             strings.Builder
+	depth           int
+	lastWasTrailing bool // true immediately after emitting a trailing comment
+	tidy            bool // apply tidy-level normalisations (index notation, etc.)
 }
 
 // clearTrailing resets lastWasTrailing and returns its old value.
@@ -226,7 +238,7 @@ func (p *printer) localFuncDef(v *LocalFuncDef) {
 	}
 	sig.WriteString(": ")
 
-	bodyInline := shortInline(v.Body)
+	bodyInline := p.shortInline(v.Body)
 	if len(sig.String())+len(bodyInline) <= 100 && !strings.Contains(bodyInline, "\n") {
 		p.write(sig.String())
 		p.write(bodyInline)
@@ -348,7 +360,7 @@ func (p *printer) node(n Node) {
 	case *Object:
 		p.objectExpr(v)
 	case *Paren:
-		inner := inlineSafe(v.Expr)
+		inner := p.inlineSafe(v.Expr)
 		if inner != "" && len(inner) <= shortThreshold && !strings.Contains(inner, "\n") && !hasAnyComment(v.Expr) {
 			p.write("(")
 			p.write(inner)
@@ -441,7 +453,7 @@ func (p *printer) pipeChain(v *Pipe) {
 		return
 	}
 
-	inline := inlineSafe(v)
+	inline := p.inlineSafe(v)
 	if inline != "" && len(inline) <= shortThreshold && !strings.Contains(inline, "\n") {
 		p.write(inline)
 		return
@@ -509,7 +521,7 @@ func (p *printer) commaExpr(v *Comma) {
 		return
 	}
 
-	inline := inlineSafe(v)
+	inline := p.inlineSafe(v)
 	if inline != "" && len(inline) <= shortThreshold && !strings.Contains(inline, "\n") {
 		p.write(inline)
 		return
@@ -586,7 +598,7 @@ func (p *printer) binOp(v *BinOp) {
 		return
 	}
 
-	inline := inlineSafe(v)
+	inline := p.inlineSafe(v)
 	if inline != "" && len(inline) <= shortThreshold && !strings.Contains(inline, "\n") {
 		p.write(inline)
 		return
@@ -650,7 +662,7 @@ func (p *printer) ifExpr(v *IfExpr) {
 	}
 
 	if !forcedMulti {
-		inline := inlineSafe(v)
+		inline := p.inlineSafe(v)
 		if inline != "" && len(inline) <= shortThreshold && !strings.Contains(inline, "\n") {
 			p.write(inline)
 			return
@@ -686,7 +698,7 @@ func (p *printer) ifExpr(v *IfExpr) {
 
 	if v.Else != nil {
 		p.newline()
-		elseInline := shortInline(v.Else)
+		elseInline := p.shortInline(v.Else)
 		if len(elseInline) <= 30 && !strings.Contains(elseInline, "\n") && !hasAnyComment(v.Else) {
 			p.write("else ")
 			p.write(elseInline)
@@ -743,7 +755,7 @@ func (p *printer) foreachExpr(v *ForeachExpr) {
 	updateInner, updateTC := stripTrailing(v.Update)
 	p.node(updateInner)
 	if v.Extract != nil {
-		extractInline := shortInline(v.Extract)
+		extractInline := p.shortInline(v.Extract)
 		if len(extractInline) <= 50 && !strings.Contains(extractInline, "\n") && !hasAnyComment(v.Extract) {
 			// Short extract on the same close line, with the `;` separator.
 			// Style ref: deb822.jq:60 "; if .out then .out else empty end)"
@@ -791,8 +803,42 @@ func (p *printer) tryExpr(v *TryExpr) {
 }
 
 func (p *printer) indexExpr(v *Index) {
+	// Tidy: normalise string-key index notation.
+	//   .["foo"]   → .foo    (identifier-safe bracket → dot notation)
+	//   ."foo"     → .foo    (dot-quoted identifier-safe → dot notation)
+	//   .["foo-bar"] → ."foo-bar"  (non-identifier bracket → dot-quoted)
+	if p.tidy {
+		if strKey, ok := v.Key.(*StrLit); ok {
+			unquoted := unquoteStrLit(strKey.Raw)
+			if unquoted != "" {
+				_, exprIsIdentity := v.Expr.(*Identity)
+				exprIsNilOrIdentity := v.Expr == nil || exprIsIdentity
+				if !exprIsNilOrIdentity {
+					// On an arbitrary expression: emit the expression first.
+					p.node(v.Expr)
+				}
+				if isIdentifier(unquoted) {
+					p.write(".")
+					p.write(unquoted)
+				} else {
+					// Dot-quoted form: ."foo-bar"
+					p.write(".")
+					p.write(strKey.Raw)
+				}
+				if v.Optional {
+					p.write("?")
+				}
+				return
+			}
+		}
+	}
+
 	if v.Expr != nil {
 		p.node(v.Expr)
+	} else {
+		// nil Expr means the index is on the identity input (e.g. ."foo-bar"
+		// parsed as Index{Expr:nil} — needs the leading dot to form .["foo-bar"]).
+		p.write(".")
 	}
 	if v.Key == nil {
 		p.write("[]")
@@ -809,6 +855,8 @@ func (p *printer) indexExpr(v *Index) {
 func (p *printer) sliceExpr(v *Slice) {
 	if v.Expr != nil {
 		p.node(v.Expr)
+	} else {
+		p.write(".")
 	}
 	p.write("[")
 	if v.Start != nil {
@@ -882,7 +930,7 @@ func (p *printer) arrayExpr(v *Array) {
 		p.write("]")
 		return
 	}
-	elemInline := inlineSafe(v.Elem)
+	elemInline := p.inlineSafe(v.Elem)
 	if elemInline != "" && len("["+elemInline+"]") <= shortThreshold && !strings.Contains(elemInline, "\n") {
 		p.write("[" + elemInline + "]")
 		return
@@ -903,7 +951,7 @@ func (p *printer) objectExpr(v *Object) {
 		p.write("{}")
 		return
 	}
-	inline := shortInlineObject(v)
+	inline := p.shortInlineObject(v)
 	if inline != "" && len(inline) <= shortThreshold && !strings.Contains(inline, "\n") {
 		p.write(inline)
 		return
@@ -1008,10 +1056,10 @@ func (p *printer) writeAfterPunct(punct string, tc *Comment) {
 
 // ── "short inline" helpers ───────────────────────────────────────────────────
 
-func shortInline(n Node) string {
-	p := &printer{}
-	p.nodeInline(n)
-	return p.out.String()
+func (p *printer) shortInline(n Node) string {
+	ip := &printer{tidy: p.tidy}
+	ip.nodeInline(n)
+	return ip.out.String()
 }
 
 // inlineSafe returns the inline representation of n if it is safe to follow
@@ -1021,11 +1069,11 @@ func shortInline(n Node) string {
 //
 // This uses an AST walk rather than a text scan to avoid false positives from
 // string literals that happen to contain " #" in their text content.
-func inlineSafe(n Node) string {
+func (p *printer) inlineSafe(n Node) string {
 	if anyNodeHasTrailingComment(n) {
 		return ""
 	}
-	return shortInline(n)
+	return p.shortInline(n)
 }
 
 // anyNodeHasTrailingComment recursively checks whether n or any of its
@@ -1076,7 +1124,7 @@ func anyNodeHasTrailingComment(n Node) bool {
 }
 
 // shortInlineObject returns "" if unsafe to inline (any trailing comment on a field value).
-func shortInlineObject(v *Object) string {
+func (p *printer) shortInlineObject(v *Object) string {
 	if len(v.Fields) == 0 {
 		return "{}"
 	}
@@ -1092,7 +1140,7 @@ func shortInlineObject(v *Object) string {
 		if i > 0 {
 			b.WriteString(", ")
 		}
-		ip := &printer{}
+		ip := &printer{tidy: p.tidy}
 		ip.objectField(f)
 		b.WriteString(ip.out.String())
 	}
@@ -1231,7 +1279,7 @@ func (p *printer) nodeInline(n Node) {
 		p.nodeInline(v.Elem)
 		p.write("]")
 	case *Object:
-		inl := shortInlineObject(v)
+		inl := p.shortInlineObject(v)
 		if inl != "" {
 			p.write(inl)
 		} else {
