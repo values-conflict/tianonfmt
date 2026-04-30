@@ -2,7 +2,7 @@ FROM {{ .variants[env.variant].from }}
 
 ENV VERSION {{ .version }}
 
-{{# this is a comment -}}
+{{ # this is a comment -}}
 RUN {{ .commands | join("; ") -}}
 
 CMD {{ .cmd | tojson -}}

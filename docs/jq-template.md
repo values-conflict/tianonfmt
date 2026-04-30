@@ -61,6 +61,21 @@ When a `{{ }}` block occupies its own line (or lines), the jq content is formatt
 
 Block expressions use `-}}` at the end to suppress the newline they would otherwise emit into the output.
 
+**Indentation:** the content of a block expression is indented one tab deeper than the `{{` opener.  The closing `}}` or `-}}` sits at the same column as `{{`.  This means a block inside a `RUN` body (where `{{` is at `\t\t`) has its content at `\t\t\t` and its closer at `\t\t`:
+
+```dockerfile
+RUN set -eux; \
+	\
+	{{
+		download({
+			arches: .arches,
+			urlKey: "url",
+		})
+	}}; \
+```
+
+**Expressions containing `#` comments are never formatted inline**, even when the surrounding Dockerfile text is on the same line as `{{`.  The formatter re-requests a multi-line format from the jq formatter in that case.  (jq `#` comments extend to end-of-line; embedding one in an inline `{{ expr }}` block would cause the comment to swallow subsequent tokens.)
+
 Corpus ref: [`docker-qemu/Dockerfile.template#L21-L28`](https://github.com/tianon/docker-qemu/blob/3ce36843e253ddb7f63a39a6d0a27a7a46762e8b/Dockerfile.template#L21-L28), [`docker-qemu/Dockerfile.template#L35-L45`](https://github.com/tianon/docker-qemu/blob/3ce36843e253ddb7f63a39a6d0a27a7a46762e8b/Dockerfile.template#L35-L45).
 
 ### Conditional blocks
@@ -115,7 +130,23 @@ Corpus refs: [`docker-qemu/Dockerfile.template#L32`](https://github.com/tianon/d
 
 ## Comments inside `{{ }}`
 
-Pure-comment blocks are supported: `{{ # this is a comment -}}`.  They produce no output and are ignored by the processor.
+Pure-comment blocks (every non-empty line is a `#` comment) are always normalised to a canonical form regardless of how they appear in the source:
+
+- **Single comment line** — collapsed to one inline line:
+  ```dockerfile
+  {{ # this is a comment -}}
+  ```
+- **Multiple comment lines** — kept multi-line with one tab of indentation per line:
+  ```dockerfile
+  {{
+  	# first comment
+  	# second comment
+  -}}
+  ```
+
+The closing marker (`-}}` or `}}`) is placed at the same indentation level as the `{{` opener.  Source that has inconsistent spacing (e.g. `{{# no space -}}` or extra indentation) is normalised on the first format pass.
+
+A block that *begins* with a comment line but also contains expression content is **not** a pure-comment block — it is formatted as a regular expression block with the comment preserved inside the jq expression.
 
 ## Dockerfile content between blocks
 

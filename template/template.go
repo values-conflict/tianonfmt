@@ -158,14 +158,44 @@ func Format(src string, jqFmt func(expr string, inline bool) string) string {
 			// the last character before {{ on the current line is non-whitespace.
 			inline := isInlineContext(b.String())
 
-			// Pure comment blocks: emit as-is.
-			if strings.HasPrefix(v.Expr, "#") {
-				b.WriteString("{{")
-				b.WriteString(v.Expr)
+			// Pure comment blocks (every non-empty line is a # comment).
+			// Single comment line → collapsed inline: {{ # foo -}}
+			// Multiple comment lines → multi-line with one tab per line:
+			//   {{
+			//   \t# foo
+			//   \t# bar
+			//   -}}
+			if isPureComment(v.Expr) {
+				var parts []string
+				for _, line := range strings.Split(v.Expr, "\n") {
+					if t := strings.TrimSpace(line); t != "" {
+						parts = append(parts, t)
+					}
+				}
+				closer := " }}"
 				if v.EatEOL {
-					b.WriteString(" -}}")
+					closer = " -}}"
+				}
+				if len(parts) == 1 {
+					b.WriteString("{{ ")
+					b.WriteString(parts[0])
+					b.WriteString(closer)
 				} else {
-					b.WriteString("}}")
+					acc := b.String()
+					lastNL := strings.LastIndex(acc, "\n")
+					var openerIndent string
+					if lastNL >= 0 {
+						openerIndent = leadingTabs(acc[lastNL+1:])
+					}
+					b.WriteString("{{\n")
+					for _, part := range parts {
+						b.WriteString(openerIndent)
+						b.WriteString("\t")
+						b.WriteString(part)
+						b.WriteByte('\n')
+					}
+					b.WriteString(openerIndent)
+					b.WriteString(strings.TrimSpace(closer))
 				}
 				break
 			}
@@ -177,6 +207,20 @@ func Format(src string, jqFmt func(expr string, inline bool) string) string {
 				if result := jqFmt(v.Expr, inline); result != "" {
 					formatted = result
 					fmtOK = true
+				}
+			}
+
+			// jq '#' comments are newline-terminated: embedding one in an inline
+			// {{ expr }} block causes it to swallow subsequent tokens up to end of
+			// string, breaking the expression.  Force multi-line layout instead.
+			if fmtOK && inline && strings.Contains(formatted, "#") {
+				if result := jqFmt(v.Expr, false); result != "" {
+					formatted = result
+					inline = false
+				} else {
+					// Can't reformat multi-line; emit verbatim to preserve structure.
+					fmtOK = false
+					formatted = v.Expr
 				}
 			}
 
@@ -251,6 +295,22 @@ func isInlineContext(acc string) bool {
 		linesSoFar = acc[lastNL+1:]
 	}
 	return strings.TrimSpace(linesSoFar) != ""
+}
+
+// isPureComment reports whether expr consists entirely of jq comment lines
+// (every non-empty line begins with #).  A block that merely starts with a
+// comment but also contains expression content returns false.
+func isPureComment(expr string) bool {
+	hasComment := false
+	for _, line := range strings.Split(expr, "\n") {
+		if t := strings.TrimSpace(line); t != "" {
+			if !strings.HasPrefix(t, "#") {
+				return false
+			}
+			hasComment = true
+		}
+	}
+	return hasComment
 }
 
 // leadingTabs returns the leading tab characters of s.

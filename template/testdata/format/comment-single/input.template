@@ -1,0 +1,7 @@
+{{
+	# single comment line
+-}}
+FROM debian:trixie-slim
+ENV A {{ .a }}
+{{# already inline comment -}}
+RUN echo done
