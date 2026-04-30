@@ -1,0 +1,555 @@
+{
+	"type": "shell",
+	"file": "input.sh",
+	"stmts": [
+		{
+			"type": "call",
+			"args": [
+				"set",
+				"-o",
+				"errexit",
+				"-o",
+				"nounset",
+				"-o",
+				"pipefail"
+			]
+		},
+		{
+			"type": "stmt",
+			"cmd": {
+				"type": "call",
+				"args": [
+					"jq",
+					"--version"
+				]
+			},
+			"redirs": [
+				{
+					"op": "\u003e",
+					"word": "/dev/null"
+				}
+			]
+		},
+		{
+			"type": "stmt",
+			"cmd": {
+				"type": "call",
+				"args": [
+					"bashbrew",
+					"--version"
+				]
+			},
+			"redirs": [
+				{
+					"op": "\u003e",
+					"word": "/dev/null"
+				}
+			]
+		},
+		{
+			"type": "stmt",
+			"cmd": {
+				"type": "call",
+				"args": [
+					"cat"
+				]
+			},
+			"redirs": [
+				{
+					"op": "\u003c\u003c-",
+					"word": "'EOH'"
+				}
+			]
+		},
+		{
+			"args": [
+				"-A",
+				"usedTags=()",
+				"archesLookupCache=()",
+				"seenVersions=()"
+			],
+			"type": "declare"
+		},
+		{
+			"type": "call",
+			"assigns": [
+				"commit=\"$(git rev-parse HEAD)\""
+			],
+			"args": []
+		},
+		{
+			"type": "call",
+			"assigns": [
+				"branch=\"$(git rev-parse --abbrev-ref HEAD)\""
+			],
+			"args": []
+		},
+		{
+			"type": "call",
+			"assigns": [
+				"common=\"$(cat \\\n\t\u003c\u003c-EOC\n\t\tGitFetch: refs/heads/$branch\n\tEOC\n)\""
+			],
+			"args": []
+		},
+		{
+			"type": "stmt",
+			"cmd": {
+				"type": "call",
+				"args": [
+					"mapfile",
+					"-t",
+					"directories"
+				]
+			},
+			"redirs": [
+				{
+					"op": "\u003c",
+					"word": "\u003c(git ls-tree -r --name-only \"$commit\" | jq --raw-input --null-input --raw-output '\n\t\t# convert \"git ls-tree\" output to a list of directories that contain a Dockerfile\n\t\t[\n\t\t\tinputs\n\t\t\t| select(endswith(\"/Dockerfile\"))\n\t\t\t| rtrimstr(\"/Dockerfile\")\n\t\t]\n\t\t| sort_by(\n\t\t\t# sort the list:\n\t\t\t# - Groovy version in descending order\n\t\t\t# - LTS JDK versions in descending order\n\t\t\t# - non-LTS JDK versions in descending order\n\t\t\t# - plain (temurin) variants above alpine\n\t\t\t# - Ubuntu versions in descending release order\n\t\t\t# (presorting the list makes tag calculation easier later because we can simply generate a list of tags each combination *could* have and let the first one to try get it, being careful not to reuse any)\n\t\t\t(\n\t\t\t\tsplit(\"/\")[0]\n\t\t\t\t| split(\"-\")[1]\n\t\t\t\t| tonumber\n\t\t\t) as $groovy\n\t\t\t| (\n\t\t\t\tsplit(\"/\")[1]\n\t\t\t\t| ltrimstr(\"jdk\")\n\t\t\t\t| split(\"-\")[0]\n\t\t\t\t| tonumber\n\t\t\t) as $jdk\n\t\t\t| [\n\t\t\t\t(-$groovy),\n\t\t\t\t# LTS JDK versions above non-LTS\n\t\t\t\t(\n\t\t\t\t\tif $jdk | IN(21, 17, 11, 8) then 0\n\t\t\t\t\telse 1 end\n\t\t\t\t),\n\t\t\t\t# JDK versions in descending version order\n\t\t\t\t(\n\t\t\t\t\t-$jdk # negative so they sort in reverse order\n\t\t\t\t),\n\t\t\t\t# plain vs alpine\n\t\t\t\t(\n\t\t\t\t\tif contains(\"alpine\") then 1\n\t\t\t\t\telse 0 end\n\t\t\t\t),\n\t\t\t\t# ubuntu versions in descending order\n\t\t\t\t(\n\t\t\t\t\t# if unspecified, we assume \"latest\" (currently \"noble\")\n\t\t\t\t\tif contains(\"jammy\") then -1\n\t\t\t\t\telse -2 end\n\t\t\t\t),\n\t\t\t\t. # if all else fails, sort lexicographically\n\t\t\t]\n\t\t)\n\t\t| .[]\n\t'\n)"
+				}
+			]
+		},
+		{
+			"type": "for",
+			"loop": {
+				"type": "wordIter",
+				"name": "dir",
+				"items": [
+					"\"${directories[@]}\""
+				]
+			},
+			"do": [
+				{
+					"type": "call",
+					"assigns": [
+						"dir=\"${dir%\"${dir##*[![:space:]]}\"}\""
+					],
+					"args": []
+				},
+				{
+					"type": "if",
+					"cond": [
+						{
+							"type": "call",
+							"args": [
+								"[",
+								"!",
+								"-d",
+								"\"$dir\"",
+								"]"
+							]
+						}
+					],
+					"then": [
+						{
+							"type": "call",
+							"args": [
+								"continue"
+							]
+						}
+					]
+				},
+				{
+					"type": "call",
+					"assigns": [
+						"dockerfile=\"$(git show \"$commit:$dir/Dockerfile\")\""
+					],
+					"args": []
+				},
+				{
+					"type": "call",
+					"assigns": [
+						"from=\"$(awk \u003c\u003c\u003c\"$dockerfile\" 'toupper($1) == \"FROM\" { print $2; exit }')\""
+					],
+					"args": []
+				},
+				{
+					"type": "call",
+					"assigns": [
+						"version=\"$(awk \u003c\u003c\u003c\"$dockerfile\" -F '[=[:space:]]+' 'toupper($1) == \"ENV\" \u0026\u0026 $2 == \"GROOVY_VERSION\" { print $3; exit }')\""
+					],
+					"args": []
+				},
+				{
+					"type": "if",
+					"cond": [
+						{
+							"type": "testClause",
+							"x": ""
+						}
+					],
+					"then": [
+						{
+							"type": "call",
+							"assigns": [
+								"version=\"${version}.0\""
+							],
+							"args": []
+						}
+					]
+				},
+				{
+					"type": "call",
+					"assigns": [
+						"majorVersion=\"${version%%.*}\""
+					],
+					"args": []
+				},
+				{
+					"type": "call",
+					"args": [
+						":",
+						"\"${seenVersions[\"$majorVersion\"]:=$version}\""
+					]
+				},
+				{
+					"type": "if",
+					"cond": [
+						{
+							"type": "call",
+							"args": [
+								"[",
+								"\"$version\"",
+								"!=",
+								"\"${seenVersions[\"$majorVersion\"]}\"",
+								"]"
+							]
+						}
+					],
+					"then": [
+						{
+							"type": "stmt",
+							"cmd": {
+								"type": "call",
+								"args": [
+									"echo",
+									"\"error: $dir contains $version (compared to ${seenVersions[\"$majorVersion\"]} in other images of major version $majorVersion)\""
+								]
+							},
+							"redirs": [
+								{
+									"op": "\u003e\u0026",
+									"word": "2"
+								}
+							]
+						},
+						{
+							"type": "call",
+							"args": [
+								"exit",
+								"1"
+							]
+						}
+					]
+				},
+				{
+					"type": "call",
+					"assigns": [
+						"majorDir=\"${dir%%/*}\""
+					],
+					"args": []
+				},
+				{
+					"type": "call",
+					"assigns": [
+						"dirCommit=\"$(git log -1 --format='%H' -- \"$majorDir\")\""
+					],
+					"args": []
+				},
+				{
+					"type": "call",
+					"assigns": [
+						"fromTag=\"${from##*:}\""
+					],
+					"args": []
+				},
+				{
+					"type": "call",
+					"assigns": [
+						"suite=\"${fromTag%-jdk}\""
+					],
+					"args": []
+				},
+				{
+					"type": "call",
+					"assigns": [
+						"suite=\"${suite##*-}\""
+					],
+					"args": []
+				},
+				{
+					"type": "call",
+					"assigns": [
+						"dirName=\"${dir##*/}\""
+					],
+					"args": []
+				},
+				{
+					"type": "call",
+					"assigns": [
+						"jdk=\"${dirName%%-*}\""
+					],
+					"args": []
+				},
+				{
+					"type": "case",
+					"word": "\"$dir\"",
+					"items": [
+						{
+							"patterns": [
+								"*-alpine"
+							],
+							"stmts": [
+								{
+									"type": "call",
+									"assigns": [
+										"variant='alpine'"
+									],
+									"args": []
+								}
+							]
+						},
+						{
+							"patterns": [
+								"*"
+							],
+							"stmts": [
+								{
+									"type": "call",
+									"assigns": [
+										"variant=''"
+									],
+									"args": []
+								}
+							]
+						}
+					]
+				},
+				{
+					"type": "call",
+					"assigns": [
+						"tags=()"
+					],
+					"args": []
+				},
+				{
+					"type": "call",
+					"assigns": [
+						"versions=(\n\t# this assumes upstream's version numbers always have three parts - if that ever changes, this needs to become more complex\n\t\"$version\"        # X.Y.Z\n\t\"${version%.*}\"   # X.Y\n\t\"${version%.*.*}\" # X\n\t''                # this will lead to some tags that start with hyphen; we'll clean them up afterwards (it makes the logic easier to write correctly so we get all of \"X.Y.Z-foo\", \"X.Y-foo\", \"X-foo\", *and* \"foo\")\n)"
+					],
+					"args": []
+				},
+				{
+					"type": "call",
+					"assigns": [
+						"tags+=(\"${versions[@]/%/-$jdk${variant:+-$variant}}\")"
+					],
+					"args": []
+				},
+				{
+					"type": "case",
+					"word": "\"$variant\"",
+					"items": [
+						{
+							"patterns": [
+								"''"
+							],
+							"stmts": [
+								{
+									"type": "call",
+									"assigns": [
+										"tags+=(\"${versions[@]/%/-$jdk-$suite}\")"
+									],
+									"args": []
+								},
+								{
+									"type": "if",
+									"cond": [
+										{
+											"type": "testClause",
+											"x": ""
+										}
+									],
+									"then": [
+										{
+											"type": "call",
+											"assigns": [
+												"tags+=('latest')"
+											],
+											"args": []
+										}
+									]
+								},
+								{
+									"type": "call",
+									"assigns": [
+										"tags+=(\\\n\t\"${versions[@]/%/-jdk}\"        # \"X.Y.Z-jdk\"\n\t\"${versions[@]}\"               # \"X.Y.Z\"\n\t\"${versions[@]/%/-jdk-$suite}\" # \"X.Y.Z-jdk-noble\"\n\t\"${versions[@]/%/-$suite}\"     # \"X.Y.Z-noble\"\n)"
+									],
+									"args": []
+								}
+							]
+						},
+						{
+							"patterns": [
+								"alpine"
+							],
+							"stmts": [
+								{
+									"type": "call",
+									"assigns": [
+										"tags+=(\\\n\t\"${versions[@]/%/-jdk-alpine}\" # \"X.Y.Z-jdk-alpine\"\n\t\"${versions[@]/%/-alpine}\"     # \"X.Y.Z-alpine\"\n)"
+									],
+									"args": []
+								},
+								{
+									"type": "if",
+									"cond": [
+										{
+											"type": "testClause",
+											"x": ""
+										}
+									],
+									"then": [
+										{
+											"type": "call",
+											"assigns": [
+												"tags+=('alpine')"
+											],
+											"args": []
+										}
+									]
+								}
+							]
+						}
+					]
+				},
+				{
+					"type": "call",
+					"assigns": [
+						"actualTags="
+					],
+					"args": []
+				},
+				{
+					"type": "for",
+					"loop": {
+						"type": "wordIter",
+						"name": "tag",
+						"items": [
+							"\"${tags[@]}\""
+						]
+					},
+					"do": [
+						{
+							"type": "call",
+							"assigns": [
+								"tag=\"${tag#-}\""
+							],
+							"args": []
+						},
+						{
+							"type": "if",
+							"cond": [
+								{
+									"type": "binary",
+									"op": "||",
+									"x": {
+										"type": "call",
+										"args": [
+											"[",
+											"-z",
+											"\"$tag\"",
+											"]"
+										]
+									},
+									"y": {
+										"type": "call",
+										"args": [
+											"[",
+											"-n",
+											"\"${usedTags[\"$tag\"]:-}\"",
+											"]"
+										]
+									}
+								}
+							],
+							"then": [
+								{
+									"type": "call",
+									"args": [
+										"continue"
+									]
+								}
+							]
+						},
+						{
+							"type": "call",
+							"assigns": [
+								"usedTags[\"$tag\"]=1"
+							],
+							"args": []
+						},
+						{
+							"type": "call",
+							"assigns": [
+								"actualTags=\"${actualTags:+$actualTags, }$tag\""
+							],
+							"args": []
+						}
+					]
+				},
+				{
+					"type": "call",
+					"assigns": [
+						"arches=\"${archesLookupCache[\"$from\"]:-}\""
+					],
+					"args": []
+				},
+				{
+					"type": "if",
+					"cond": [
+						{
+							"type": "call",
+							"args": [
+								"[",
+								"-z",
+								"\"$arches\"",
+								"]"
+							]
+						}
+					],
+					"then": [
+						{
+							"type": "call",
+							"assigns": [
+								"arches=\"$(bashbrew cat --format '{{ join \", \" .TagEntry.Architectures }}' \"https://github.com/docker-library/official-images/raw/HEAD/library/$from\")\""
+							],
+							"args": []
+						},
+						{
+							"type": "call",
+							"assigns": [
+								"archesLookupCache[\"$from\"]=\"$arches\""
+							],
+							"args": []
+						}
+					]
+				},
+				{
+					"type": "stmt",
+					"cmd": {
+						"type": "call",
+						"args": [
+							"cat"
+						]
+					},
+					"redirs": [
+						{
+							"op": "\u003c\u003c-",
+							"word": "EOE"
+						}
+					]
+				}
+			]
+		}
+	]
+}

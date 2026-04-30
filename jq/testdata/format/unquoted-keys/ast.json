@@ -1,0 +1,48 @@
+{
+	"type": "jq",
+	"query": {
+		"type": "object",
+		"fields": [
+			{
+				"key": {
+					"type": "string",
+					"raw": "\"foo\""
+				},
+				"value": {
+					"type": "field",
+					"name": ".bar"
+				}
+			},
+			{
+				"key": {
+					"type": "string",
+					"raw": "\"org.opencontainers\""
+				},
+				"value": {
+					"type": "field",
+					"name": ".x"
+				}
+			},
+			{
+				"key": {
+					"type": "string",
+					"raw": "\"hello-world\""
+				},
+				"value": {
+					"type": "field",
+					"name": ".y"
+				}
+			},
+			{
+				"key": {
+					"type": "string",
+					"raw": "\"type\""
+				},
+				"value": {
+					"type": "field",
+					"name": ".z"
+				}
+			}
+		]
+	}
+}

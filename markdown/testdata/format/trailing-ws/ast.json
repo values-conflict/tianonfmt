@@ -1,0 +1,29 @@
+{
+	"blocks": [
+		{
+			"level": 1,
+			"text": "Title",
+			"type": "heading"
+		},
+		{
+			"type": "blank"
+		},
+		{
+			"text": "Paragraph with trailing space.   ",
+			"type": "paragraph"
+		},
+		{
+			"text": "Intentional soft break.  ",
+			"type": "paragraph"
+		},
+		{
+			"text": "Next line.",
+			"type": "paragraph"
+		},
+		{
+			"type": "blank"
+		}
+	],
+	"file": "input.md",
+	"type": "markdown"
+}

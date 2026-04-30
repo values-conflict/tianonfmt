@@ -1,0 +1,31 @@
+{
+	"type": "jq",
+	"query": {
+		"type": "array",
+		"elem": {
+			"type": "comma",
+			"left": {
+				"type": "comma",
+				"left": {
+					"type": "comma",
+					"left": {
+						"type": "string",
+						"raw": "\"long-element-one\""
+					},
+					"right": {
+						"type": "string",
+						"raw": "\"long-element-two\""
+					}
+				},
+				"right": {
+					"type": "string",
+					"raw": "\"long-element-three\""
+				}
+			},
+			"right": {
+				"type": "call",
+				"name": "empty"
+			}
+		}
+	}
+}

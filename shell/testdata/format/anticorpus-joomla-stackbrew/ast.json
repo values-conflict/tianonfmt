@@ -1,0 +1,712 @@
+{
+	"type": "shell",
+	"file": "input.sh",
+	"stmts": [
+		{
+			"type": "call",
+			"args": [
+				"set",
+				"-Eeuo",
+				"pipefail"
+			]
+		},
+		{
+			"type": "call",
+			"assigns": [
+				"self=\"$(basename \"$BASH_SOURCE\")\""
+			],
+			"args": []
+		},
+		{
+			"type": "call",
+			"args": [
+				"cd",
+				"\"$(dirname \"$(readlink -f \"$BASH_SOURCE\")\")\""
+			]
+		},
+		{
+			"type": "if",
+			"cond": [
+				{
+					"type": "call",
+					"args": [
+						"[",
+						"\"$#\"",
+						"-eq",
+						"0",
+						"]"
+					]
+				}
+			],
+			"then": [
+				{
+					"type": "call",
+					"assigns": [
+						"versions=\"$(jq -r 'keys | map(@sh) | join(\" \")' versions.json)\""
+					],
+					"args": []
+				},
+				{
+					"type": "call",
+					"args": [
+						"eval",
+						"\"set -- $versions\""
+					]
+				}
+			]
+		},
+		{
+			"type": "call",
+			"assigns": [
+				"IFS=$'\\n'"
+			],
+			"args": []
+		},
+		{
+			"type": "call",
+			"args": [
+				"set",
+				"--",
+				"$(sort -rV \u003c\u003c\u003c\"$*\")"
+			]
+		},
+		{
+			"type": "call",
+			"args": [
+				"unset",
+				"IFS"
+			]
+		},
+		{
+			"type": "funcDecl",
+			"name": "fileCommit",
+			"body": {
+				"type": "block",
+				"stmts": [
+					{
+						"type": "call",
+						"args": [
+							"git",
+							"log",
+							"-1",
+							"--format='format:%H'",
+							"HEAD",
+							"--",
+							"\"$@\""
+						]
+					}
+				]
+			}
+		},
+		{
+			"type": "funcDecl",
+			"name": "dirCommit",
+			"body": {
+				"type": "block",
+				"stmts": [
+					{
+						"args": [
+							"dir=\"$1\""
+						],
+						"type": "local"
+					},
+					{
+						"type": "call",
+						"args": [
+							"shift"
+						]
+					},
+					{
+						"type": "subshell",
+						"stmts": [
+							{
+								"type": "call",
+								"args": [
+									"cd",
+									"\"$dir\""
+								]
+							},
+							{
+								"type": "call",
+								"args": [
+									"fileCommit",
+									"Dockerfile",
+									"$(git show HEAD:./Dockerfile | awk '\n\t\t\t\ttoupper($1) == \"COPY\" {\n\t\t\t\t\tfor (i = 2; i \u003c NF; i++) {\n\t\t\t\t\t\tif ($i ~ /^--from=/) {\n\t\t\t\t\t\t\tnext\n\t\t\t\t\t\t}\n\t\t\t\t\t\tprint $i\n\t\t\t\t\t}\n\t\t\t\t}\n\t\t\t')"
+								]
+							}
+						]
+					}
+				]
+			}
+		},
+		{
+			"type": "call",
+			"assigns": [
+				"gawkParents='\n\t{ cmd = toupper($1) }\n\tcmd == \"FROM\" {\n\t\tprint $2\n\t\tnext\n\t}\n\tcmd == \"COPY\" {\n\t\tfor (i = 2; i \u003c NF; i++) {\n\t\t\tif ($i ~ /^--from=/) {\n\t\t\t\tgsub(/^--from=/, \"\", $i)\n\t\t\t\tprint $i\n\t\t\t\tnext\n\t\t\t}\n\t\t}\n\t}\n'"
+			],
+			"args": []
+		},
+		{
+			"type": "funcDecl",
+			"name": "getArches",
+			"body": {
+				"type": "block",
+				"stmts": [
+					{
+						"args": [
+							"repo=\"$1\""
+						],
+						"type": "local"
+					},
+					{
+						"type": "call",
+						"args": [
+							"shift"
+						]
+					},
+					{
+						"args": [
+							"parentRepoToArchesStr"
+						],
+						"type": "local"
+					},
+					{
+						"type": "call",
+						"assigns": [
+							"parentRepoToArchesStr=\"$(find -name 'Dockerfile' -exec gawk \"$gawkParents\" '{}' + \\\n\t| sort -u \\\n\t| gawk -v officialImagesUrl='https://github.com/docker-library/official-images/raw/master/library/' '\n\t\t\t\t$1 !~ /^('\"$repo\"'|scratch|.*\\/.*)(:|$)/ {\n\t\t\t\t\tprintf \"%s%s\\n\", officialImagesUrl, $1\n\t\t\t\t}\n\t\t\t' \\\n\t| xargs -r bashbrew cat --format '[\"{{ .RepoName }}:{{ .TagName }}\"]=\"{{ join \" \" .TagEntry.Architectures }}\"'\n)\""
+						],
+						"args": []
+					},
+					{
+						"type": "call",
+						"args": [
+							"eval",
+							"\"declare -g -A parentRepoToArches=( $parentRepoToArchesStr )\""
+						]
+					}
+				]
+			}
+		},
+		{
+			"type": "call",
+			"args": [
+				"getArches",
+				"'joomla'"
+			]
+		},
+		{
+			"type": "call",
+			"assigns": [
+				"joomlaMaintainers=\"$(jq -cr '. | map(.firstname + \" \" + .lastname + \" \u003c\" + .email + \"\u003e (@\" + .github + \")\") | join(\",\\n             \")' maintainers.json)\""
+			],
+			"args": []
+		},
+		{
+			"type": "stmt",
+			"cmd": {
+				"type": "call",
+				"args": [
+					"cat"
+				]
+			},
+			"redirs": [
+				{
+					"op": "\u003c\u003c-",
+					"word": "EOH"
+				}
+			]
+		},
+		{
+			"type": "funcDecl",
+			"name": "join",
+			"body": {
+				"type": "block",
+				"stmts": [
+					{
+						"args": [
+							"sep=\"$1\""
+						],
+						"type": "local"
+					},
+					{
+						"type": "call",
+						"args": [
+							"shift"
+						]
+					},
+					{
+						"args": [
+							"out"
+						],
+						"type": "local"
+					},
+					{
+						"type": "call",
+						"args": [
+							"printf",
+							"-v",
+							"out",
+							"\"${sep//%/%%}%s\"",
+							"\"$@\""
+						]
+					},
+					{
+						"type": "call",
+						"args": [
+							"echo",
+							"\"${out#$sep}\""
+						]
+					}
+				]
+			}
+		},
+		{
+			"type": "for",
+			"loop": {
+				"type": "wordIter",
+				"name": "version"
+			},
+			"do": [
+				{
+					"args": [
+						"version"
+					],
+					"type": "export"
+				},
+				{
+					"type": "call",
+					"assigns": [
+						"phpVersions=\"$(jq -r '.[env.version].phpVersions | map(@sh) | join(\" \")' versions.json)\""
+					],
+					"args": []
+				},
+				{
+					"type": "call",
+					"args": [
+						"eval",
+						"\"phpVersions=( $phpVersions )\""
+					]
+				},
+				{
+					"type": "call",
+					"assigns": [
+						"defaultPhpVersion=\"$(jq -r '.[env.version].php' versions.json)\""
+					],
+					"args": []
+				},
+				{
+					"type": "call",
+					"assigns": [
+						"variants=\"$(jq -r '.[env.version].variants | map(@sh) | join(\" \")' versions.json)\""
+					],
+					"args": []
+				},
+				{
+					"type": "call",
+					"args": [
+						"eval",
+						"\"variants=( $variants )\""
+					]
+				},
+				{
+					"type": "call",
+					"assigns": [
+						"defaultVariant=\"$(jq -r '.[env.version].variant' versions.json)\""
+					],
+					"args": []
+				},
+				{
+					"type": "call",
+					"assigns": [
+						"fullVersion=\"$(jq -r '.[env.version].version' versions.json)\""
+					],
+					"args": []
+				},
+				{
+					"type": "call",
+					"assigns": [
+						"rcVersion=\"${version%-rc}\""
+					],
+					"args": []
+				},
+				{
+					"type": "call",
+					"assigns": [
+						"versionAliases=()"
+					],
+					"args": []
+				},
+				{
+					"type": "while",
+					"cond": [
+						{
+							"type": "call",
+							"args": [
+								"[",
+								"\"$fullVersion\"",
+								"!=",
+								"\"$rcVersion\"",
+								"-a",
+								"\"${fullVersion%[.]*}\"",
+								"!=",
+								"\"$fullVersion\"",
+								"]"
+							]
+						}
+					],
+					"do": [
+						{
+							"type": "call",
+							"assigns": [
+								"versionAliases+=($fullVersion)"
+							],
+							"args": []
+						},
+						{
+							"type": "call",
+							"assigns": [
+								"fullVersion=\"${fullVersion%[.]*}\""
+							],
+							"args": []
+						}
+					]
+				},
+				{
+					"type": "call",
+					"assigns": [
+						"aliases=\"$(jq -r '.[env.version].aliases | map(@sh) | join(\" \")' versions.json)\""
+					],
+					"args": []
+				},
+				{
+					"type": "call",
+					"args": [
+						"eval",
+						"\"aliases=( $aliases )\""
+					]
+				},
+				{
+					"type": "call",
+					"assigns": [
+						"versionAliases+=(\\\n\t$version\n\t${aliases[@]:-}\n)"
+					],
+					"args": []
+				},
+				{
+					"type": "for",
+					"loop": {
+						"type": "wordIter",
+						"name": "phpVersion",
+						"items": [
+							"\"${phpVersions[@]}\""
+						]
+					},
+					"do": [
+						{
+							"type": "call",
+							"assigns": [
+								"phpVersion=\"php$phpVersion\""
+							],
+							"args": []
+						},
+						{
+							"type": "for",
+							"loop": {
+								"type": "wordIter",
+								"name": "variant",
+								"items": [
+									"\"${variants[@]}\""
+								]
+							},
+							"do": [
+								{
+									"type": "call",
+									"assigns": [
+										"dir=\"$version/$phpVersion/$variant\""
+									],
+									"args": []
+								},
+								{
+									"type": "binary",
+									"op": "||",
+									"x": {
+										"type": "call",
+										"args": [
+											"[",
+											"-f",
+											"\"$dir/Dockerfile\"",
+											"]"
+										]
+									},
+									"y": {
+										"type": "call",
+										"args": [
+											"continue"
+										]
+									}
+								},
+								{
+									"type": "call",
+									"assigns": [
+										"commit=\"$(dirCommit \"$dir\")\""
+									],
+									"args": []
+								},
+								{
+									"type": "call",
+									"assigns": [
+										"phpVersionAliases=(\"${versionAliases[@]/%/-$phpVersion}\")"
+									],
+									"args": []
+								},
+								{
+									"type": "call",
+									"assigns": [
+										"phpVersionAliases=(\"${phpVersionAliases[@]//latest-/}\")"
+									],
+									"args": []
+								},
+								{
+									"type": "call",
+									"assigns": [
+										"variantSuffixes=(\"$variant\")"
+									],
+									"args": []
+								},
+								{
+									"type": "call",
+									"assigns": [
+										"variantAliases=()"
+									],
+									"args": []
+								},
+								{
+									"type": "call",
+									"assigns": [
+										"phpVersionVariantAliases=()"
+									],
+									"args": []
+								},
+								{
+									"type": "for",
+									"loop": {
+										"type": "wordIter",
+										"name": "variantSuffix",
+										"items": [
+											"\"${variantSuffixes[@]}\""
+										]
+									},
+									"do": [
+										{
+											"type": "call",
+											"assigns": [
+												"variantAliases+=(\"${versionAliases[@]/%/-$variantSuffix}\")"
+											],
+											"args": []
+										},
+										{
+											"type": "call",
+											"assigns": [
+												"phpVersionVariantAliases+=(\"${phpVersionAliases[@]/%/-$variantSuffix}\")"
+											],
+											"args": []
+										}
+									]
+								},
+								{
+									"type": "call",
+									"assigns": [
+										"variantAliases=(\"${variantAliases[@]//latest-/}\")"
+									],
+									"args": []
+								},
+								{
+									"type": "call",
+									"assigns": [
+										"phpVersionVariantAliases=(\"${phpVersionVariantAliases[@]//latest-/}\")"
+									],
+									"args": []
+								},
+								{
+									"type": "call",
+									"assigns": [
+										"fullAliases=()"
+									],
+									"args": []
+								},
+								{
+									"type": "if",
+									"cond": [
+										{
+											"type": "binary",
+											"op": "\u0026\u0026",
+											"x": {
+												"type": "call",
+												"args": [
+													"[",
+													"\"$phpVersion\"",
+													"=",
+													"\"php$defaultPhpVersion\"",
+													"]"
+												]
+											},
+											"y": {
+												"type": "call",
+												"args": [
+													"[",
+													"\"$variant\"",
+													"=",
+													"\"$defaultVariant\"",
+													"]"
+												]
+											}
+										}
+									],
+									"then": [
+										{
+											"type": "call",
+											"assigns": [
+												"fullAliases+=(\"${versionAliases[@]}\")"
+											],
+											"args": []
+										},
+										{
+											"type": "call",
+											"assigns": [
+												"fullAliases+=(\"${variantAliases[@]}\")"
+											],
+											"args": []
+										},
+										{
+											"type": "call",
+											"assigns": [
+												"fullAliases+=(\"${phpVersionAliases[@]}\")"
+											],
+											"args": []
+										}
+									]
+								},
+								{
+									"type": "call",
+									"assigns": [
+										"fullAliases+=(\"${phpVersionVariantAliases[@]}\")"
+									],
+									"args": []
+								},
+								{
+									"type": "call",
+									"assigns": [
+										"variantParents=\"$(gawk \"$gawkParents\" \"$dir/Dockerfile\")\""
+									],
+									"args": []
+								},
+								{
+									"type": "call",
+									"assigns": [
+										"variantArches="
+									],
+									"args": []
+								},
+								{
+									"type": "for",
+									"loop": {
+										"type": "wordIter",
+										"name": "variantParent",
+										"items": [
+											"$variantParents"
+										]
+									},
+									"do": [
+										{
+											"type": "call",
+											"assigns": [
+												"parentArches=\"${parentRepoToArches[$variantParent]:-}\""
+											],
+											"args": []
+										},
+										{
+											"type": "if",
+											"cond": [
+												{
+													"type": "call",
+													"args": [
+														"[",
+														"-z",
+														"\"$parentArches\"",
+														"]"
+													]
+												}
+											],
+											"then": [
+												{
+													"type": "call",
+													"args": [
+														"continue"
+													]
+												}
+											],
+											"elifs": [
+												{
+													"cond": [
+														{
+															"type": "call",
+															"args": [
+																"[",
+																"-z",
+																"\"$variantArches\"",
+																"]"
+															]
+														}
+													],
+													"then": [
+														{
+															"type": "call",
+															"assigns": [
+																"variantArches=\"$parentArches\""
+															],
+															"args": []
+														}
+													]
+												}
+											],
+											"else": [
+												{
+													"type": "call",
+													"assigns": [
+														"variantArches=\"$(comm -12 \\\n\t\u003c(\n\t\txargs -n1 \u003c\u003c\u003c\"$variantArches\" | sort -u\n\t) \\\n\t\u003c(xargs -n1 \u003c\u003c\u003c\"$parentArches\" | sort -u)\n)\""
+													],
+													"args": []
+												}
+											]
+										}
+									]
+								},
+								{
+									"type": "call",
+									"args": [
+										"echo"
+									]
+								},
+								{
+									"type": "stmt",
+									"cmd": {
+										"type": "call",
+										"args": [
+											"cat"
+										]
+									},
+									"redirs": [
+										{
+											"op": "\u003c\u003c-",
+											"word": "EOE"
+										}
+									]
+								}
+							]
+						}
+					]
+				}
+			]
+		}
+	]
+}

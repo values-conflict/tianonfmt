@@ -1,0 +1,149 @@
+{
+	"type": "dockerfile",
+	"file": "input.dockerfile",
+	"instructions": [
+		{
+			"type": "FROM",
+			"ref": "{{ .variants[env.variant].from }}",
+			"lines": [
+				{
+					"kind": "instruction",
+					"text": "FROM {{ .variants[env.variant].from }}"
+				}
+			],
+			"startLine": 1,
+			"endLine": 1
+		},
+		{
+			"type": "blank",
+			"lines": [
+				{
+					"kind": "blank"
+				}
+			],
+			"startLine": 2,
+			"endLine": 2
+		},
+		{
+			"type": "ENV",
+			"args": "HY_VERSION {{ .version }}",
+			"lines": [
+				{
+					"kind": "instruction",
+					"text": "ENV HY_VERSION {{ .version }}"
+				}
+			],
+			"startLine": 3,
+			"endLine": 3
+		},
+		{
+			"type": "ENV",
+			"args": "HYRULE_VERSION {{ .hyrule.version }}",
+			"lines": [
+				{
+					"kind": "instruction",
+					"text": "ENV HYRULE_VERSION {{ .hyrule.version }}"
+				}
+			],
+			"startLine": 4,
+			"endLine": 4
+		},
+		{
+			"type": "blank",
+			"lines": [
+				{
+					"kind": "blank"
+				}
+			],
+			"startLine": 5,
+			"endLine": 5
+		},
+		{
+			"type": "{{",
+			"args": "if env.variant | contains(\"windows\") then ( -}}",
+			"lines": [
+				{
+					"kind": "instruction",
+					"text": "{{ if env.variant | contains(\"windows\") then ( -}}"
+				}
+			],
+			"startLine": 6,
+			"endLine": 6
+		},
+		{
+			"type": "RUN",
+			"form": "shell",
+			"args": "pip install --no-cache-dir ('hy == {0}' -f $env:HY_VERSION) ('hyrule == {0}' -f $env:HYRULE_VERSION)",
+			"lines": [
+				{
+					"kind": "instruction",
+					"text": "RUN pip install --no-cache-dir ('hy == {0}' -f $env:HY_VERSION) ('hyrule == {0}' -f $env:HYRULE_VERSION)"
+				}
+			],
+			"startLine": 7,
+			"endLine": 7
+		},
+		{
+			"type": "{{",
+			"args": ") else ( -}}",
+			"lines": [
+				{
+					"kind": "instruction",
+					"text": "{{ ) else ( -}}"
+				}
+			],
+			"startLine": 8,
+			"endLine": 8
+		},
+		{
+			"type": "RUN",
+			"form": "shell",
+			"args": "pip install --no-cache-dir \"hy == $HY_VERSION\" \"hyrule == $HYRULE_VERSION\"",
+			"lines": [
+				{
+					"kind": "instruction",
+					"text": "RUN pip install --no-cache-dir \"hy == $HY_VERSION\" \"hyrule == $HYRULE_VERSION\""
+				}
+			],
+			"startLine": 9,
+			"endLine": 9
+		},
+		{
+			"type": "{{",
+			"args": ") end -}}",
+			"lines": [
+				{
+					"kind": "instruction",
+					"text": "{{ ) end -}}"
+				}
+			],
+			"startLine": 10,
+			"endLine": 10
+		},
+		{
+			"type": "blank",
+			"lines": [
+				{
+					"kind": "blank"
+				}
+			],
+			"startLine": 11,
+			"endLine": 11
+		},
+		{
+			"type": "CMD",
+			"form": "exec",
+			"args": [
+				"hy"
+			],
+			"lines": [
+				{
+					"kind": "instruction",
+					"text": "CMD [\"hy\"]"
+				}
+			],
+			"startLine": 12,
+			"endLine": 12
+		}
+	]
+}

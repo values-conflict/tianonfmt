@@ -1,0 +1,42 @@
+{
+	"blocks": [
+		{
+			"level": 2,
+			"text": "Items",
+			"type": "heading"
+		},
+		{
+			"type": "blank"
+		},
+		{
+			"bullet": "*",
+			"text": "First",
+			"type": "listItem"
+		},
+		{
+			"bullet": "+",
+			"text": "Second",
+			"type": "listItem"
+		},
+		{
+			"bullet": "-",
+			"text": "Third",
+			"type": "listItem"
+		},
+		{
+			"bullet": "*",
+			"text": "nested A",
+			"type": "listItem"
+		},
+		{
+			"bullet": "+",
+			"text": "nested B",
+			"type": "listItem"
+		},
+		{
+			"type": "blank"
+		}
+	],
+	"file": "input.md",
+	"type": "markdown"
+}

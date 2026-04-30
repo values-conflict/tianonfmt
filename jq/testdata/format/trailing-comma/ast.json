@@ -1,0 +1,69 @@
+{
+	"type": "jq",
+	"query": {
+		"type": "object",
+		"fields": [
+			{
+				"key": {
+					"type": "ident",
+					"name": "os"
+				},
+				"value": {
+					"type": "paren",
+					"expr": {
+						"type": "comma",
+						"left": {
+							"type": "comma",
+							"left": {
+								"type": "string",
+								"raw": "\"linux\""
+							},
+							"right": {
+								"type": "string",
+								"raw": "\"windows\""
+							}
+						},
+						"right": {
+							"type": "call",
+							"name": "empty"
+						}
+					}
+				}
+			},
+			{
+				"key": {
+					"type": "ident",
+					"name": "architecture"
+				},
+				"value": {
+					"type": "paren",
+					"expr": {
+						"type": "comma",
+						"left": {
+							"type": "comma",
+							"left": {
+								"type": "comma",
+								"left": {
+									"type": "string",
+									"raw": "\"amd64\""
+								},
+								"right": {
+									"type": "string",
+									"raw": "\"386\""
+								}
+							},
+							"right": {
+								"type": "string",
+								"raw": "\"arm64\""
+							}
+						},
+						"right": {
+							"type": "call",
+							"name": "empty"
+						}
+					}
+				}
+			}
+		]
+	}
+}

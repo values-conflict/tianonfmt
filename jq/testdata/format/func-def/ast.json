@@ -1,0 +1,84 @@
+{
+	"type": "jq",
+	"funcDefs": [
+		{
+			"type": "funcDef",
+			"name": "normalize",
+			"body": {
+				"type": "pipe",
+				"left": {
+					"type": "call",
+					"name": "gsub",
+					"args": [
+						{
+							"type": "string",
+							"raw": "\"^\\\\s+|\\\\s+$\""
+						},
+						{
+							"type": "string",
+							"raw": "\"\""
+						}
+					]
+				},
+				"right": {
+					"type": "call",
+					"name": "gsub",
+					"args": [
+						{
+							"type": "string",
+							"raw": "\"\\\\s+\""
+						},
+						{
+							"type": "string",
+							"raw": "\" \""
+						}
+					]
+				}
+			}
+		},
+		{
+			"type": "funcDef",
+			"name": "normalize_ref_to_docker",
+			"body": {
+				"type": "pipe",
+				"left": {
+					"type": "call",
+					"name": "ltrimstr",
+					"args": [
+						{
+							"type": "string",
+							"raw": "\"docker.io/\""
+						}
+					]
+				},
+				"right": {
+					"type": "call",
+					"name": "ltrimstr",
+					"args": [
+						{
+							"type": "string",
+							"raw": "\"library/\""
+						}
+					]
+				}
+			}
+		}
+	],
+	"query": {
+		"type": "pipe",
+		"left": {
+			"type": "field",
+			"name": ".images"
+		},
+		"right": {
+			"type": "call",
+			"name": "map",
+			"args": [
+				{
+					"type": "call",
+					"name": "normalize_ref_to_docker"
+				}
+			]
+		}
+	}
+}

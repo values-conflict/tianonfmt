@@ -1,0 +1,411 @@
+{
+	"type": "dockerfile",
+	"file": "input.dockerfile",
+	"instructions": [
+		{
+			"type": "FROM",
+			"ref": "debian:bullseye-slim",
+			"lines": [
+				{
+					"kind": "instruction",
+					"text": "FROM debian:bullseye-slim"
+				}
+			],
+			"startLine": 1,
+			"endLine": 1
+		},
+		{
+			"type": "ENV",
+			"args": "JAVA_HOME=/opt/java/openjdk",
+			"lines": [
+				{
+					"kind": "instruction",
+					"text": "ENV JAVA_HOME=/opt/java/openjdk"
+				}
+			],
+			"startLine": 2,
+			"endLine": 2
+		},
+		{
+			"type": "COPY",
+			"from": "eclipse-temurin:17",
+			"form": "plain",
+			"paths": "$JAVA_HOME $JAVA_HOME",
+			"lines": [
+				{
+					"kind": "instruction",
+					"text": "COPY --from=eclipse-temurin:17 $JAVA_HOME $JAVA_HOME"
+				}
+			],
+			"startLine": 3,
+			"endLine": 3
+		},
+		{
+			"type": "ENV",
+			"args": "PATH=\"${JAVA_HOME}/bin:${PATH}\"     NEO4J_SHA256=6a753836adb5bd3a355a32a8f0b1c4dd5509aeba22c50a027be1e0e9553175e8     NEO4J_TARBALL=neo4j-enterprise-5.26.0-unix.tar.gz     NEO4J_EDITION=enterprise     NEO4J_HOME=\"/var/lib/neo4j\"     LANG=C.UTF-8",
+			"lines": [
+				{
+					"kind": "instruction",
+					"text": "ENV PATH=\"${JAVA_HOME}/bin:${PATH}\" \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "    NEO4J_SHA256=6a753836adb5bd3a355a32a8f0b1c4dd5509aeba22c50a027be1e0e9553175e8 \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "    NEO4J_TARBALL=neo4j-enterprise-5.26.0-unix.tar.gz \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "    NEO4J_EDITION=enterprise \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "    NEO4J_HOME=\"/var/lib/neo4j\" \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "    LANG=C.UTF-8"
+				}
+			],
+			"startLine": 4,
+			"endLine": 9
+		},
+		{
+			"type": "ARG",
+			"args": "NEO4J_URI=https://dist.neo4j.org/neo4j-enterprise-5.26.0-unix.tar.gz",
+			"lines": [
+				{
+					"kind": "instruction",
+					"text": "ARG NEO4J_URI=https://dist.neo4j.org/neo4j-enterprise-5.26.0-unix.tar.gz"
+				}
+			],
+			"startLine": 10,
+			"endLine": 10
+		},
+		{
+			"type": "blank",
+			"lines": [
+				{
+					"kind": "blank"
+				}
+			],
+			"startLine": 11,
+			"endLine": 11
+		},
+		{
+			"type": "RUN",
+			"form": "shell",
+			"args": "addgroup --gid 7474 --system neo4j \u0026\u0026 adduser --uid 7474 --system --no-create-home --home \"${NEO4J_HOME}\" --ingroup neo4j neo4j",
+			"lines": [
+				{
+					"kind": "instruction",
+					"text": "RUN addgroup --gid 7474 --system neo4j \u0026\u0026 adduser --uid 7474 --system --no-create-home --home \"${NEO4J_HOME}\" --ingroup neo4j neo4j"
+				}
+			],
+			"startLine": 12,
+			"endLine": 12
+		},
+		{
+			"type": "blank",
+			"lines": [
+				{
+					"kind": "blank"
+				}
+			],
+			"startLine": 13,
+			"endLine": 13
+		},
+		{
+			"type": "COPY",
+			"form": "plain",
+			"paths": "./local-package/* /startup/",
+			"lines": [
+				{
+					"kind": "instruction",
+					"text": "COPY ./local-package/* /startup/"
+				}
+			],
+			"startLine": 14,
+			"endLine": 14
+		},
+		{
+			"type": "blank",
+			"lines": [
+				{
+					"kind": "blank"
+				}
+			],
+			"startLine": 15,
+			"endLine": 15
+		},
+		{
+			"type": "RUN",
+			"form": "shell",
+			"args": "apt update     \u0026\u0026 apt-get install -y curl gcc git jq make procps tini wget     \u0026\u0026 curl --fail --silent --show-error --location --remote-name ${NEO4J_URI}     \u0026\u0026 echo \"${NEO4J_SHA256}  ${NEO4J_TARBALL}\" | sha256sum -c --strict --quiet     \u0026\u0026 tar --extract --file ${NEO4J_TARBALL} --directory /var/lib     \u0026\u0026 mv /var/lib/neo4j-* \"${NEO4J_HOME}\"     \u0026\u0026 rm ${NEO4J_TARBALL}     \u0026\u0026 sed -i 's/Package Type:.*/Package Type: docker bullseye/' $NEO4J_HOME/packaging_info     \u0026\u0026 mv /startup/neo4j-admin-report.sh \"${NEO4J_HOME}\"/bin/neo4j-admin-report     \u0026\u0026 mv \"${NEO4J_HOME}\"/data /data     \u0026\u0026 mv \"${NEO4J_HOME}\"/logs /logs     \u0026\u0026 chown -R neo4j:neo4j /data     \u0026\u0026 chmod -R 777 /data     \u0026\u0026 chown -R neo4j:neo4j /logs     \u0026\u0026 chmod -R 777 /logs     \u0026\u0026 chown -R neo4j:neo4j \"${NEO4J_HOME}\"     \u0026\u0026 chmod -R 777 \"${NEO4J_HOME}\"     \u0026\u0026 chmod -R 755 \"${NEO4J_HOME}/bin\"     \u0026\u0026 ln -s /data \"${NEO4J_HOME}\"/data     \u0026\u0026 ln -s /logs \"${NEO4J_HOME}\"/logs     \u0026\u0026 git clone https://github.com/ncopa/su-exec.git     \u0026\u0026 cd su-exec     \u0026\u0026 git checkout 4c3bb42b093f14da70d8ab924b487ccfbb1397af     \u0026\u0026 echo d6c40440609a23483f12eb6295b5191e94baf08298a856bab6e15b10c3b82891 su-exec.c | sha256sum -c     \u0026\u0026 echo 2a87af245eb125aca9305a0b1025525ac80825590800f047419dc57bba36b334 Makefile | sha256sum -c     \u0026\u0026 make     \u0026\u0026 mv /su-exec/su-exec /usr/bin/su-exec     \u0026\u0026 apt-get -y purge --auto-remove curl gcc git make     \u0026\u0026 rm -rf /var/lib/apt/lists/* /su-exec",
+			"lines": [
+				{
+					"kind": "instruction",
+					"text": "RUN apt update \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "    \u0026\u0026 apt-get install -y curl gcc git jq make procps tini wget \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "    \u0026\u0026 curl --fail --silent --show-error --location --remote-name ${NEO4J_URI} \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "    \u0026\u0026 echo \"${NEO4J_SHA256}  ${NEO4J_TARBALL}\" | sha256sum -c --strict --quiet \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "    \u0026\u0026 tar --extract --file ${NEO4J_TARBALL} --directory /var/lib \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "    \u0026\u0026 mv /var/lib/neo4j-* \"${NEO4J_HOME}\" \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "    \u0026\u0026 rm ${NEO4J_TARBALL} \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "    \u0026\u0026 sed -i 's/Package Type:.*/Package Type: docker bullseye/' $NEO4J_HOME/packaging_info \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "    \u0026\u0026 mv /startup/neo4j-admin-report.sh \"${NEO4J_HOME}\"/bin/neo4j-admin-report \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "    \u0026\u0026 mv \"${NEO4J_HOME}\"/data /data \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "    \u0026\u0026 mv \"${NEO4J_HOME}\"/logs /logs \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "    \u0026\u0026 chown -R neo4j:neo4j /data \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "    \u0026\u0026 chmod -R 777 /data \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "    \u0026\u0026 chown -R neo4j:neo4j /logs \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "    \u0026\u0026 chmod -R 777 /logs \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "    \u0026\u0026 chown -R neo4j:neo4j \"${NEO4J_HOME}\" \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "    \u0026\u0026 chmod -R 777 \"${NEO4J_HOME}\" \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "    \u0026\u0026 chmod -R 755 \"${NEO4J_HOME}/bin\" \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "    \u0026\u0026 ln -s /data \"${NEO4J_HOME}\"/data \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "    \u0026\u0026 ln -s /logs \"${NEO4J_HOME}\"/logs \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "    \u0026\u0026 git clone https://github.com/ncopa/su-exec.git \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "    \u0026\u0026 cd su-exec \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "    \u0026\u0026 git checkout 4c3bb42b093f14da70d8ab924b487ccfbb1397af \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "    \u0026\u0026 echo d6c40440609a23483f12eb6295b5191e94baf08298a856bab6e15b10c3b82891 su-exec.c | sha256sum -c \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "    \u0026\u0026 echo 2a87af245eb125aca9305a0b1025525ac80825590800f047419dc57bba36b334 Makefile | sha256sum -c \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "    \u0026\u0026 make \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "    \u0026\u0026 mv /su-exec/su-exec /usr/bin/su-exec \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "    \u0026\u0026 apt-get -y purge --auto-remove curl gcc git make \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "    \u0026\u0026 rm -rf /var/lib/apt/lists/* /su-exec"
+				}
+			],
+			"startLine": 16,
+			"endLine": 44
+		},
+		{
+			"type": "blank",
+			"lines": [
+				{
+					"kind": "blank"
+				}
+			],
+			"startLine": 45,
+			"endLine": 45
+		},
+		{
+			"type": "blank",
+			"lines": [
+				{
+					"kind": "blank"
+				}
+			],
+			"startLine": 46,
+			"endLine": 46
+		},
+		{
+			"type": "ENV",
+			"args": "PATH=\"${NEO4J_HOME}\"/bin:$PATH",
+			"lines": [
+				{
+					"kind": "instruction",
+					"text": "ENV PATH=\"${NEO4J_HOME}\"/bin:$PATH"
+				}
+			],
+			"startLine": 47,
+			"endLine": 47
+		},
+		{
+			"type": "blank",
+			"lines": [
+				{
+					"kind": "blank"
+				}
+			],
+			"startLine": 48,
+			"endLine": 48
+		},
+		{
+			"type": "WORKDIR",
+			"args": "\"${NEO4J_HOME}\"",
+			"lines": [
+				{
+					"kind": "instruction",
+					"text": "WORKDIR \"${NEO4J_HOME}\""
+				}
+			],
+			"startLine": 49,
+			"endLine": 49
+		},
+		{
+			"type": "blank",
+			"lines": [
+				{
+					"kind": "blank"
+				}
+			],
+			"startLine": 50,
+			"endLine": 50
+		},
+		{
+			"type": "VOLUME",
+			"form": "plain",
+			"args": "/data /logs",
+			"lines": [
+				{
+					"kind": "instruction",
+					"text": "VOLUME /data /logs"
+				}
+			],
+			"startLine": 51,
+			"endLine": 51
+		},
+		{
+			"type": "blank",
+			"lines": [
+				{
+					"kind": "blank"
+				}
+			],
+			"startLine": 52,
+			"endLine": 52
+		},
+		{
+			"type": "EXPOSE",
+			"args": "7474 7473 7687",
+			"lines": [
+				{
+					"kind": "instruction",
+					"text": "EXPOSE 7474 7473 7687"
+				}
+			],
+			"startLine": 53,
+			"endLine": 53
+		},
+		{
+			"type": "blank",
+			"lines": [
+				{
+					"kind": "blank"
+				}
+			],
+			"startLine": 54,
+			"endLine": 54
+		},
+		{
+			"type": "ENTRYPOINT",
+			"form": "exec",
+			"args": [
+				"tini",
+				"-g",
+				"--",
+				"/startup/docker-entrypoint.sh"
+			],
+			"lines": [
+				{
+					"kind": "instruction",
+					"text": "ENTRYPOINT [\"tini\", \"-g\", \"--\", \"/startup/docker-entrypoint.sh\"]"
+				}
+			],
+			"startLine": 55,
+			"endLine": 55
+		},
+		{
+			"type": "CMD",
+			"form": "exec",
+			"args": [
+				"neo4j"
+			],
+			"lines": [
+				{
+					"kind": "instruction",
+					"text": "CMD [\"neo4j\"]"
+				}
+			],
+			"startLine": 56,
+			"endLine": 56
+		}
+	]
+}

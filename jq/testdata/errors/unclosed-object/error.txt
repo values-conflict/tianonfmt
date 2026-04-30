@@ -1,0 +1,1 @@
+jq parse error: expected object key, got Field (".foo")

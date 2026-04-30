@@ -1,0 +1,75 @@
+{
+	"type": "dockerfile",
+	"file": "input.dockerfile",
+	"instructions": [
+		{
+			"type": "FROM",
+			"ref": "debian:bookworm-slim",
+			"lines": [
+				{
+					"kind": "instruction",
+					"text": "FROM debian:bookworm-slim"
+				}
+			],
+			"startLine": 1,
+			"endLine": 1
+		},
+		{
+			"type": "blank",
+			"lines": [
+				{
+					"kind": "blank"
+				}
+			],
+			"startLine": 2,
+			"endLine": 2
+		},
+		{
+			"type": "ENV",
+			"args": "GOPATH=/go",
+			"lines": [
+				{
+					"kind": "instruction",
+					"text": "ENV GOPATH=/go"
+				}
+			],
+			"startLine": 3,
+			"endLine": 3
+		},
+		{
+			"type": "ENV",
+			"args": "GOPATH /go",
+			"lines": [
+				{
+					"kind": "instruction",
+					"text": "ENV GOPATH /go"
+				}
+			],
+			"startLine": 4,
+			"endLine": 4
+		},
+		{
+			"type": "blank",
+			"lines": [
+				{
+					"kind": "blank"
+				}
+			],
+			"startLine": 5,
+			"endLine": 5
+		},
+		{
+			"type": "RUN",
+			"form": "shell",
+			"args": "echo \"done\"",
+			"lines": [
+				{
+					"kind": "instruction",
+					"text": "RUN echo \"done\""
+				}
+			],
+			"startLine": 6,
+			"endLine": 6
+		}
+	]
+}

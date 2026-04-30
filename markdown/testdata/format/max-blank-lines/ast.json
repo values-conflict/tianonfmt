@@ -1,0 +1,48 @@
+{
+	"blocks": [
+		{
+			"level": 1,
+			"text": "A",
+			"type": "heading"
+		},
+		{
+			"type": "blank"
+		},
+		{
+			"type": "blank"
+		},
+		{
+			"type": "blank"
+		},
+		{
+			"level": 1,
+			"text": "B",
+			"type": "heading"
+		},
+		{
+			"type": "blank"
+		},
+		{
+			"type": "blank"
+		},
+		{
+			"type": "blank"
+		},
+		{
+			"type": "blank"
+		},
+		{
+			"level": 1,
+			"text": "C",
+			"type": "heading"
+		},
+		{
+			"type": "blank"
+		},
+		{
+			"type": "blank"
+		}
+	],
+	"file": "input.md",
+	"type": "markdown"
+}

@@ -20,16 +20,26 @@ func TestMain(m *testing.M) {
 	os.Exit(m.Run())
 }
 
+// ── parse errors ─────────────────────────────────────────────────────────────
+
+// TestParseErrors pins the exact error message for malformed shell inputs.
+func TestParseErrors(t *testing.T) {
+	testutil.Golden(t, "testdata/errors", "input.sh", "", func(src string) (string, error) {
+		_, err := shell.ParseFile(src, shell.DetectLang(src))
+		return "", err
+	})
+}
+
 // ── format ────────────────────────────────────────────────────────────────────
 
 func TestFormat(t *testing.T) {
-	testutil.Golden(t, "testdata/format", ".sh", ".sh", func(input string) (string, error) {
+	testutil.Golden(t, "testdata/format", "input.sh", "output.sh", func(input string) (string, error) {
 		return shell.Format(input, shell.DetectLang(input), nil)
 	})
 }
 
 func TestFormatIdempotent(t *testing.T) {
-	testutil.Golden(t, "testdata/format", ".sh", ".sh", func(input string) (string, error) {
+	testutil.Golden(t, "testdata/format", "input.sh", "output.sh", func(input string) (string, error) {
 		lang := shell.DetectLang(input)
 		first, err := shell.Format(input, lang, nil)
 		if err != nil {
@@ -42,13 +52,13 @@ func TestFormatIdempotent(t *testing.T) {
 // ── tidy ──────────────────────────────────────────────────────────────────────
 
 func TestTidy(t *testing.T) {
-	testutil.Golden(t, "testdata/tidy", ".sh", ".sh", func(input string) (string, error) {
+	testutil.Golden(t, "testdata/tidy", "input.sh", "output.sh", func(input string) (string, error) {
 		return shell.FormatWithTidy(input, shell.DetectLang(input), nil)
 	})
 }
 
 func TestTidyIdempotent(t *testing.T) {
-	testutil.Golden(t, "testdata/tidy", ".sh", ".sh", func(input string) (string, error) {
+	testutil.Golden(t, "testdata/tidy", "input.sh", "output.sh", func(input string) (string, error) {
 		lang := shell.DetectLang(input)
 		first, err := shell.FormatWithTidy(input, lang, nil)
 		if err != nil {
@@ -192,37 +202,21 @@ func TestApplyTidy_WhichWithFlags_Unchanged(t *testing.T) {
 	}
 }
 
-// ── MarshalFile ───────────────────────────────────────────────────────────────
+// ── MarshalAST golden ─────────────────────────────────────────────────────────
 
-func TestMarshalFile(t *testing.T) {
-	f, err := shell.ParseFile("#!/usr/bin/env bash\necho hi\n", syntax.LangBash)
-	if err != nil {
-		t.Fatal(err)
-	}
-	v := shell.MarshalFile(f, "test.sh")
-	b, err := json.Marshal(v)
-	if err != nil {
-		t.Fatal(err)
-	}
-	got := string(b)
-	for _, want := range []string{`"type":"shell"`, `"file":"test.sh"`, `"stmts"`} {
-		if !strings.Contains(got, want) {
-			t.Errorf("MarshalFile JSON missing %q\ngot: %s", want, got)
+// TestMarshalAST pins the full JSON AST output for every format fixture.
+func TestMarshalAST(t *testing.T) {
+	testutil.Golden(t, "testdata/format", "input.sh", "ast.json", func(src string) (string, error) {
+		f, err := shell.ParseFile(src, shell.DetectLang(src))
+		if err != nil {
+			return "", err
 		}
-	}
-}
-
-func TestMarshalFile_DeclClause(t *testing.T) {
-	f, err := shell.ParseFile("local x=\"$1\"\n", syntax.LangBash)
-	if err != nil {
-		t.Fatal(err)
-	}
-	v := shell.MarshalFile(f, "-")
-	b, _ := json.Marshal(v)
-	got := string(b)
-	if !strings.Contains(got, `"type":"local"`) {
-		t.Errorf("DeclClause (local) not serialized correctly\ngot: %s", got)
-	}
+		b, err := json.MarshalIndent(shell.MarshalFile(f, "input.sh"), "", "\t")
+		if err != nil {
+			return "", err
+		}
+		return string(b) + "\n", nil
+	})
 }
 
 // ── FormatRUN ─────────────────────────────────────────────────────────────────
@@ -488,108 +482,6 @@ func TestFormatWithJQCallback(t *testing.T) {
 	}
 }
 
-// ── Marshal: all command types ────────────────────────────────────────────────
-
-func TestMarshalFile_IfClause(t *testing.T) {
-	f, _ := shell.ParseFile("if [ \"$x\" = a ]; then echo yes; elif [ \"$x\" = b ]; then echo maybe; else echo no; fi\n", syntax.LangBash)
-	b, _ := json.Marshal(shell.MarshalFile(f, "-"))
-	got := string(b)
-	for _, want := range []string{`"type":"if"`, `"elifs"`, `"else"`} {
-		if !strings.Contains(got, want) {
-			t.Errorf("missing %q in:\n%s", want, got)
-		}
-	}
-}
-
-func TestMarshalFile_WhileLoop(t *testing.T) {
-	f, _ := shell.ParseFile("while read -r line; do echo \"$line\"; done\n", syntax.LangBash)
-	b, _ := json.Marshal(shell.MarshalFile(f, "-"))
-	if !strings.Contains(string(b), `"type":"while"`) {
-		t.Errorf("while not serialized: %s", string(b))
-	}
-}
-
-func TestMarshalFile_ForLoop(t *testing.T) {
-	f, _ := shell.ParseFile("for x in a b c; do echo \"$x\"; done\n", syntax.LangBash)
-	b, _ := json.Marshal(shell.MarshalFile(f, "-"))
-	got := string(b)
-	if !strings.Contains(got, `"type":"for"`) || !strings.Contains(got, `"type":"wordIter"`) {
-		t.Errorf("for/wordIter not serialized: %s", got)
-	}
-}
-
-func TestMarshalFile_CaseStatement(t *testing.T) {
-	f, _ := shell.ParseFile("case \"$x\" in a) echo a ;; b) echo b ;; *) echo other ;; esac\n", syntax.LangBash)
-	b, _ := json.Marshal(shell.MarshalFile(f, "-"))
-	if !strings.Contains(string(b), `"type":"case"`) {
-		t.Errorf("case not serialized: %s", string(b))
-	}
-}
-
-func TestMarshalFile_Subshell(t *testing.T) {
-	f, _ := shell.ParseFile("(cd /tmp && echo hi)\n", syntax.LangBash)
-	b, _ := json.Marshal(shell.MarshalFile(f, "-"))
-	if !strings.Contains(string(b), `"type":"subshell"`) {
-		t.Errorf("subshell not serialized: %s", string(b))
-	}
-}
-
-func TestMarshalFile_Block(t *testing.T) {
-	f, _ := shell.ParseFile("{ echo a; echo b; }\n", syntax.LangBash)
-	b, _ := json.Marshal(shell.MarshalFile(f, "-"))
-	if !strings.Contains(string(b), `"type":"block"`) {
-		t.Errorf("block not serialized: %s", string(b))
-	}
-}
-
-func TestMarshalFile_Redirect(t *testing.T) {
-	f, _ := shell.ParseFile("echo hi > /dev/null\n", syntax.LangBash)
-	b, _ := json.Marshal(shell.MarshalFile(f, "-"))
-	if !strings.Contains(string(b), `"redirs"`) {
-		t.Errorf("redirect not serialized: %s", string(b))
-	}
-}
-
-func TestMarshalFile_ArithmCmd(t *testing.T) {
-	f, _ := shell.ParseFile("(( x++ ))\n", syntax.LangBash)
-	b, _ := json.Marshal(shell.MarshalFile(f, "-"))
-	if !strings.Contains(string(b), `"type":"arithmCmd"`) {
-		t.Errorf("ArithmCmd not serialized: %s", string(b))
-	}
-}
-
-func TestMarshalFile_TestClause(t *testing.T) {
-	f, _ := shell.ParseFile("[[ -f /etc/foo ]]\n", syntax.LangBash)
-	b, _ := json.Marshal(shell.MarshalFile(f, "-"))
-	if !strings.Contains(string(b), `"type":"testClause"`) {
-		t.Errorf("TestClause not serialized: %s", string(b))
-	}
-}
-
-func TestMarshalFile_LetClause(t *testing.T) {
-	f, _ := shell.ParseFile("let x=5 y=x+1\n", syntax.LangBash)
-	b, _ := json.Marshal(shell.MarshalFile(f, "-"))
-	if !strings.Contains(string(b), `"type":"let"`) {
-		t.Errorf("LetClause not serialized: %s", string(b))
-	}
-}
-
-func TestMarshalFile_TimeClause(t *testing.T) {
-	f, _ := shell.ParseFile("time sleep 1\n", syntax.LangBash)
-	b, _ := json.Marshal(shell.MarshalFile(f, "-"))
-	if !strings.Contains(string(b), `"type":"time"`) {
-		t.Errorf("TimeClause not serialized: %s", string(b))
-	}
-}
-
-func TestMarshalFile_NegatedBackground(t *testing.T) {
-	f, _ := shell.ParseFile("! false &\n", syntax.LangBash)
-	b, _ := json.Marshal(shell.MarshalFile(f, "-"))
-	got := string(b)
-	if !strings.Contains(got, `"negated"`) || !strings.Contains(got, `"background"`) {
-		t.Errorf("negated/background not serialized: %s", got)
-	}
-}
 
 // ── golden helper ─────────────────────────────────────────────────────────────
 

@@ -1,0 +1,29 @@
+{
+	"type": "jq",
+	"query": {
+		"type": "pipe",
+		"left": {
+			"type": "commented",
+			"expr": {
+				"type": "field",
+				"name": ".foo"
+			},
+			"trailingComment": "# comment on field access"
+		},
+		"right": {
+			"type": "pipe",
+			"left": {
+				"type": "field",
+				"name": ".bar"
+			},
+			"right": {
+				"type": "commented",
+				"expr": {
+					"type": "field",
+					"name": ".baz"
+				},
+				"trailingComment": "# trailing on last field"
+			}
+		}
+	}
+}

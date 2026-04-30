@@ -24,7 +24,7 @@ func TestMain(m *testing.M) {
 // TestFormat verifies the formatter produces expected output for each testdata case.
 // Run `go test -update` to regenerate golden output files.
 func TestFormat(t *testing.T) {
-	testutil.Golden(t, "testdata/format", ".jq", ".jq", func(input string) (string, error) {
+	testutil.Golden(t, "testdata/format", "input.jq", "output.jq", func(input string) (string, error) {
 		f, err := jq.ParseFile(input)
 		if err != nil {
 			return "", err
@@ -35,7 +35,7 @@ func TestFormat(t *testing.T) {
 
 // TestFormatIdempotent verifies formatting is stable: format(format(x)) == format(x).
 func TestFormatIdempotent(t *testing.T) {
-	testutil.Golden(t, "testdata/format", ".jq", ".jq", func(input string) (string, error) {
+	testutil.Golden(t, "testdata/format", "input.jq", "output.jq", func(input string) (string, error) {
 		f, err := jq.ParseFile(input)
 		if err != nil {
 			return "", err
@@ -85,7 +85,7 @@ func TestLintNullInElse_AllBranches(t *testing.T) {
 }
 
 func TestLint(t *testing.T) {
-	testutil.Golden(t, "testdata/lint", ".jq", ".txt", func(input string) (string, error) {
+	testutil.Golden(t, "testdata/lint", "input.jq", "output.txt", func(input string) (string, error) {
 		f, err := jq.ParseFile(input)
 		if err != nil {
 			return "", err
@@ -119,32 +119,35 @@ func TestTokens(t *testing.T) {
 	}
 }
 
-// ── marshalComments / Comment.MarshalAST ─────────────────────────────────────
+// ── MarshalAST golden ─────────────────────────────────────────────────────────
 
-func TestMarshalAST_WithLeadingComments(t *testing.T) {
-	// A function with leading comments exercises marshalComments.
-	src := "# Parse a value\n# Returns a result\ndef parse: . + 1;\nparse\n"
-	f, err := jq.ParseFile(src)
-	if err != nil {
-		t.Fatalf("parse: %v", err)
-	}
-	b, err := json.Marshal(f.MarshalAST())
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !strings.Contains(string(b), "leadingComments") {
-		t.Errorf("expected leadingComments in AST JSON\ngot: %s", string(b))
-	}
+// TestMarshalAST pins the full JSON AST output for every format fixture.
+// This catches regressions in AST structure, field names, and ordering.
+func TestMarshalAST(t *testing.T) {
+	testutil.Golden(t, "testdata/format", "input.jq", "ast.json", func(src string) (string, error) {
+		f, err := jq.ParseFile(src)
+		if err != nil {
+			return "", err
+		}
+		b, err := json.MarshalIndent(f.MarshalAST(), "", "\t")
+		if err != nil {
+			return "", err
+		}
+		return string(b) + "\n", nil
+	})
 }
+
+// ── marshalComments / Comment.MarshalAST ─────────────────────────────────────
 
 func TestCommentMarshalAST(t *testing.T) {
 	// Direct test of Comment.MarshalAST (required by the Node interface).
+	// The comments fixture covers leadingComments in the golden AST output;
+	// this exercises the direct MarshalAST call on a Comment node.
 	src := "# hello\n.x\n"
 	f, err := jq.ParseFile(src)
 	if err != nil {
 		t.Fatalf("parse: %v", err)
 	}
-	// Walk to find a Comment node and call MarshalAST on it directly.
 	var foundComment bool
 	jq.Walk(f, func(n jq.Node) bool {
 		if c, ok := n.(*jq.Comment); ok {
@@ -173,32 +176,14 @@ func TestParseExpr(t *testing.T) {
 	}
 }
 
-func TestParseExpr_Error(t *testing.T) {
-	_, err := jq.ParseExpr("((((")
-	if err == nil {
-		t.Error("expected parse error")
-	}
-}
-
-// TestParseErrors tests that various malformed inputs produce parse errors (not panics).
+// TestParseErrors verifies that malformed jq inputs produce the expected parse
+// errors (not panics, and not nil).  Each fixture in testdata/errors/ has an
+// input.jq and an error.txt golden file pinning the exact error message.
 func TestParseErrors(t *testing.T) {
-	cases := []string{
-		`[.foo`,           // unclosed array (triggers parseArray error path)
-		`{.foo`,           // unclosed object
-		`if .a then`,      // incomplete if
-		`.foo |`,          // trailing pipe
-		`reduce .[] as`,   // incomplete reduce (triggers parseReduce error)
-		`label`,           // incomplete label (triggers parseLabel error)
-		`foreach .[] as`,  // incomplete foreach
-	}
-	for _, src := range cases {
-		t.Run(src[:min(15, len(src))], func(t *testing.T) {
-			_, err := jq.ParseFile(src)
-			if err == nil {
-				t.Errorf("expected parse error for %q, got nil", src)
-			}
-		})
-	}
+	testutil.Golden(t, "testdata/errors", "input.jq", "", func(src string) (string, error) {
+		_, err := jq.ParseFile(src)
+		return "", err
+	})
 }
 
 func TestFormatNode(t *testing.T) {
@@ -307,76 +292,6 @@ func TestWalkEarlyReturn(t *testing.T) {
 }
 
 // ── marshal / AST ─────────────────────────────────────────────────────────────
-
-// TestMarshalAST verifies AST JSON output for key node types.
-func TestMarshalAST(t *testing.T) {
-	tests := []struct {
-		name string
-		src  string
-		want string // JSON fragment that must appear in output
-	}{
-		{"pipe", `.foo | .bar`, `"type":"pipe"`},
-		{"field", `.foo`, `"type":"field"`},
-		{"binop-eq", `.x == 1`, `"type":"binOp","op":"=="`},
-		{"if", `if .x then .y else .z end`, `"type":"if"`},
-		{"call", `length`, `"type":"call","name":"length"`},
-		{"number", `42`, `"type":"number","raw":"42"`},
-		{"string", `"hello"`, `"type":"string"`},
-		{"null", `null`, `"type":"null"`},
-		{"bool-true", `true`, `"type":"bool","value":true`},
-		{"bool-false", `false`, `"type":"bool","value":false`},
-		{"array", `[1, 2]`, `"type":"array"`},
-		{"object", `{a: .b}`, `"type":"object"`},
-		{"identity", `.`, `"type":"identity"`},
-		{"recurse", `..`, `"type":"recurse"`},
-		{"var", `. as $x | $x`, `"type":"var","name":"$x"`},
-		{"optional", `.foo?`, `"type":"optional"`},
-		{"try", `try .foo catch .`, `"type":"try"`},
-		{"reduce", `reduce .[] as $x (0; . + $x)`, `"type":"reduce"`},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			f, err := jq.ParseFile(tt.src)
-			if err != nil {
-				t.Fatalf("parse: %v", err)
-			}
-			b, err := json.Marshal(f.MarshalAST())
-			if err != nil {
-				t.Fatalf("marshal: %v", err)
-			}
-			got := string(b)
-			if !strings.Contains(got, tt.want) {
-				t.Errorf("AST JSON missing %q\ngot: %s", tt.want, got)
-			}
-		})
-	}
-}
-
-// TestMarshalASTFileType verifies the top-level "type" is "jq".
-func TestMarshalNodeNil(t *testing.T) {
-	// marshalNode(nil) must return nil without panicking.
-	// This is the defensive nil check at the top of marshalNode.
-	// Triggered by Optional{Expr: nil} or similar zero-value nodes.
-	f, err := jq.ParseFile(".a?")
-	if err != nil {
-		t.Fatal(err)
-	}
-	b, err := json.Marshal(f.MarshalAST())
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !strings.Contains(string(b), "optional") {
-		t.Errorf("expected optional in AST: %s", string(b))
-	}
-}
-
-func TestMarshalASTFileType(t *testing.T) {
-	f, _ := jq.ParseFile(`.x`)
-	m := f.MarshalAST()
-	if len(m) == 0 || m[0].Key != "type" || m[0].Val != "jq" {
-		t.Errorf("expected first key to be type=jq, got %v", m)
-	}
-}
 
 // ── comprehensive node-type coverage ─────────────────────────────────────────
 
@@ -721,73 +636,6 @@ func TestFormatInlineVsMultiline(t *testing.T) {
 	}
 }
 
-// TestMarshalAST_IfElseIfs verifies that elif branches serialize correctly.
-func TestMarshalAST_IfElseIfs(t *testing.T) {
-	src := `if .a then 1 elif .b then 2 elif .c then 3 else 4 end`
-	f, err := jq.ParseFile(src)
-	if err != nil {
-		t.Fatalf("parse: %v", err)
-	}
-	b, _ := json.Marshal(f.MarshalAST())
-	got := string(b)
-	if !strings.Contains(got, `"elseIfs"`) {
-		t.Errorf("elseIfs array missing from AST: %s", got)
-	}
-	if !strings.Contains(got, `"else"`) {
-		t.Errorf("else branch missing from AST: %s", got)
-	}
-}
-
-// TestMarshalAST_AllNodeTypes serializes an AST with all important node types.
-func TestMarshalAST_AllNodeTypes(t *testing.T) {
-	cases := []struct {
-		name string
-		src  string
-		want string // expected "type":"<want>" substring in JSON
-	}{
-		{"foreach", `foreach .[] as $x (0; . + $x; .)`, "foreach"},
-		{"label", `label $lbl | break $lbl`, "label"},
-		{"break", `label $lbl | break $lbl`, "break"},
-		{"as-expr", `. as $x | $x`, "as"},
-		{"slice", `.a[1:2]`, "slice"},
-		{"format", `@base64`, "format"},
-		{"comma", `.a, .b`, "comma"},
-		{"loc", `$__loc__`, "loc"},
-		{"recurse", `..`, "recurse"},
-		{"paren", `(.)`, "paren"},
-		{"optional", `.a?`, "optional"},
-		{"array-pattern", `. as [$a] | $a`, "arrayPattern"},
-		{"object-pattern", `. as {a: $b} | $b`, "objectPattern"},
-		{"binop", `.a == .b`, "binOp"},
-		{"func-def", `def f: .+1; f`, "funcDef"},
-		{"module", `module {}; .x`, "module"},
-		{"import", `import "foo" as $bar; .x`, "import"},
-		{"local-func-def", `def outer: def inner: .+1; inner; outer`, "localFuncDef"},
-		{"funcdef-params", `def f($x; $y): $x + $y; f(1; 2)`, "funcDef"},
-		// elseIfs is an array key, not a "type" value — check differently below.
-		// {"if-elif-else", ...}
-		{"infix-ops", `.a + .b - .c * .d / .e`, "binOp"},
-		{"alt-op", `.a // .b // "default"`, "binOp"},
-		{"update-ops", `.a |= .+1`, "binOp"},
-		{"add-assign", `.a += 1`, "binOp"},
-		{"alt-assign", `.a //= "default"`, "binOp"},
-		{"try-catch", `try .a catch "err"`, "try"},
-		{"alt-try", `.a ?// .b`, "binOp"},
-	}
-	for _, tt := range cases {
-		t.Run(tt.name, func(t *testing.T) {
-			f, err := jq.ParseFile(tt.src)
-			if err != nil {
-				t.Fatalf("parse: %v", err)
-			}
-			b, _ := json.Marshal(f.MarshalAST())
-			needle := `"type":"` + tt.want + `"`
-			if !strings.Contains(string(b), needle) {
-				t.Errorf("AST missing %s\nsrc: %s\ngot: %s", needle, tt.src, string(b))
-			}
-		})
-	}
-}
 
 // ── golden helper ─────────────────────────────────────────────────────────────
 

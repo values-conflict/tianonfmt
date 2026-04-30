@@ -1,0 +1,72 @@
+{
+	"type": "jq",
+	"funcDefs": [
+		{
+			"type": "funcDef",
+			"name": "dpkg_version_parse",
+			"leadingComments": [
+				"# https://www.debian.org/doc/debian-policy/ch-controlfields.html#version",
+				"# given a Debian version, returns a parsed object: { epoch, upstream, revision }"
+			],
+			"body": {
+				"type": "call",
+				"name": "capture",
+				"args": [
+					{
+						"type": "string",
+						"raw": "\"^(?:(?\u003cepoch\u003e[0-9]*)(?:[:])|)(?\u003cupstream\u003e.*?)(?:[-](?\u003crevision\u003e[^-]*))?$\""
+					}
+				]
+			}
+		},
+		{
+			"type": "funcDef",
+			"name": "dpkg_version_string",
+			"leadingComments": [
+				"# given a parsed object (from dpkg_version_parse), returns a Debian version string"
+			],
+			"body": {
+				"type": "binOp",
+				"op": "+",
+				"left": {
+					"type": "binOp",
+					"op": "+",
+					"left": {
+						"type": "if",
+						"cond": {
+							"type": "field",
+							"name": ".epoch"
+						},
+						"then": {
+							"type": "string",
+							"raw": "\"\\(.epoch):\""
+						},
+						"else": {
+							"type": "string",
+							"raw": "\"\""
+						}
+					},
+					"right": {
+						"type": "field",
+						"name": ".upstream"
+					}
+				},
+				"right": {
+					"type": "if",
+					"cond": {
+						"type": "field",
+						"name": ".revision"
+					},
+					"then": {
+						"type": "string",
+						"raw": "\"-\\(.revision)\""
+					},
+					"else": {
+						"type": "string",
+						"raw": "\"\""
+					}
+				}
+			}
+		}
+	]
+}

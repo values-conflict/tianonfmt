@@ -1,0 +1,29 @@
+{
+	"blocks": [
+		{
+			"level": 1,
+			"text": "Project Title",
+			"type": "heading"
+		},
+		{
+			"type": "blank"
+		},
+		{
+			"level": 2,
+			"text": "Subsection",
+			"type": "heading"
+		},
+		{
+			"type": "blank"
+		},
+		{
+			"text": "Normal paragraph.",
+			"type": "paragraph"
+		},
+		{
+			"type": "blank"
+		}
+	],
+	"file": "input.md",
+	"type": "markdown"
+}
