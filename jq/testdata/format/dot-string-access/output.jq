@@ -1,1 +1,1 @@
-.["foo"]["bar"] | .["baz-qux"] | .a["b-c"]["d"]
+."foo"."bar" | ."baz-qux" | .a."b-c"."d"

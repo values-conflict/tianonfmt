@@ -19,82 +19,70 @@ func TestMain(m *testing.M) {
 	os.Exit(m.Run())
 }
 
-// ── format ────────────────────────────────────────────────────────────────────
+// ── format / tidy / AST ───────────────────────────────────────────────────────
 
-// TestFormat verifies the formatter produces expected output for each testdata case.
-// Run `go test -update` to regenerate golden output files.
 func TestFormat(t *testing.T) {
-	testutil.Golden(t, "testdata/format", "input.jq", "output.jq", func(input string) (string, error) {
-		f, err := jq.ParseFile(input)
-		if err != nil {
-			return "", err
-		}
-		return jq.FormatFile(f), nil
+	parse := func(src string) (*jq.File, error) { return jq.ParseFile(src) }
+	testutil.Golden(t, "testdata/format", "input.jq", []testutil.Case{
+		{Out: "output.jq", Fn: func(src string) (string, error) {
+			f, err := parse(src)
+			if err != nil {
+				return "", err
+			}
+			return jq.FormatFile(f), nil
+		}, Idem: true},
+		{Out: "output.tidy.jq", Fn: func(src string) (string, error) {
+			f, err := parse(src)
+			if err != nil {
+				return "", err
+			}
+			jq.TidyFile(f)
+			return jq.FormatFileTidy(f), nil
+		}, Idem: true},
+		{Out: "ast.json", Fn: func(src string) (string, error) {
+			f, err := parse(src)
+			if err != nil {
+				return "", err
+			}
+			b, err := json.MarshalIndent(f.MarshalAST(), "", "\t")
+			if err != nil {
+				return "", err
+			}
+			return string(b) + "\n", nil
+		}},
 	})
 }
 
-// TestFormatIdempotent verifies formatting is stable: format(format(x)) == format(x).
-func TestFormatIdempotent(t *testing.T) {
-	testutil.Golden(t, "testdata/format", "input.jq", "output.jq", func(input string) (string, error) {
-		f, err := jq.ParseFile(input)
-		if err != nil {
-			return "", err
-		}
-		first := jq.FormatFile(f)
-		f2, err := jq.ParseFile(first)
-		if err != nil {
-			return "", fmt.Errorf("re-parse after format: %w", err)
-		}
-		return jq.FormatFile(f2), nil
-	})
-}
+// ── parse errors ─────────────────────────────────────────────────────────────
 
-// ── tidy ──────────────────────────────────────────────────────────────────────
-
-// TestFormatRoundTrip verifies that the formatter is a no-op on already-canonical
-// files.  If format(golden) != golden the AST is silently losing information.
-func TestFormatRoundTrip(t *testing.T) {
-	testutil.Golden(t, "testdata/format", "output.jq", "output.jq", func(src string) (string, error) {
-		f, err := jq.ParseFile(src)
-		if err != nil {
+func TestParseErrors(t *testing.T) {
+	testutil.Golden(t, "testdata/errors", "input.jq", []testutil.Case{
+		{Fn: func(src string) (string, error) {
+			_, err := jq.ParseFile(src)
 			return "", err
-		}
-		return jq.FormatFile(f), nil
-	})
-}
-
-func TestTidy(t *testing.T) {
-	testutil.Golden(t, "testdata/tidy", "input.jq", "output.jq", func(src string) (string, error) {
-		f, err := jq.ParseFile(src)
-		if err != nil {
-			return "", err
-		}
-		jq.TidyFile(f)
-		return jq.FormatFileTidy(f), nil
-	})
-}
-
-func TestTidyIdempotent(t *testing.T) {
-	testutil.Golden(t, "testdata/tidy", "input.jq", "output.jq", func(src string) (string, error) {
-		f, err := jq.ParseFile(src)
-		if err != nil {
-			return "", err
-		}
-		jq.TidyFile(f)
-		first := jq.FormatFileTidy(f)
-		f2, err := jq.ParseFile(first)
-		if err != nil {
-			return "", fmt.Errorf("re-parse after tidy: %w", err)
-		}
-		jq.TidyFile(f2)
-		return jq.FormatFileTidy(f2), nil
+		}},
 	})
 }
 
 // ── lint ──────────────────────────────────────────────────────────────────────
 
-// TestLint verifies the linter reports the expected violations.
-// violations.txt contains one "line: message" entry per line; empty = no violations.
+func TestLint(t *testing.T) {
+	testutil.Golden(t, "testdata/lint", "input.jq", []testutil.Case{
+		{Out: "output.txt", Fn: func(src string) (string, error) {
+			f, err := jq.ParseFile(src)
+			if err != nil {
+				return "", err
+			}
+			vs := jq.LintFile(f, src)
+			var sb strings.Builder
+			for _, v := range vs {
+				fmt.Fprintf(&sb, "%d: %s\n", v.Line, v.Msg)
+			}
+			return sb.String(), nil
+		}},
+	})
+}
+
 // TestLintNullInElse_AllBranches exercises all three branches of lintNullInElse.
 func TestLintNullInElse_AllBranches(t *testing.T) {
 	lint := func(src string) []jq.Violation {
@@ -126,21 +114,6 @@ func TestLintNullInElse_AllBranches(t *testing.T) {
 	}
 }
 
-func TestLint(t *testing.T) {
-	testutil.Golden(t, "testdata/lint", "input.jq", "output.txt", func(input string) (string, error) {
-		f, err := jq.ParseFile(input)
-		if err != nil {
-			return "", err
-		}
-		vs := jq.LintFile(f, input)
-		var sb strings.Builder
-		for _, v := range vs {
-			fmt.Fprintf(&sb, "%d: %s\n", v.Line, v.Msg)
-		}
-		return sb.String(), nil
-	})
-}
-
 // ── Tokens (lexer) ───────────────────────────────────────────────────────────
 
 func TestTokens(t *testing.T) {
@@ -159,24 +132,6 @@ func TestTokens(t *testing.T) {
 	if !found {
 		t.Errorf("expected FIELD token in .foo | .bar; got: %v", toks)
 	}
-}
-
-// ── MarshalAST golden ─────────────────────────────────────────────────────────
-
-// TestMarshalAST pins the full JSON AST output for every format fixture.
-// This catches regressions in AST structure, field names, and ordering.
-func TestMarshalAST(t *testing.T) {
-	testutil.Golden(t, "testdata/format", "input.jq", "ast.json", func(src string) (string, error) {
-		f, err := jq.ParseFile(src)
-		if err != nil {
-			return "", err
-		}
-		b, err := json.MarshalIndent(f.MarshalAST(), "", "\t")
-		if err != nil {
-			return "", err
-		}
-		return string(b) + "\n", nil
-	})
 }
 
 // ── marshalComments / Comment.MarshalAST ─────────────────────────────────────
@@ -216,16 +171,6 @@ func TestParseExpr(t *testing.T) {
 	if node == nil {
 		t.Error("nil node")
 	}
-}
-
-// TestParseErrors verifies that malformed jq inputs produce the expected parse
-// errors (not panics, and not nil).  Each fixture in testdata/errors/ has an
-// input.jq and an error.txt golden file pinning the exact error message.
-func TestParseErrors(t *testing.T) {
-	testutil.Golden(t, "testdata/errors", "input.jq", "", func(src string) (string, error) {
-		_, err := jq.ParseFile(src)
-		return "", err
-	})
 }
 
 func TestFormatNode(t *testing.T) {

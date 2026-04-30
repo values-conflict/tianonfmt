@@ -38,76 +38,39 @@ func TestMain(m *testing.M) {
 	os.Exit(m.Run())
 }
 
-// ── parse errors ─────────────────────────────────────────────────────────────
-
-// TestParseErrors pins the exact error message for malformed shell inputs.
-func TestParseErrors(t *testing.T) {
-	testutil.Golden(t, "testdata/errors", "input.sh", "", func(src string) (string, error) {
-		_, err := shell.ParseFile(src, shell.DetectLang(src))
-		return "", err
-	})
-}
-
-// ── format ────────────────────────────────────────────────────────────────────
-
-// TestFormatWithJQ exercises jq expression reformatting inside shell scripts
-// (the formatJQInAST / reformatSglQuoted code paths), which the nil-jqFmt
-// golden tests cannot reach.
-func TestFormatWithJQ(t *testing.T) {
-	testutil.Golden(t, "testdata/format-with-jq", "input.sh", "output.sh", func(src string) (string, error) {
-		return shell.Format(src, shell.DetectLang(src), realJQFmt)
-	})
-}
-
-func TestFormatWithJQIdempotent(t *testing.T) {
-	testutil.Golden(t, "testdata/format-with-jq", "input.sh", "output.sh", func(src string) (string, error) {
-		first, err := shell.Format(src, shell.DetectLang(src), realJQFmt)
-		if err != nil {
-			return "", err
-		}
-		return shell.Format(first, shell.DetectLang(first), realJQFmt)
-	})
-}
+// ── format / tidy / AST / errors ─────────────────────────────────────────────
 
 func TestFormat(t *testing.T) {
-	testutil.Golden(t, "testdata/format", "input.sh", "output.sh", func(input string) (string, error) {
-		return shell.Format(input, shell.DetectLang(input), nil)
+	testutil.Golden(t, "testdata/format", "input.sh", []testutil.Case{
+		{Out: "output.sh", Fn: func(src string) (string, error) {
+			return shell.Format(src, shell.DetectLang(src), nil)
+		}, Idem: true},
+		{Out: "output.tidy.sh", Fn: func(src string) (string, error) {
+			return shell.FormatWithTidy(src, shell.DetectLang(src), nil)
+		}, Idem: true},
+		{Out: "output.format-jq.sh", Fn: func(src string) (string, error) {
+			return shell.Format(src, shell.DetectLang(src), realJQFmt)
+		}, Idem: true},
+		{Out: "ast.json", Fn: func(src string) (string, error) {
+			f, err := shell.ParseFile(src, shell.DetectLang(src))
+			if err != nil {
+				return "", err
+			}
+			b, err := json.MarshalIndent(shell.MarshalFile(f, "input.sh"), "", "\t")
+			if err != nil {
+				return "", err
+			}
+			return string(b) + "\n", nil
+		}},
 	})
 }
 
-func TestFormatIdempotent(t *testing.T) {
-	testutil.Golden(t, "testdata/format", "input.sh", "output.sh", func(input string) (string, error) {
-		lang := shell.DetectLang(input)
-		first, err := shell.Format(input, lang, nil)
-		if err != nil {
+func TestParseErrors(t *testing.T) {
+	testutil.Golden(t, "testdata/errors", "input.sh", []testutil.Case{
+		{Fn: func(src string) (string, error) {
+			_, err := shell.ParseFile(src, shell.DetectLang(src))
 			return "", err
-		}
-		return shell.Format(first, lang, nil)
-	})
-}
-
-// ── tidy ──────────────────────────────────────────────────────────────────────
-
-func TestFormatRoundTrip(t *testing.T) {
-	testutil.Golden(t, "testdata/format", "output.sh", "output.sh", func(src string) (string, error) {
-		return shell.Format(src, shell.DetectLang(src), nil)
-	})
-}
-
-func TestTidy(t *testing.T) {
-	testutil.Golden(t, "testdata/tidy", "input.sh", "output.sh", func(input string) (string, error) {
-		return shell.FormatWithTidy(input, shell.DetectLang(input), nil)
-	})
-}
-
-func TestTidyIdempotent(t *testing.T) {
-	testutil.Golden(t, "testdata/tidy", "input.sh", "output.sh", func(input string) (string, error) {
-		lang := shell.DetectLang(input)
-		first, err := shell.FormatWithTidy(input, lang, nil)
-		if err != nil {
-			return "", err
-		}
-		return shell.FormatWithTidy(first, lang, nil)
+		}},
 	})
 }
 
@@ -243,23 +206,6 @@ func TestApplyTidy_WhichWithFlags_Unchanged(t *testing.T) {
 	if out != "which -a docker" {
 		t.Errorf("got %q, want unchanged %q", out, "which -a docker")
 	}
-}
-
-// ── MarshalAST golden ─────────────────────────────────────────────────────────
-
-// TestMarshalAST pins the full JSON AST output for every format fixture.
-func TestMarshalAST(t *testing.T) {
-	testutil.Golden(t, "testdata/format", "input.sh", "ast.json", func(src string) (string, error) {
-		f, err := shell.ParseFile(src, shell.DetectLang(src))
-		if err != nil {
-			return "", err
-		}
-		b, err := json.MarshalIndent(shell.MarshalFile(f, "input.sh"), "", "\t")
-		if err != nil {
-			return "", err
-		}
-		return string(b) + "\n", nil
-	})
 }
 
 // ── FormatRUN ─────────────────────────────────────────────────────────────────

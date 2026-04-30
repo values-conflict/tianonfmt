@@ -1,0 +1,21 @@
+{
+	"type": "shell",
+	"file": "input.sh",
+	"stmts": [
+		{
+			"type": "call",
+			"args": [
+				"set",
+				"-Eeuo",
+				"pipefail"
+			]
+		},
+		{
+			"type": "call",
+			"args": [
+				"echo",
+				"\"hello\""
+			]
+		}
+	]
+}

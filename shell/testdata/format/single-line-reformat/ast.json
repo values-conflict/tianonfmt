@@ -1,0 +1,28 @@
+{
+	"type": "shell",
+	"file": "input.sh",
+	"stmts": [
+		{
+			"type": "call",
+			"args": [
+				"set",
+				"-Eeuo",
+				"pipefail"
+			]
+		},
+		{
+			"type": "call",
+			"assigns": [
+				"result=\"$(jq -n --arg foo \"bar\" '{\"foo\": $foo}')\""
+			],
+			"args": []
+		},
+		{
+			"type": "call",
+			"args": [
+				"echo",
+				"\"$result\""
+			]
+		}
+	]
+}

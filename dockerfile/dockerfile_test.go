@@ -5,7 +5,6 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 
@@ -20,53 +19,36 @@ func TestMain(m *testing.M) {
 	os.Exit(m.Run())
 }
 
-// ── format ────────────────────────────────────────────────────────────────────
+// ── format / tidy / AST ───────────────────────────────────────────────────────
 
 func TestFormat(t *testing.T) {
-	testutil.Golden(t, "testdata/format", "input.dockerfile", "output.dockerfile", func(input string) (string, error) {
-		f, err := dockerfile.Parse(input)
-		if err != nil {
-			return "", err
-		}
-		return dockerfile.Format(f), nil
-	})
-}
-
-func TestFormatIdempotent(t *testing.T) {
-	testutil.Golden(t, "testdata/format", "input.dockerfile", "output.dockerfile", func(input string) (string, error) {
-		f, err := dockerfile.Parse(input)
-		if err != nil {
-			return "", err
-		}
-		first := dockerfile.Format(f)
-		g, err := dockerfile.Parse(first)
-		if err != nil {
-			return "", fmt.Errorf("re-parse after format: %w", err)
-		}
-		return dockerfile.Format(g), nil
-	})
-}
-
-// ── tidy ──────────────────────────────────────────────────────────────────────
-
-func TestFormatRoundTrip(t *testing.T) {
-	testutil.Golden(t, "testdata/format", "output.dockerfile", "output.dockerfile", func(src string) (string, error) {
-		f, err := dockerfile.Parse(src)
-		if err != nil {
-			return "", err
-		}
-		return dockerfile.Format(f), nil
-	})
-}
-
-func TestTidy(t *testing.T) {
-	testutil.Golden(t, "testdata/tidy", "input.dockerfile", "output.dockerfile", func(input string) (string, error) {
-		f, err := dockerfile.Parse(input)
-		if err != nil {
-			return "", err
-		}
-		dockerfile.TidyFile(f, tidyRUNStub, normaliseSetFlagsStub)
-		return dockerfile.Format(f), nil
+	testutil.Golden(t, "testdata/format", "input.dockerfile", []testutil.Case{
+		{Out: "output.dockerfile", Fn: func(src string) (string, error) {
+			f, err := dockerfile.Parse(src)
+			if err != nil {
+				return "", err
+			}
+			return dockerfile.Format(f), nil
+		}, Idem: true},
+		{Out: "output.tidy.dockerfile", Fn: func(src string) (string, error) {
+			f, err := dockerfile.Parse(src)
+			if err != nil {
+				return "", err
+			}
+			dockerfile.TidyFile(f, tidyRUNStub, normaliseSetFlagsStub)
+			return dockerfile.Format(f), nil
+		}},
+		{Out: "ast.json", Fn: func(src string) (string, error) {
+			f, err := dockerfile.Parse(src)
+			if err != nil {
+				return "", err
+			}
+			b, err := json.MarshalIndent(dockerfile.MarshalFile(f, "input.dockerfile"), "", "\t")
+			if err != nil {
+				return "", err
+			}
+			return string(b) + "\n", nil
+		}},
 	})
 }
 
@@ -198,21 +180,6 @@ func TestParse_Directives(t *testing.T) {
 
 // ── MarshalAST golden ─────────────────────────────────────────────────────────
 
-// TestMarshalAST pins the full JSON AST output for every format fixture.
-func TestMarshalAST(t *testing.T) {
-	testutil.Golden(t, "testdata/format", "input.dockerfile", "ast.json", func(src string) (string, error) {
-		f, err := dockerfile.Parse(src)
-		if err != nil {
-			return "", err
-		}
-		b, err := json.MarshalIndent(dockerfile.MarshalFile(f, "input.dockerfile"), "", "\t")
-		if err != nil {
-			return "", err
-		}
-		return string(b) + "\n", nil
-	})
-}
-
 func TestTidyCmdEntrypoint_EmptyArgs(t *testing.T) {
 	// len(tokens)==0 path: bare CMD with no arguments
 	src := "FROM scratch\nCMD\n"
@@ -309,14 +276,11 @@ func TestPedanticCmdEntrypoint_WrapsShellFeatures(t *testing.T) {
 // ── lint ─────────────────────────────────────────────────────────────────────
 
 // TestLint verifies that the Dockerfile-specific lint checks work.
-// These are tested via golden files in testdata/lint/.
-// violations.txt is one "line: message" per line; empty means clean.
 func TestLint(t *testing.T) {
-	type lintFn func(src string) []string
-	run := func(src string) []string {
+	lintFn := func(src string) (string, error) {
 		f, err := dockerfile.Parse(src)
 		if err != nil {
-			return nil
+			return "", err
 		}
 		var msgs []string
 		for _, instr := range f.Instructions {
@@ -339,56 +303,13 @@ func TestLint(t *testing.T) {
 				}
 			}
 		}
-		return msgs
+		out := strings.Join(msgs, "\n") + "\n"
+		if out == "\n" {
+			out = ""
+		}
+		return out, nil
 	}
-
-	goldenLint(t, "testdata/lint", ".dockerfile", func(input string) string {
-		msgs := run(input)
-		return strings.Join(msgs, "\n") + "\n"
+	testutil.Golden(t, "testdata/lint", "input.dockerfile", []testutil.Case{
+		{Out: "violations.txt", Fn: lintFn},
 	})
-}
-
-// ── golden helpers ────────────────────────────────────────────────────────────
-
-
-func goldenLint(t *testing.T, dir, inExt string, fn func(string) string) {
-	t.Helper()
-	entries, err := os.ReadDir(dir)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return
-		}
-		t.Fatal(err)
-	}
-	for _, e := range entries {
-		if !e.IsDir() {
-			continue
-		}
-		t.Run(e.Name(), func(t *testing.T) {
-			t.Helper()
-			inPath := filepath.Join(dir, e.Name(), "input"+inExt)
-			outPath := filepath.Join(dir, e.Name(), "violations.txt")
-			in, err := os.ReadFile(inPath)
-			if err != nil {
-				t.Fatalf("read input: %v", err)
-			}
-			got := fn(string(in))
-			if got == "\n" { // normalise "empty" to truly empty
-				got = ""
-			}
-			if *testutil.Update {
-				if err := os.WriteFile(outPath, []byte(got), 0o644); err != nil {
-					t.Fatalf("write golden: %v", err)
-				}
-				return
-			}
-			want, err := os.ReadFile(outPath)
-			if err != nil {
-				t.Fatalf("golden %s missing — run `go test -update` to create it: %v", outPath, err)
-			}
-			if got != string(want) {
-				t.Errorf("lint mismatch for %s\n--- got ---\n%q--- want ---\n%q", e.Name(), got, string(want))
-			}
-		})
-	}
 }

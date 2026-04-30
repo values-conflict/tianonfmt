@@ -36,6 +36,14 @@ testutil.Golden(t, "testdata/format", ".sh", ".sh", func(src string) (string, er
 - Always add both an idempotency test (apply twice, compare) alongside the primary golden test
 - Organize testdata by suite (`format/`, `tidy/`, `pedantic/`, `errors/`, `lint/`) so purpose is obvious from the path
 
+### Minimise the number of distinct input files
+
+**If we can parse it, we can format it, tidy it, and pedantic it.**  Every input that exists should be tested against every applicable transformer.
+
+- **Do not create separate input files per suite.**  `testdata/format/` is the primary home for inputs.  `TestFormat`, `TestTidy`, `TestFormatRoundTrip`, and `TestMarshalAST` all read from `testdata/format/` and write differently-named outputs into the same fixture directory (`output.sh`, `output.tidy.sh`, `ast.json`).
+- **`testdata/tidy/` (and other suite subdirectories) exist only for inputs whose edge case is impossible to express in the format suite.**  If an input could live in `testdata/format/`, it must — a duplicate in `testdata/tidy/` is dead weight.
+- Before adding any new fixture, verify no existing fixture already exercises the same AST paths.  If one does, extend it rather than creating a parallel one.
+
 ### Fixture attribution (`meta.txt`)
 
 Every fixture directory whose input file was copied verbatim from an external source must contain a `meta.txt`:
@@ -50,6 +58,25 @@ Use the full 40-character commit SHA — never a branch ref.  Add a `Note:` line
 For fixtures sourced from `corpus/` or `anticorpus/` (Tianon's own code or Docker official image repos), still include `Source:`.  If the source repo has no license file, write `License: **WARNING:** UNKNOWN` instead of omitting the line.
 
 This convention is enforced by review, not tooling — always add `meta.txt` when copying fixture content from any repo.
+
+### AST design: parser and formatter are separate concerns
+
+**Parsers** and **formatters** must never be conflated.  The parser's job is to capture everything — every syntax form, every comment, every structurally-meaningful choice — into the AST.  The formatter's job is to transform that AST into canonical text, applying style rules.
+
+Concretely:
+
+- An AST node must distinguish syntactically different forms that are semantically equivalent.  For example, `jq.Index.DotAccess` records whether the original source used `."key"` (dot-quoted) vs `.["key"]` (bracket) — both mean the same thing but the AST must remember which was written.
+- **Whitespace** is the one exception: whitespace between tokens is not preserved in the AST.  The formatter applies canonical whitespace.
+- **Comments** must always be preserved in the AST and reproduced faithfully by the formatter.
+- If `format(parse(any_valid_input))` produces output that differs from `format(parse(format(parse(any_valid_input))))`, the AST is incomplete — it dropped information on the first parse.
+
+If you find a valid input where `format(parse(x)) != format(parse(format(parse(x))))`, the AST node for the relevant construct is missing a field.  Add the field to the AST, set it in the parser, and use it in the formatter.
+
+### AST round-trip test
+
+`TestFormatIdempotent` asserts `format(format(input)) == format(input)`.  `TestFormat` asserts `format(input) == golden`.  Together these imply `format(golden) == golden` — the round-trip property — so no separate `TestFormatRoundTrip` is needed.
+
+If the formatter changes something on a second pass, `TestFormatIdempotent` catches it; if it produces wrong output, `TestFormat` catches it.
 
 ### Golden error fixtures
 

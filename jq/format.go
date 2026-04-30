@@ -833,11 +833,23 @@ func (p *printer) indexExpr(v *Index) {
 		}
 	}
 
+	// Non-tidy: preserve the original dot-access form (."key") vs bracket form (.["key"]).
+	if v.DotAccess {
+		if v.Expr != nil {
+			p.node(v.Expr)
+		}
+		p.write(".")
+		p.node(v.Key)
+		if v.Optional {
+			p.write("?")
+		}
+		return
+	}
+
 	if v.Expr != nil {
 		p.node(v.Expr)
 	} else {
-		// nil Expr means the index is on the identity input (e.g. ."foo-bar"
-		// parsed as Index{Expr:nil} — needs the leading dot to form .["foo-bar"]).
+		// nil Expr with bracket notation: .[key] on identity — emit leading dot.
 		p.write(".")
 	}
 	if v.Key == nil {

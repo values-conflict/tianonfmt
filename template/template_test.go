@@ -36,21 +36,10 @@ func realJQFmt(expr string, inline bool) string {
 // ── Format ────────────────────────────────────────────────────────────────────
 
 func TestFormat(t *testing.T) {
-	testutil.Golden(t, "testdata/format", "input.template", "output.template", func(src string) (string, error) {
-		return template.Format(src, realJQFmt), nil
-	})
-}
-
-func TestFormatRoundTrip(t *testing.T) {
-	testutil.Golden(t, "testdata/format", "output.template", "output.template", func(src string) (string, error) {
-		return template.Format(src, realJQFmt), nil
-	})
-}
-
-func TestFormatIdempotent(t *testing.T) {
-	testutil.Golden(t, "testdata/format", "input.template", "output.template", func(src string) (string, error) {
-		first := template.Format(src, realJQFmt)
-		return template.Format(first, realJQFmt), nil
+	testutil.Golden(t, "testdata/format", "input.template", []testutil.Case{
+		{Out: "output.template", Fn: func(src string) (string, error) {
+			return template.Format(src, realJQFmt), nil
+		}, Idem: true},
 	})
 }
 

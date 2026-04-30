@@ -198,10 +198,11 @@ func (f *Field) nodePos() Pos { return f.At }
 
 // Index: expr[key] or .[key] or expr[] or .[]
 type Index struct {
-	At       Pos
-	Expr     Node // nil when standalone e.g. .[0]
-	Key      Node // nil for iterator .[]
-	Optional bool // trailing ?
+	At         Pos
+	Expr       Node // nil when standalone e.g. .[0]
+	Key        Node // nil for iterator .[]
+	Optional   bool // trailing ?
+	DotAccess  bool // written as ."key" or expr."key" (dot-quoted form), not .["key"]
 }
 
 func (i *Index) jqNode()      {}

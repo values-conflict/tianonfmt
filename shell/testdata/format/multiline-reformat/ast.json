@@ -1,0 +1,28 @@
+{
+	"type": "shell",
+	"file": "input.sh",
+	"stmts": [
+		{
+			"type": "call",
+			"args": [
+				"set",
+				"-Eeuo",
+				"pipefail"
+			]
+		},
+		{
+			"type": "call",
+			"assigns": [
+				"json=\"$(jq -n --arg foo \"bar\" --argjson x \"1\" '\n\t{\"foo\": $foo, \"x\": $x}\n\t| .total = (.x + 1)\n')\""
+			],
+			"args": []
+		},
+		{
+			"type": "call",
+			"args": [
+				"echo",
+				"\"$json\""
+			]
+		}
+	]
+}

@@ -1,0 +1,2139 @@
+{
+	"type": "shell",
+	"file": "input.sh",
+	"stmts": [
+		{
+			"type": "call",
+			"args": [
+				"set",
+				"-eu"
+			]
+		},
+		{
+			"type": "funcDecl",
+			"name": "version_greater",
+			"body": {
+				"type": "block",
+				"stmts": [
+					{
+						"type": "call",
+						"args": [
+							"[",
+							"\"$(printf '%s\\n' \"$@\" | sort -t '.' -n -k1,1 -k2,2 -k3,3 -k4,4 | head -n 1)\"",
+							"!=",
+							"\"$1\"",
+							"]"
+						]
+					}
+				]
+			}
+		},
+		{
+			"type": "funcDecl",
+			"name": "directory_empty",
+			"body": {
+				"type": "block",
+				"stmts": [
+					{
+						"type": "call",
+						"args": [
+							"[",
+							"-z",
+							"\"$(ls -A \"$1/\")\"",
+							"]"
+						]
+					}
+				]
+			}
+		},
+		{
+			"type": "funcDecl",
+			"name": "run_as",
+			"body": {
+				"type": "block",
+				"stmts": [
+					{
+						"type": "if",
+						"cond": [
+							{
+								"type": "call",
+								"args": [
+									"[",
+									"\"$(id -u)\"",
+									"=",
+									"0",
+									"]"
+								]
+							}
+						],
+						"then": [
+							{
+								"type": "call",
+								"args": [
+									"su",
+									"-p",
+									"\"$user\"",
+									"-s",
+									"/bin/sh",
+									"-c",
+									"\"$1\""
+								]
+							}
+						],
+						"else": [
+							{
+								"type": "call",
+								"args": [
+									"sh",
+									"-c",
+									"\"$1\""
+								]
+							}
+						]
+					}
+				]
+			}
+		},
+		{
+			"type": "funcDecl",
+			"name": "run_path",
+			"body": {
+				"type": "block",
+				"stmts": [
+					{
+						"type": "call",
+						"args": [
+							"local",
+							"hook_folder_path=\"/docker-entrypoint-hooks.d/$1\""
+						]
+					},
+					{
+						"type": "call",
+						"args": [
+							"local",
+							"found=0"
+						]
+					},
+					{
+						"type": "call",
+						"args": [
+							"echo",
+							"\"=\u003e Searching for hook scripts (*.sh) to run, located in the folder \\\"${hook_folder_path}\\\"\""
+						]
+					},
+					{
+						"type": "if",
+						"cond": [
+							{
+								"type": "binary",
+								"op": "||",
+								"x": {
+									"type": "stmt",
+									"cmd": {
+										"type": "call",
+										"args": [
+											"[",
+											"-d",
+											"\"${hook_folder_path}\"",
+											"]"
+										]
+									},
+									"negated": true
+								},
+								"y": {
+									"type": "call",
+									"args": [
+										"directory_empty",
+										"\"${hook_folder_path}\""
+									]
+								}
+							}
+						],
+						"then": [
+							{
+								"type": "call",
+								"args": [
+									"echo",
+									"\"==\u003e Skipped: the \\\"$1\\\" folder is empty (or does not exist)\""
+								]
+							},
+							{
+								"type": "call",
+								"args": [
+									"return",
+									"0"
+								]
+							}
+						]
+					},
+					{
+						"type": "binary",
+						"op": "|",
+						"x": {
+							"type": "binary",
+							"op": "|",
+							"x": {
+								"type": "call",
+								"args": [
+									"find",
+									"\"${hook_folder_path}\"",
+									"-maxdepth",
+									"1",
+									"-iname",
+									"'*.sh'",
+									"'('",
+									"-type",
+									"f",
+									"-o",
+									"-type",
+									"l",
+									"')'",
+									"-print"
+								]
+							},
+							"y": {
+								"type": "call",
+								"args": [
+									"sort"
+								]
+							}
+						},
+						"y": {
+							"type": "subshell",
+							"stmts": [
+								{
+									"type": "while",
+									"cond": [
+										{
+											"type": "call",
+											"args": [
+												"read",
+												"-r",
+												"script_file_path"
+											]
+										}
+									],
+									"do": [
+										{
+											"type": "if",
+											"cond": [
+												{
+													"type": "stmt",
+													"cmd": {
+														"type": "call",
+														"args": [
+															"[",
+															"-x",
+															"\"${script_file_path}\"",
+															"]"
+														]
+													},
+													"negated": true
+												}
+											],
+											"then": [
+												{
+													"type": "call",
+													"args": [
+														"echo",
+														"\"==\u003e The script \\\"${script_file_path}\\\" was skipped, because it lacks the executable flag\""
+													]
+												},
+												{
+													"type": "call",
+													"args": [
+														"continue"
+													]
+												}
+											]
+										},
+										{
+											"type": "call",
+											"args": [
+												"echo",
+												"\"==\u003e Running the script (cwd: $(pwd)): \\\"${script_file_path}\\\"\""
+											]
+										},
+										{
+											"type": "call",
+											"assigns": [
+												"found=$((found + 1))"
+											],
+											"args": []
+										},
+										{
+											"type": "binary",
+											"op": "||",
+											"x": {
+												"type": "call",
+												"args": [
+													"run_as",
+													"\"${script_file_path}\""
+												]
+											},
+											"y": {
+												"type": "block",
+												"stmts": [
+													{
+														"type": "call",
+														"assigns": [
+															"return_code=\"$?\""
+														],
+														"args": []
+													},
+													{
+														"type": "call",
+														"args": [
+															"echo",
+															"\"==\u003e Failed at executing script \\\"${script_file_path}\\\". Exit code: ${return_code}\""
+														]
+													},
+													{
+														"type": "call",
+														"args": [
+															"exit",
+															"1"
+														]
+													}
+												]
+											}
+										},
+										{
+											"type": "call",
+											"args": [
+												"echo",
+												"\"==\u003e Finished executing the script: \\\"${script_file_path}\\\"\""
+											]
+										}
+									]
+								},
+								{
+									"type": "if",
+									"cond": [
+										{
+											"type": "call",
+											"args": [
+												"[",
+												"\"$found\"",
+												"-gt",
+												"\"0\"",
+												"]"
+											]
+										}
+									],
+									"then": [
+										{
+											"type": "call",
+											"args": [
+												"echo",
+												"\"=\u003e Completed executing scripts in the \\\"$1\\\" folder\""
+											]
+										}
+									],
+									"else": [
+										{
+											"type": "call",
+											"args": [
+												"echo",
+												"\"==\u003e Skipped: the \\\"$1\\\" folder does not contain any valid scripts\""
+											]
+										}
+									]
+								}
+							]
+						}
+					}
+				]
+			}
+		},
+		{
+			"type": "funcDecl",
+			"name": "file_env",
+			"body": {
+				"type": "block",
+				"stmts": [
+					{
+						"type": "call",
+						"args": [
+							"local",
+							"var=\"$1\""
+						]
+					},
+					{
+						"type": "call",
+						"args": [
+							"local",
+							"fileVar=\"${var}_FILE\""
+						]
+					},
+					{
+						"type": "call",
+						"args": [
+							"local",
+							"def=\"${2:-}\""
+						]
+					},
+					{
+						"type": "call",
+						"args": [
+							"local",
+							"varValue=$(env | grep -E \"^${var}=\" | sed -E -e \"s/^${var}=//\")"
+						]
+					},
+					{
+						"type": "call",
+						"args": [
+							"local",
+							"fileVarValue=$(env | grep -E \"^${fileVar}=\" | sed -E -e \"s/^${fileVar}=//\")"
+						]
+					},
+					{
+						"type": "if",
+						"cond": [
+							{
+								"type": "binary",
+								"op": "\u0026\u0026",
+								"x": {
+									"type": "call",
+									"args": [
+										"[",
+										"-n",
+										"\"${varValue}\"",
+										"]"
+									]
+								},
+								"y": {
+									"type": "call",
+									"args": [
+										"[",
+										"-n",
+										"\"${fileVarValue}\"",
+										"]"
+									]
+								}
+							}
+						],
+						"then": [
+							{
+								"type": "stmt",
+								"cmd": {
+									"type": "call",
+									"args": [
+										"echo",
+										"\"error: both $var and $fileVar are set (but are exclusive)\""
+									]
+								},
+								"redirs": [
+									{
+										"op": "\u003e\u0026",
+										"word": "2"
+									}
+								]
+							},
+							{
+								"type": "call",
+								"args": [
+									"exit",
+									"1"
+								]
+							}
+						]
+					},
+					{
+						"type": "if",
+						"cond": [
+							{
+								"type": "call",
+								"args": [
+									"[",
+									"-n",
+									"\"${varValue}\"",
+									"]"
+								]
+							}
+						],
+						"then": [
+							{
+								"type": "call",
+								"args": [
+									"export",
+									"\"$var\"=\"${varValue}\""
+								]
+							}
+						],
+						"elifs": [
+							{
+								"cond": [
+									{
+										"type": "call",
+										"args": [
+											"[",
+											"-n",
+											"\"${fileVarValue}\"",
+											"]"
+										]
+									}
+								],
+								"then": [
+									{
+										"type": "call",
+										"args": [
+											"export",
+											"\"$var\"=\"$(cat \"${fileVarValue}\")\""
+										]
+									}
+								]
+							},
+							{
+								"cond": [
+									{
+										"type": "call",
+										"args": [
+											"[",
+											"-n",
+											"\"${def}\"",
+											"]"
+										]
+									}
+								],
+								"then": [
+									{
+										"type": "call",
+										"args": [
+											"export",
+											"\"$var\"=\"$def\""
+										]
+									}
+								]
+							}
+						]
+					},
+					{
+						"type": "call",
+						"args": [
+							"unset",
+							"\"$fileVar\""
+						]
+					}
+				]
+			}
+		},
+		{
+			"type": "funcDecl",
+			"name": "get_enabled_apps",
+			"body": {
+				"type": "block",
+				"stmts": [
+					{
+						"type": "binary",
+						"op": "|",
+						"x": {
+							"type": "binary",
+							"op": "|",
+							"x": {
+								"type": "binary",
+								"op": "|",
+								"x": {
+									"type": "binary",
+									"op": "|",
+									"x": {
+										"type": "call",
+										"args": [
+											"run_as",
+											"'php /var/www/html/occ app:list'"
+										]
+									},
+									"y": {
+										"type": "call",
+										"args": [
+											"sed",
+											"-n",
+											"'/^Enabled:$/,/^Disabled:$/p'"
+										]
+									}
+								},
+								"y": {
+									"type": "call",
+									"args": [
+										"sed",
+										"'1d;$d'"
+									]
+								}
+							},
+							"y": {
+								"type": "call",
+								"args": [
+									"sed",
+									"-n",
+									"'s/^  - \\([^:]*\\):.*/\\1/p'"
+								]
+							}
+						},
+						"y": {
+							"type": "call",
+							"args": [
+								"sort"
+							]
+						}
+					}
+				]
+			}
+		},
+		{
+			"type": "funcDecl",
+			"name": "configure_redis_session",
+			"body": {
+				"type": "block",
+				"stmts": [
+					{
+						"type": "call",
+						"args": [
+							"local",
+							"redis_save_path"
+						]
+					},
+					{
+						"type": "call",
+						"args": [
+							"local",
+							"redis_auth=''"
+						]
+					},
+					{
+						"type": "call",
+						"args": [
+							"echo",
+							"\"=\u003e Configuring PHP session handler...\""
+						]
+					},
+					{
+						"type": "if",
+						"cond": [
+							{
+								"type": "call",
+								"args": [
+									"[",
+									"-z",
+									"\"${REDIS_HOST:-}\"",
+									"]"
+								]
+							}
+						],
+						"then": [
+							{
+								"type": "call",
+								"args": [
+									"echo",
+									"\"==\u003e Using default PHP session handler\""
+								]
+							},
+							{
+								"type": "call",
+								"args": [
+									"return",
+									"0"
+								]
+							}
+						]
+					},
+					{
+						"type": "call",
+						"args": [
+							"file_env",
+							"REDIS_HOST_PASSWORD"
+						]
+					},
+					{
+						"type": "case",
+						"word": "\"$REDIS_HOST\"",
+						"items": [
+							{
+								"patterns": [
+									"/*"
+								],
+								"stmts": [
+									{
+										"type": "call",
+										"assigns": [
+											"redis_save_path=\"unix://${REDIS_HOST}\""
+										],
+										"args": []
+									}
+								]
+							},
+							{
+								"patterns": [
+									"*"
+								],
+								"stmts": [
+									{
+										"type": "call",
+										"assigns": [
+											"redis_save_path=\"tcp://${REDIS_HOST}:${REDIS_HOST_PORT:=6379}\""
+										],
+										"args": []
+									}
+								]
+							}
+						]
+					},
+					{
+						"type": "if",
+						"cond": [
+							{
+								"type": "binary",
+								"op": "\u0026\u0026",
+								"x": {
+									"type": "call",
+									"args": [
+										"[",
+										"-n",
+										"\"${REDIS_HOST_PASSWORD+x}\"",
+										"]"
+									]
+								},
+								"y": {
+									"type": "call",
+									"args": [
+										"[",
+										"-n",
+										"\"${REDIS_HOST_USER+x}\"",
+										"]"
+									]
+								}
+							}
+						],
+						"then": [
+							{
+								"type": "call",
+								"assigns": [
+									"redis_auth=\"?auth[]=${REDIS_HOST_USER}\u0026auth[]=${REDIS_HOST_PASSWORD}\""
+								],
+								"args": []
+							}
+						],
+						"elifs": [
+							{
+								"cond": [
+									{
+										"type": "call",
+										"args": [
+											"[",
+											"-n",
+											"\"${REDIS_HOST_PASSWORD+x}\"",
+											"]"
+										]
+									}
+								],
+								"then": [
+									{
+										"type": "call",
+										"assigns": [
+											"redis_auth=\"?auth=${REDIS_HOST_PASSWORD}\""
+										],
+										"args": []
+									}
+								]
+							}
+						]
+					},
+					{
+						"type": "call",
+						"args": [
+							"echo",
+							"\"==\u003e Using Redis as PHP session handler...\""
+						]
+					},
+					{
+						"type": "stmt",
+						"cmd": {
+							"type": "block",
+							"stmts": [
+								{
+									"type": "call",
+									"args": [
+										"echo",
+										"'session.save_handler = redis'"
+									]
+								},
+								{
+									"type": "call",
+									"args": [
+										"echo",
+										"\"session.save_path = \\\"${redis_save_path}${redis_auth}\\\"\""
+									]
+								},
+								{
+									"type": "call",
+									"args": [
+										"echo",
+										"\"redis.session.locking_enabled = 1\""
+									]
+								},
+								{
+									"type": "call",
+									"args": [
+										"echo",
+										"\"redis.session.lock_retries = -1\""
+									]
+								},
+								{
+									"type": "call",
+									"args": [
+										"echo",
+										"\"redis.session.lock_wait_time = 10000\""
+									]
+								}
+							]
+						},
+						"redirs": [
+							{
+								"op": "\u003e",
+								"word": "/usr/local/etc/php/conf.d/redis-session.ini"
+							}
+						]
+					}
+				]
+			}
+		},
+		{
+			"type": "if",
+			"cond": [
+				{
+					"type": "stmt",
+					"cmd": {
+						"type": "call",
+						"args": [
+							"expr",
+							"\"$1\"",
+							":",
+							"\"apache\""
+						]
+					},
+					"redirs": [
+						{
+							"op": "\u003e",
+							"word": "/dev/null",
+							"n": "1"
+						}
+					]
+				}
+			],
+			"then": [
+				{
+					"type": "if",
+					"cond": [
+						{
+							"type": "call",
+							"args": [
+								"[",
+								"-n",
+								"\"${APACHE_DISABLE_REWRITE_IP+x}\"",
+								"]"
+							]
+						}
+					],
+					"then": [
+						{
+							"type": "call",
+							"args": [
+								"a2disconf",
+								"remoteip"
+							]
+						}
+					]
+				}
+			]
+		},
+		{
+			"type": "if",
+			"cond": [
+				{
+					"type": "binary",
+					"op": "||",
+					"x": {
+						"type": "binary",
+						"op": "||",
+						"x": {
+							"type": "stmt",
+							"cmd": {
+								"type": "call",
+								"args": [
+									"expr",
+									"\"$1\"",
+									":",
+									"\"apache\""
+								]
+							},
+							"redirs": [
+								{
+									"op": "\u003e",
+									"word": "/dev/null",
+									"n": "1"
+								}
+							]
+						},
+						"y": {
+							"type": "call",
+							"args": [
+								"[",
+								"\"$1\"",
+								"=",
+								"\"php-fpm\"",
+								"]"
+							]
+						}
+					},
+					"y": {
+						"type": "call",
+						"args": [
+							"[",
+							"\"${NEXTCLOUD_UPDATE:-0}\"",
+							"-eq",
+							"1",
+							"]"
+						]
+					}
+				}
+			],
+			"then": [
+				{
+					"type": "call",
+					"assigns": [
+						"uid=\"$(id -u)\""
+					],
+					"args": []
+				},
+				{
+					"type": "call",
+					"assigns": [
+						"gid=\"$(id -g)\""
+					],
+					"args": []
+				},
+				{
+					"type": "if",
+					"cond": [
+						{
+							"type": "call",
+							"args": [
+								"[",
+								"\"$uid\"",
+								"=",
+								"'0'",
+								"]"
+							]
+						}
+					],
+					"then": [
+						{
+							"type": "case",
+							"word": "\"$1\"",
+							"items": [
+								{
+									"patterns": [
+										"apache2*"
+									],
+									"stmts": [
+										{
+											"type": "call",
+											"assigns": [
+												"user=\"${APACHE_RUN_USER:-www-data}\""
+											],
+											"args": []
+										},
+										{
+											"type": "call",
+											"assigns": [
+												"group=\"${APACHE_RUN_GROUP:-www-data}\""
+											],
+											"args": []
+										},
+										{
+											"type": "call",
+											"assigns": [
+												"user=\"${user#'#'}\""
+											],
+											"args": []
+										},
+										{
+											"type": "call",
+											"assigns": [
+												"group=\"${group#'#'}\""
+											],
+											"args": []
+										}
+									]
+								},
+								{
+									"patterns": [
+										"*"
+									],
+									"stmts": [
+										{
+											"type": "call",
+											"assigns": [
+												"user='www-data'"
+											],
+											"args": []
+										},
+										{
+											"type": "call",
+											"assigns": [
+												"group='www-data'"
+											],
+											"args": []
+										}
+									]
+								}
+							]
+						}
+					],
+					"else": [
+						{
+							"type": "call",
+							"assigns": [
+								"user=\"$uid\""
+							],
+							"args": []
+						},
+						{
+							"type": "call",
+							"assigns": [
+								"group=\"$gid\""
+							],
+							"args": []
+						}
+					]
+				},
+				{
+					"type": "call",
+					"args": [
+						"configure_redis_session"
+					]
+				},
+				{
+					"type": "stmt",
+					"cmd": {
+						"type": "subshell",
+						"stmts": [
+							{
+								"type": "if",
+								"cond": [
+									{
+										"type": "stmt",
+										"cmd": {
+											"type": "call",
+											"args": [
+												"flock",
+												"-n",
+												"9"
+											]
+										},
+										"negated": true
+									}
+								],
+								"then": [
+									{
+										"type": "call",
+										"args": [
+											"echo",
+											"\"Another process is initializing Nextcloud. Waiting...\""
+										]
+									},
+									{
+										"type": "call",
+										"args": [
+											"flock",
+											"9"
+										]
+									}
+								]
+							},
+							{
+								"type": "call",
+								"assigns": [
+									"installed_version=\"0.0.0.0\""
+								],
+								"args": []
+							},
+							{
+								"type": "if",
+								"cond": [
+									{
+										"type": "call",
+										"args": [
+											"[",
+											"-f",
+											"/var/www/html/version.php",
+											"]"
+										]
+									}
+								],
+								"then": [
+									{
+										"type": "call",
+										"assigns": [
+											"installed_version=\"$(php -r 'require \"/var/www/html/version.php\"; echo implode(\".\", $OC_Version);')\""
+										],
+										"args": []
+									}
+								]
+							},
+							{
+								"type": "call",
+								"assigns": [
+									"image_version=\"$(php -r 'require \"/usr/src/nextcloud/version.php\"; echo implode(\".\", $OC_Version);')\""
+								],
+								"args": []
+							},
+							{
+								"type": "if",
+								"cond": [
+									{
+										"type": "call",
+										"args": [
+											"version_greater",
+											"\"$installed_version\"",
+											"\"$image_version\""
+										]
+									}
+								],
+								"then": [
+									{
+										"type": "call",
+										"args": [
+											"echo",
+											"\"Can't start Nextcloud because the version of the data ($installed_version) is higher than the docker image version ($image_version) and downgrading is not supported. Are you sure you have pulled the newest image version?\""
+										]
+									},
+									{
+										"type": "call",
+										"args": [
+											"exit",
+											"1"
+										]
+									}
+								]
+							},
+							{
+								"type": "if",
+								"cond": [
+									{
+										"type": "call",
+										"args": [
+											"version_greater",
+											"\"$image_version\"",
+											"\"$installed_version\""
+										]
+									}
+								],
+								"then": [
+									{
+										"type": "call",
+										"args": [
+											"echo",
+											"\"Initializing nextcloud $image_version ...\""
+										]
+									},
+									{
+										"type": "if",
+										"cond": [
+											{
+												"type": "call",
+												"args": [
+													"[",
+													"\"$installed_version\"",
+													"!=",
+													"\"0.0.0.0\"",
+													"]"
+												]
+											}
+										],
+										"then": [
+											{
+												"type": "if",
+												"cond": [
+													{
+														"type": "call",
+														"args": [
+															"[",
+															"\"${image_version%%.*}\"",
+															"-gt",
+															"\"$((${installed_version%%.*} + 1))\"",
+															"]"
+														]
+													}
+												],
+												"then": [
+													{
+														"type": "call",
+														"args": [
+															"echo",
+															"\"Can't start Nextcloud because upgrading from $installed_version to $image_version is not supported.\""
+														]
+													},
+													{
+														"type": "call",
+														"args": [
+															"echo",
+															"\"It is only possible to upgrade one major version at a time. For example, if you want to upgrade from version 14 to 16, you will have to upgrade from version 14 to 15, then from 15 to 16.\""
+														]
+													},
+													{
+														"type": "call",
+														"args": [
+															"exit",
+															"1"
+														]
+													}
+												]
+											},
+											{
+												"type": "call",
+												"args": [
+													"echo",
+													"\"Upgrading nextcloud from $installed_version ...\""
+												]
+											},
+											{
+												"type": "stmt",
+												"cmd": {
+													"type": "call",
+													"args": [
+														"get_enabled_apps"
+													]
+												},
+												"redirs": [
+													{
+														"op": "\u003e",
+														"word": "/tmp/list_before"
+													}
+												]
+											}
+										]
+									},
+									{
+										"type": "if",
+										"cond": [
+											{
+												"type": "call",
+												"args": [
+													"[",
+													"\"$(id -u)\"",
+													"=",
+													"0",
+													"]"
+												]
+											}
+										],
+										"then": [
+											{
+												"type": "call",
+												"assigns": [
+													"rsync_options=\"-rlDog --chown $user:$group\""
+												],
+												"args": []
+											}
+										],
+										"else": [
+											{
+												"type": "call",
+												"assigns": [
+													"rsync_options=\"-rlD\""
+												],
+												"args": []
+											}
+										]
+									},
+									{
+										"type": "call",
+										"args": [
+											"rsync",
+											"$rsync_options",
+											"--delete",
+											"--exclude-from=/upgrade.exclude",
+											"/usr/src/nextcloud/",
+											"/var/www/html/"
+										]
+									},
+									{
+										"type": "for",
+										"loop": {
+											"type": "wordIter",
+											"name": "dir",
+											"items": [
+												"config",
+												"data",
+												"custom_apps",
+												"themes"
+											]
+										},
+										"do": [
+											{
+												"type": "if",
+												"cond": [
+													{
+														"type": "binary",
+														"op": "||",
+														"x": {
+															"type": "call",
+															"args": [
+																"[",
+																"!",
+																"-d",
+																"\"/var/www/html/$dir\"",
+																"]"
+															]
+														},
+														"y": {
+															"type": "call",
+															"args": [
+																"directory_empty",
+																"\"/var/www/html/$dir\""
+															]
+														}
+													}
+												],
+												"then": [
+													{
+														"type": "call",
+														"args": [
+															"rsync",
+															"$rsync_options",
+															"--include",
+															"\"/$dir/\"",
+															"--exclude",
+															"'/*'",
+															"/usr/src/nextcloud/",
+															"/var/www/html/"
+														]
+													}
+												]
+											}
+										]
+									},
+									{
+										"type": "call",
+										"args": [
+											"rsync",
+											"$rsync_options",
+											"--include",
+											"'/version.php'",
+											"--exclude",
+											"'/*'",
+											"/usr/src/nextcloud/",
+											"/var/www/html/"
+										]
+									},
+									{
+										"type": "if",
+										"cond": [
+											{
+												"type": "call",
+												"args": [
+													"[",
+													"\"$installed_version\"",
+													"=",
+													"\"0.0.0.0\"",
+													"]"
+												]
+											}
+										],
+										"then": [
+											{
+												"type": "call",
+												"args": [
+													"echo",
+													"\"New nextcloud instance\""
+												]
+											},
+											{
+												"type": "call",
+												"args": [
+													"file_env",
+													"NEXTCLOUD_ADMIN_PASSWORD"
+												]
+											},
+											{
+												"type": "call",
+												"args": [
+													"file_env",
+													"NEXTCLOUD_ADMIN_USER"
+												]
+											},
+											{
+												"type": "call",
+												"assigns": [
+													"install=false"
+												],
+												"args": []
+											},
+											{
+												"type": "if",
+												"cond": [
+													{
+														"type": "binary",
+														"op": "\u0026\u0026",
+														"x": {
+															"type": "call",
+															"args": [
+																"[",
+																"-n",
+																"\"${NEXTCLOUD_ADMIN_USER+x}\"",
+																"]"
+															]
+														},
+														"y": {
+															"type": "call",
+															"args": [
+																"[",
+																"-n",
+																"\"${NEXTCLOUD_ADMIN_PASSWORD+x}\"",
+																"]"
+															]
+														}
+													}
+												],
+												"then": [
+													{
+														"type": "call",
+														"assigns": [
+															"install_options='-n --admin-user \"$NEXTCLOUD_ADMIN_USER\" --admin-pass \"$NEXTCLOUD_ADMIN_PASSWORD\"'"
+														],
+														"args": []
+													},
+													{
+														"type": "if",
+														"cond": [
+															{
+																"type": "call",
+																"args": [
+																	"[",
+																	"-n",
+																	"\"${NEXTCLOUD_DATA_DIR+x}\"",
+																	"]"
+																]
+															}
+														],
+														"then": [
+															{
+																"type": "call",
+																"assigns": [
+																	"install_options=$install_options' --data-dir \"$NEXTCLOUD_DATA_DIR\"'"
+																],
+																"args": []
+															}
+														]
+													},
+													{
+														"type": "call",
+														"args": [
+															"file_env",
+															"MYSQL_DATABASE"
+														]
+													},
+													{
+														"type": "call",
+														"args": [
+															"file_env",
+															"MYSQL_PASSWORD"
+														]
+													},
+													{
+														"type": "call",
+														"args": [
+															"file_env",
+															"MYSQL_USER"
+														]
+													},
+													{
+														"type": "call",
+														"args": [
+															"file_env",
+															"POSTGRES_DB"
+														]
+													},
+													{
+														"type": "call",
+														"args": [
+															"file_env",
+															"POSTGRES_PASSWORD"
+														]
+													},
+													{
+														"type": "call",
+														"args": [
+															"file_env",
+															"POSTGRES_USER"
+														]
+													},
+													{
+														"type": "if",
+														"cond": [
+															{
+																"type": "call",
+																"args": [
+																	"[",
+																	"-n",
+																	"\"${SQLITE_DATABASE+x}\"",
+																	"]"
+																]
+															}
+														],
+														"then": [
+															{
+																"type": "call",
+																"args": [
+																	"echo",
+																	"\"Installing with SQLite database\""
+																]
+															},
+															{
+																"type": "call",
+																"assigns": [
+																	"install_options=$install_options' --database-name \"$SQLITE_DATABASE\"'"
+																],
+																"args": []
+															},
+															{
+																"type": "call",
+																"assigns": [
+																	"install=true"
+																],
+																"args": []
+															}
+														],
+														"elifs": [
+															{
+																"cond": [
+																	{
+																		"type": "binary",
+																		"op": "\u0026\u0026",
+																		"x": {
+																			"type": "binary",
+																			"op": "\u0026\u0026",
+																			"x": {
+																				"type": "binary",
+																				"op": "\u0026\u0026",
+																				"x": {
+																					"type": "call",
+																					"args": [
+																						"[",
+																						"-n",
+																						"\"${MYSQL_DATABASE+x}\"",
+																						"]"
+																					]
+																				},
+																				"y": {
+																					"type": "call",
+																					"args": [
+																						"[",
+																						"-n",
+																						"\"${MYSQL_USER+x}\"",
+																						"]"
+																					]
+																				}
+																			},
+																			"y": {
+																				"type": "call",
+																				"args": [
+																					"[",
+																					"-n",
+																					"\"${MYSQL_PASSWORD+x}\"",
+																					"]"
+																				]
+																			}
+																		},
+																		"y": {
+																			"type": "call",
+																			"args": [
+																				"[",
+																				"-n",
+																				"\"${MYSQL_HOST+x}\"",
+																				"]"
+																			]
+																		}
+																	}
+																],
+																"then": [
+																	{
+																		"type": "call",
+																		"args": [
+																			"echo",
+																			"\"Installing with MySQL database\""
+																		]
+																	},
+																	{
+																		"type": "call",
+																		"assigns": [
+																			"install_options=$install_options' --database mysql --database-name \"$MYSQL_DATABASE\" --database-user \"$MYSQL_USER\" --database-pass \"$MYSQL_PASSWORD\" --database-host \"$MYSQL_HOST\"'"
+																		],
+																		"args": []
+																	},
+																	{
+																		"type": "call",
+																		"assigns": [
+																			"install=true"
+																		],
+																		"args": []
+																	}
+																]
+															},
+															{
+																"cond": [
+																	{
+																		"type": "binary",
+																		"op": "\u0026\u0026",
+																		"x": {
+																			"type": "binary",
+																			"op": "\u0026\u0026",
+																			"x": {
+																				"type": "binary",
+																				"op": "\u0026\u0026",
+																				"x": {
+																					"type": "call",
+																					"args": [
+																						"[",
+																						"-n",
+																						"\"${POSTGRES_DB+x}\"",
+																						"]"
+																					]
+																				},
+																				"y": {
+																					"type": "call",
+																					"args": [
+																						"[",
+																						"-n",
+																						"\"${POSTGRES_USER+x}\"",
+																						"]"
+																					]
+																				}
+																			},
+																			"y": {
+																				"type": "call",
+																				"args": [
+																					"[",
+																					"-n",
+																					"\"${POSTGRES_PASSWORD+x}\"",
+																					"]"
+																				]
+																			}
+																		},
+																		"y": {
+																			"type": "call",
+																			"args": [
+																				"[",
+																				"-n",
+																				"\"${POSTGRES_HOST+x}\"",
+																				"]"
+																			]
+																		}
+																	}
+																],
+																"then": [
+																	{
+																		"type": "call",
+																		"args": [
+																			"echo",
+																			"\"Installing with PostgreSQL database\""
+																		]
+																	},
+																	{
+																		"type": "call",
+																		"assigns": [
+																			"install_options=$install_options' --database pgsql --database-name \"$POSTGRES_DB\" --database-user \"$POSTGRES_USER\" --database-pass \"$POSTGRES_PASSWORD\" --database-host \"$POSTGRES_HOST\"'"
+																		],
+																		"args": []
+																	},
+																	{
+																		"type": "call",
+																		"assigns": [
+																			"install=true"
+																		],
+																		"args": []
+																	}
+																]
+															}
+														]
+													},
+													{
+														"type": "if",
+														"cond": [
+															{
+																"type": "call",
+																"args": [
+																	"[",
+																	"\"$install\"",
+																	"=",
+																	"true",
+																	"]"
+																]
+															}
+														],
+														"then": [
+															{
+																"type": "call",
+																"args": [
+																	"run_path",
+																	"pre-installation"
+																]
+															},
+															{
+																"type": "call",
+																"args": [
+																	"echo",
+																	"\"Starting nextcloud installation\""
+																]
+															},
+															{
+																"type": "call",
+																"assigns": [
+																	"max_retries=10"
+																],
+																"args": []
+															},
+															{
+																"type": "call",
+																"assigns": [
+																	"try=0"
+																],
+																"args": []
+															},
+															{
+																"type": "until",
+																"cond": [
+																	{
+																		"type": "binary",
+																		"op": "||",
+																		"x": {
+																			"type": "call",
+																			"args": [
+																				"[",
+																				"\"$try\"",
+																				"-gt",
+																				"\"$max_retries\"",
+																				"]"
+																			]
+																		},
+																		"y": {
+																			"type": "call",
+																			"args": [
+																				"run_as",
+																				"\"php /var/www/html/occ maintenance:install $install_options\""
+																			]
+																		}
+																	}
+																],
+																"do": [
+																	{
+																		"type": "call",
+																		"args": [
+																			"echo",
+																			"\"Retrying install...\""
+																		]
+																	},
+																	{
+																		"type": "call",
+																		"assigns": [
+																			"try=$((try + 1))"
+																		],
+																		"args": []
+																	},
+																	{
+																		"type": "call",
+																		"args": [
+																			"sleep",
+																			"10s"
+																		]
+																	}
+																]
+															},
+															{
+																"type": "if",
+																"cond": [
+																	{
+																		"type": "call",
+																		"args": [
+																			"[",
+																			"\"$try\"",
+																			"-gt",
+																			"\"$max_retries\"",
+																			"]"
+																		]
+																	}
+																],
+																"then": [
+																	{
+																		"type": "call",
+																		"args": [
+																			"echo",
+																			"\"Installing of nextcloud failed!\""
+																		]
+																	},
+																	{
+																		"type": "call",
+																		"args": [
+																			"exit",
+																			"1"
+																		]
+																	}
+																]
+															},
+															{
+																"type": "if",
+																"cond": [
+																	{
+																		"type": "call",
+																		"args": [
+																			"[",
+																			"-n",
+																			"\"${NEXTCLOUD_TRUSTED_DOMAINS+x}\"",
+																			"]"
+																		]
+																	}
+																],
+																"then": [
+																	{
+																		"type": "call",
+																		"args": [
+																			"echo",
+																			"\"Setting trusted domains…\""
+																		]
+																	},
+																	{
+																		"type": "call",
+																		"args": [
+																			"set",
+																			"-f"
+																		]
+																	},
+																	{
+																		"type": "call",
+																		"assigns": [
+																			"NC_TRUSTED_DOMAIN_IDX=1"
+																		],
+																		"args": []
+																	},
+																	{
+																		"type": "for",
+																		"loop": {
+																			"type": "wordIter",
+																			"name": "DOMAIN",
+																			"items": [
+																				"${NEXTCLOUD_TRUSTED_DOMAINS}"
+																			]
+																		},
+																		"do": [
+																			{
+																				"type": "call",
+																				"assigns": [
+																					"DOMAIN=$(echo \"${DOMAIN}\" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
+																				],
+																				"args": []
+																			},
+																			{
+																				"type": "call",
+																				"args": [
+																					"run_as",
+																					"\"php /var/www/html/occ config:system:set trusted_domains $NC_TRUSTED_DOMAIN_IDX --value=\\\"${DOMAIN}\\\"\""
+																				]
+																			},
+																			{
+																				"type": "call",
+																				"assigns": [
+																					"NC_TRUSTED_DOMAIN_IDX=$((NC_TRUSTED_DOMAIN_IDX + 1))"
+																				],
+																				"args": []
+																			}
+																		]
+																	},
+																	{
+																		"type": "call",
+																		"args": [
+																			"set",
+																			"+f"
+																		]
+																	}
+																]
+															},
+															{
+																"type": "call",
+																"args": [
+																	"run_path",
+																	"post-installation"
+																]
+															}
+														]
+													}
+												]
+											},
+											{
+												"type": "if",
+												"cond": [
+													{
+														"type": "call",
+														"args": [
+															"[",
+															"\"$install\"",
+															"=",
+															"false",
+															"]"
+														]
+													}
+												],
+												"then": [
+													{
+														"type": "call",
+														"args": [
+															"echo",
+															"\"Next step: Access your instance to finish the web-based installation!\""
+														]
+													},
+													{
+														"type": "call",
+														"args": [
+															"echo",
+															"\"Hint: You can specify NEXTCLOUD_ADMIN_USER and NEXTCLOUD_ADMIN_PASSWORD and the database variables _prior to first launch_ to fully automate initial installation.\""
+														]
+													}
+												]
+											}
+										],
+										"else": [
+											{
+												"type": "call",
+												"args": [
+													"run_path",
+													"pre-upgrade"
+												]
+											},
+											{
+												"type": "call",
+												"args": [
+													"run_as",
+													"'php /var/www/html/occ upgrade'"
+												]
+											},
+											{
+												"type": "stmt",
+												"cmd": {
+													"type": "call",
+													"args": [
+														"get_enabled_apps"
+													]
+												},
+												"redirs": [
+													{
+														"op": "\u003e",
+														"word": "/tmp/list_after"
+													}
+												]
+											},
+											{
+												"type": "call",
+												"assigns": [
+													"disabled_apps=\"$(comm -23 /tmp/list_before /tmp/list_after || true)\""
+												],
+												"args": []
+											},
+											{
+												"type": "if",
+												"cond": [
+													{
+														"type": "call",
+														"args": [
+															"[",
+															"-n",
+															"\"$disabled_apps\"",
+															"]"
+														]
+													}
+												],
+												"then": [
+													{
+														"type": "call",
+														"args": [
+															"echo",
+															"\"The following apps have been disabled:\""
+														]
+													},
+													{
+														"type": "call",
+														"args": [
+															"printf",
+															"'%s\\n'",
+															"\"$disabled_apps\""
+														]
+													}
+												]
+											},
+											{
+												"type": "call",
+												"args": [
+													"rm",
+													"-f",
+													"/tmp/list_before",
+													"/tmp/list_after"
+												]
+											},
+											{
+												"type": "call",
+												"args": [
+													"run_path",
+													"post-upgrade"
+												]
+											}
+										]
+									},
+									{
+										"type": "call",
+										"args": [
+											"echo",
+											"\"Initializing finished\""
+										]
+									}
+								]
+							},
+							{
+								"type": "if",
+								"cond": [
+									{
+										"type": "binary",
+										"op": "\u0026\u0026",
+										"x": {
+											"type": "call",
+											"args": [
+												"[",
+												"-n",
+												"\"${NEXTCLOUD_INIT_HTACCESS+x}\"",
+												"]"
+											]
+										},
+										"y": {
+											"type": "call",
+											"args": [
+												"[",
+												"\"$installed_version\"",
+												"!=",
+												"\"0.0.0.0\"",
+												"]"
+											]
+										}
+									}
+								],
+								"then": [
+									{
+										"type": "call",
+										"args": [
+											"run_as",
+											"'php /var/www/html/occ maintenance:update:htaccess'"
+										]
+									}
+								]
+							}
+						]
+					},
+					"redirs": [
+						{
+							"op": "\u003e",
+							"word": "/var/www/html/nextcloud-init-sync.lock",
+							"n": "9"
+						}
+					]
+				},
+				{
+					"type": "for",
+					"loop": {
+						"type": "wordIter",
+						"name": "cfgPath",
+						"items": [
+							"/usr/src/nextcloud/config/*.php"
+						]
+					},
+					"do": [
+						{
+							"type": "call",
+							"assigns": [
+								"cfgFile=$(basename \"$cfgPath\")"
+							],
+							"args": []
+						},
+						{
+							"type": "if",
+							"cond": [
+								{
+									"type": "binary",
+									"op": "\u0026\u0026",
+									"x": {
+										"type": "call",
+										"args": [
+											"[",
+											"\"$cfgFile\"",
+											"!=",
+											"\"config.sample.php\"",
+											"]"
+										]
+									},
+									"y": {
+										"type": "call",
+										"args": [
+											"[",
+											"\"$cfgFile\"",
+											"!=",
+											"\"autoconfig.php\"",
+											"]"
+										]
+									}
+								}
+							],
+							"then": [
+								{
+									"type": "if",
+									"cond": [
+										{
+											"type": "stmt",
+											"cmd": {
+												"type": "call",
+												"args": [
+													"cmp",
+													"-s",
+													"\"/usr/src/nextcloud/config/$cfgFile\"",
+													"\"/var/www/html/config/$cfgFile\""
+												]
+											},
+											"negated": true
+										}
+									],
+									"then": [
+										{
+											"type": "call",
+											"args": [
+												"echo",
+												"\"Warning: /var/www/html/config/$cfgFile differs from the latest version of this image at /usr/src/nextcloud/config/$cfgFile\""
+											]
+										}
+									]
+								}
+							]
+						}
+					]
+				},
+				{
+					"type": "call",
+					"args": [
+						"run_path",
+						"before-starting"
+					]
+				}
+			]
+		},
+		{
+			"type": "call",
+			"args": [
+				"exec",
+				"\"$@\""
+			]
+		}
+	]
+}
