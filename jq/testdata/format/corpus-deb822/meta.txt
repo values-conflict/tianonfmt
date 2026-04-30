@@ -1,0 +1,3 @@
+Source: https://github.com/tianon/debian-bin/blob/d508ea34f15e88b8ac63d71ffb1938fccbc21206/jq/deb822.jq
+License: **WARNING:** UNKNOWN
+Note: fixture is an older snapshot (deb822_stream only; later commits added filter_inline_pgp_noise and deb822_parse); exact source commit not found in local clone

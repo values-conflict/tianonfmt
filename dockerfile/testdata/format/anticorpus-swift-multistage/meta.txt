@@ -1,0 +1,2 @@
+Source: https://github.com/apple/swift-docker/blob/bff66a4644f3957293711c8a841a10e0d00ea0b3/nightly-main/ubuntu/24.04/buildx/Dockerfile
+License: Apache-2.0

@@ -1,0 +1,2 @@
+Source: https://github.com/docker-library/meta-scripts/blob/e583a5f26710ccc23ec91979e0f948f759819c64/meta.jq
+License: Apache-2.0

@@ -1,0 +1,2 @@
+Source: https://github.com/joomla-docker/docker-joomla/blob/562e0feb6f118eb87010ece972df7c720ab8a6a5/generate-stackbrew-library.sh
+License: GPL-2

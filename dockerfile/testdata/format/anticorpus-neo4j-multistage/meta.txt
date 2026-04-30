@@ -1,0 +1,2 @@
+Source: https://github.com/neo4j/docker-neo4j-publish/blob/ae06064fb16112cbf1fd11ed327240dfc27d3d5c/5.26.0/bullseye/enterprise/Dockerfile
+License: Apache-2.0

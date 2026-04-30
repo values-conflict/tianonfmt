@@ -1,0 +1,2 @@
+Source: https://github.com/ibmruntimes/semeru-containers/blob/4057e69e89925f546a1f7d2d7e0015d90124cd3d/11/jre/windows/windowsservercore-ltsc2016/Dockerfile.open.releases.full
+License: Apache-2.0

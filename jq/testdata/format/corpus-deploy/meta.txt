@@ -1,0 +1,2 @@
+Source: https://github.com/docker-library/meta-scripts/blob/e48b7063a1567ccb30e23de591c5dc863ebe5c29/deploy.jq
+License: Apache-2.0
