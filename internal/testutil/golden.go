@@ -67,14 +67,14 @@ func Golden(t *testing.T, dir, in string, cases []Case) {
 				}
 				t.Run(name, func(t *testing.T) {
 					t.Helper()
-					runCase(t, filepath.Join(dir, e.Name()), string(src), c)
+					runCase(t, filepath.Join(dir, e.Name()), in, string(src), c)
 				})
 			}
 		})
 	}
 }
 
-func runCase(t *testing.T, fixtureDir, src string, c Case) {
+func runCase(t *testing.T, fixtureDir, inFile, src string, c Case) {
 	t.Helper()
 	errPath := filepath.Join(fixtureDir, "error.txt")
 
@@ -124,8 +124,17 @@ func runCase(t *testing.T, fixtureDir, src string, c Case) {
 	}
 
 	if *Update {
-		if err := os.WriteFile(outPath, []byte(got), 0o644); err != nil {
-			t.Fatalf("write golden: %v", err)
+		os.Remove(outPath)
+		if got == src {
+			// Output is identical to input: use a symlink so it's obvious
+			// that this formatter makes no changes to this input.
+			if err := os.Symlink(inFile, outPath); err != nil {
+				t.Fatalf("symlink golden: %v", err)
+			}
+		} else {
+			if err := os.WriteFile(outPath, []byte(got), 0o644); err != nil {
+				t.Fatalf("write golden: %v", err)
+			}
 		}
 		return
 	}
