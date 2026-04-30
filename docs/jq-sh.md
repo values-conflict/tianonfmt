@@ -210,6 +210,16 @@ Corpus ref: [`tianon-dockerfiles/.github/workflows/update.yml#L31-L47`](https://
 | `include` | At top of file | Via `-L dir 'include "module"; ...'` |
 | Input | Via `inputs`, `input`, filters | Via here-string `<<<` or `-f file` |
 
+## Formatter behaviour
+
+When `tianonfmt` formats a shell script, it also reformats any jq expressions it finds inside `jq '...'` invocations:
+
+- **Single-line expressions** are kept on one line and formatted compactly (e.g. quoted object keys are unquoted: `'{"foo": .bar}'` → `'{foo: .bar}'`).
+- **Multi-line expressions** (opening `'` followed by a newline) are reformatted using the same rules as standalone `.jq` files, then re-indented to match the surrounding shell indentation.
+- If a jq expression cannot be parsed (e.g. it uses unknown syntax), it is left unchanged.
+
+Detection heuristic: the formatter recognises `jq '...'` calls where the last non-flag, non-value-flag argument is a single-quoted string.  Value flags (`--arg`, `--argjson`, `--slurpfile`, `--rawfile`, `-f`) consume their following arguments and are skipped.  The last remaining single-quoted argument is treated as the filter expression.
+
 ## Notable omissions
 
 Things Tianon **never** does when embedding jq in shell:

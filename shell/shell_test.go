@@ -10,9 +10,27 @@ import (
 
 	"github.com/tianon/fmt/tianonfmt/internal/testutil"
 
+	"github.com/tianon/fmt/tianonfmt/jq"
 	"github.com/tianon/fmt/tianonfmt/shell"
 	"mvdan.cc/sh/v3/syntax"
 )
+
+// realJQFmt mirrors jqFmtFunc from cmd/tianonfmt: parse and re-format jq
+// expressions found embedded in shell scripts.
+func realJQFmt(expr string, inline bool) string {
+	node, err := jq.ParseExpr(strings.TrimSpace(expr))
+	if err != nil {
+		f, ferr := jq.ParseFile(strings.TrimSpace(expr))
+		if ferr != nil {
+			return ""
+		}
+		return jq.FormatFile(f)
+	}
+	if inline {
+		return jq.FormatNodeInline(node)
+	}
+	return jq.FormatNode(node)
+}
 
 
 func TestMain(m *testing.M) {
@@ -31,6 +49,25 @@ func TestParseErrors(t *testing.T) {
 }
 
 // ── format ────────────────────────────────────────────────────────────────────
+
+// TestFormatWithJQ exercises jq expression reformatting inside shell scripts
+// (the formatJQInAST / reformatSglQuoted code paths), which the nil-jqFmt
+// golden tests cannot reach.
+func TestFormatWithJQ(t *testing.T) {
+	testutil.Golden(t, "testdata/format-with-jq", "input.sh", "output.sh", func(src string) (string, error) {
+		return shell.Format(src, shell.DetectLang(src), realJQFmt)
+	})
+}
+
+func TestFormatWithJQIdempotent(t *testing.T) {
+	testutil.Golden(t, "testdata/format-with-jq", "input.sh", "output.sh", func(src string) (string, error) {
+		first, err := shell.Format(src, shell.DetectLang(src), realJQFmt)
+		if err != nil {
+			return "", err
+		}
+		return shell.Format(first, shell.DetectLang(first), realJQFmt)
+	})
+}
 
 func TestFormat(t *testing.T) {
 	testutil.Golden(t, "testdata/format", "input.sh", "output.sh", func(input string) (string, error) {

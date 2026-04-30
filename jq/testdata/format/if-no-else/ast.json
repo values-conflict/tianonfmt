@@ -1,0 +1,36 @@
+{
+	"type": "jq",
+	"query": {
+		"type": "pipe",
+		"left": {
+			"type": "if",
+			"cond": {
+				"type": "field",
+				"name": ".enabled"
+			},
+			"then": {
+				"type": "field",
+				"name": ".value"
+			}
+		},
+		"right": {
+			"type": "if",
+			"cond": {
+				"type": "binOp",
+				"op": "\u003e",
+				"left": {
+					"type": "field",
+					"name": ".x"
+				},
+				"right": {
+					"type": "number",
+					"raw": "0"
+				}
+			},
+			"then": {
+				"type": "string",
+				"raw": "\"positive\""
+			}
+		}
+	}
+}

@@ -1,0 +1,232 @@
+{
+	"type": "jq",
+	"query": {
+		"type": "pipe",
+		"left": {
+			"type": "binOp",
+			"op": "|=",
+			"left": {
+				"type": "field",
+				"name": ".a"
+			},
+			"right": {
+				"type": "binOp",
+				"op": "+",
+				"left": {
+					"type": "identity"
+				},
+				"right": {
+					"type": "number",
+					"raw": "1"
+				}
+			}
+		},
+		"right": {
+			"type": "pipe",
+			"left": {
+				"type": "binOp",
+				"op": "+=",
+				"left": {
+					"type": "field",
+					"name": ".b"
+				},
+				"right": {
+					"type": "number",
+					"raw": "10"
+				}
+			},
+			"right": {
+				"type": "pipe",
+				"left": {
+					"type": "binOp",
+					"op": "-=",
+					"left": {
+						"type": "field",
+						"name": ".c"
+					},
+					"right": {
+						"type": "number",
+						"raw": "1"
+					}
+				},
+				"right": {
+					"type": "pipe",
+					"left": {
+						"type": "binOp",
+						"op": "*=",
+						"left": {
+							"type": "field",
+							"name": ".d"
+						},
+						"right": {
+							"type": "number",
+							"raw": "2"
+						}
+					},
+					"right": {
+						"type": "pipe",
+						"left": {
+							"type": "binOp",
+							"op": "/=",
+							"left": {
+								"type": "field",
+								"name": ".e"
+							},
+							"right": {
+								"type": "number",
+								"raw": "4"
+							}
+						},
+						"right": {
+							"type": "pipe",
+							"left": {
+								"type": "binOp",
+								"op": "%=",
+								"left": {
+									"type": "field",
+									"name": ".f"
+								},
+								"right": {
+									"type": "number",
+									"raw": "3"
+								}
+							},
+							"right": {
+								"type": "pipe",
+								"left": {
+									"type": "binOp",
+									"op": "//=",
+									"left": {
+										"type": "field",
+										"name": ".g"
+									},
+									"right": {
+										"type": "string",
+										"raw": "\"default\""
+									}
+								},
+								"right": {
+									"type": "pipe",
+									"left": {
+										"type": "binOp",
+										"op": "!=",
+										"left": {
+											"type": "field",
+											"name": ".h"
+										},
+										"right": {
+											"type": "field",
+											"name": ".i"
+										}
+									},
+									"right": {
+										"type": "pipe",
+										"left": {
+											"type": "binOp",
+											"op": "\u003c",
+											"left": {
+												"type": "field",
+												"name": ".j"
+											},
+											"right": {
+												"type": "field",
+												"name": ".k"
+											}
+										},
+										"right": {
+											"type": "pipe",
+											"left": {
+												"type": "binOp",
+												"op": "\u003c=",
+												"left": {
+													"type": "field",
+													"name": ".l"
+												},
+												"right": {
+													"type": "field",
+													"name": ".m"
+												}
+											},
+											"right": {
+												"type": "pipe",
+												"left": {
+													"type": "binOp",
+													"op": "\u003e",
+													"left": {
+														"type": "field",
+														"name": ".n"
+													},
+													"right": {
+														"type": "field",
+														"name": ".o"
+													}
+												},
+												"right": {
+													"type": "pipe",
+													"left": {
+														"type": "binOp",
+														"op": "\u003e=",
+														"left": {
+															"type": "field",
+															"name": ".p"
+														},
+														"right": {
+															"type": "field",
+															"name": ".q"
+														}
+													},
+													"right": {
+														"type": "pipe",
+														"left": {
+															"type": "binOp",
+															"op": "and",
+															"left": {
+																"type": "field",
+																"name": ".r"
+															},
+															"right": {
+																"type": "field",
+																"name": ".s"
+															}
+														},
+														"right": {
+															"type": "pipe",
+															"left": {
+																"type": "binOp",
+																"op": "or",
+																"left": {
+																	"type": "field",
+																	"name": ".t"
+																},
+																"right": {
+																	"type": "field",
+																	"name": ".u"
+																}
+															},
+															"right": {
+																"type": "binOp",
+																"op": "?//",
+																"left": {
+																	"type": "field",
+																	"name": ".v"
+																},
+																"right": {
+																	"type": "field",
+																	"name": ".w"
+																}
+															}
+														}
+													}
+												}
+											}
+										}
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+}
