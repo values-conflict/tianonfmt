@@ -1,0 +1,703 @@
+{
+	"type": "jq",
+	"imports": [
+		{
+			"type": "import",
+			"include": true,
+			"path": "\"oci\""
+		}
+	],
+	"funcDefs": [
+		{
+			"type": "funcDef",
+			"name": "tagged_manifests",
+			"params": [
+				"builds_selector",
+				"tags_extractor"
+			],
+			"leadingComments": [
+				"# input: array of \"build\" objects (with \"buildId\" top level keys)",
+				"# output: map of { \"tag\": [ list of OCI descriptors ], ... }"
+			],
+			"body": {
+				"type": "reduce",
+				"expr": {
+					"type": "paren",
+					"expr": {
+						"type": "pipe",
+						"left": {
+							"type": "index",
+							"expr": {
+								"type": "identity"
+							}
+						},
+						"right": {
+							"type": "call",
+							"name": "select",
+							"args": [
+								{
+									"type": "binOp",
+									"op": "and",
+									"left": {
+										"type": "binOp",
+										"op": "",
+										"left": {
+											"type": "field",
+											"name": ".build"
+										},
+										"right": {
+											"type": "field",
+											"name": ".resolved"
+										}
+									},
+									"right": {
+										"type": "call",
+										"name": "builds_selector"
+									}
+								}
+							]
+						}
+					}
+				},
+				"pattern": {
+					"type": "var",
+					"name": "$i"
+				},
+				"init": {
+					"type": "object",
+					"fields": []
+				},
+				"update": {
+					"type": "binOp",
+					"op": "+=",
+					"left": {
+						"type": "index",
+						"expr": {
+							"type": "identity"
+						},
+						"key": {
+							"type": "pipe",
+							"left": {
+								"type": "var",
+								"name": "$i"
+							},
+							"right": {
+								"type": "pipe",
+								"left": {
+									"type": "call",
+									"name": "tags_extractor"
+								},
+								"right": {
+									"type": "pipe",
+									"left": {
+										"type": "recurse"
+									},
+									"right": {
+										"type": "commented",
+										"expr": {
+											"type": "call",
+											"name": "strings"
+										},
+										"trailingComment": "# no matter what \"tags_extractor\" gives us, this will flatten us to a stream of strings"
+									}
+								}
+							}
+						}
+					},
+					"right": {
+						"type": "array",
+						"elem": {
+							"type": "pipe",
+							"left": {
+								"type": "commented",
+								"leadingComments": [
+									"# as an extra protection against cross-architecture \"bleeding\" (\"riscv64\" infra pushing \"amd64\" images, for example), filter the list of manifests to those whose architecture matches the architecture it is supposed to be for",
+									"# to be explicitly clear, this filtering is *also* done as part of our \"builds.json\" generation, so this is an added layer of best-effort protection that will be especially important to preserve and/or replicate if/when we solve the \"not built yet so include the previous contents of the tag\" portion of the problem at this layer instead of in the currently-separate put-shared process"
+								],
+								"expr": {
+									"type": "index",
+									"expr": {
+										"type": "binOp",
+										"op": "",
+										"left": {
+											"type": "binOp",
+											"op": "",
+											"left": {
+												"type": "binOp",
+												"op": "",
+												"left": {
+													"type": "var",
+													"name": "$i"
+												},
+												"right": {
+													"type": "field",
+													"name": ".build"
+												}
+											},
+											"right": {
+												"type": "field",
+												"name": ".resolved"
+											}
+										},
+										"right": {
+											"type": "field",
+											"name": ".manifests"
+										}
+									}
+								}
+							},
+							"right": {
+								"type": "commented",
+								"expr": {
+									"type": "call",
+									"name": "select",
+									"args": [
+										{
+											"type": "binOp",
+											"op": "//",
+											"left": {
+												"type": "index",
+												"expr": {
+													"type": "field",
+													"name": ".annotations"
+												},
+												"key": {
+													"type": "string",
+													"raw": "\"com.docker.official-images.bashbrew.arch\""
+												}
+											},
+											"right": {
+												"type": "binOp",
+												"op": "==",
+												"left": {
+													"type": "string",
+													"raw": "\"\""
+												},
+												"right": {
+													"type": "binOp",
+													"op": "",
+													"left": {
+														"type": "binOp",
+														"op": "",
+														"left": {
+															"type": "var",
+															"name": "$i"
+														},
+														"right": {
+															"type": "field",
+															"name": ".build"
+														}
+													},
+													"right": {
+														"type": "field",
+														"name": ".arch"
+													}
+												}
+											}
+										}
+									]
+								},
+								"trailingComment": "# this assumes \"registry.SynthesizeIndex\" created this list of manifests (because it sets this annotation), but it would be reasonable for us to reimplement that conversion of \"OCI platform object\" to \"bashbrew architecture\" in pure jq if it was prudent or necessary to do so"
+							}
+						}
+					}
+				}
+			}
+		},
+		{
+			"type": "funcDef",
+			"name": "arch_tagged_manifests",
+			"params": [
+				"$arch"
+			],
+			"body": {
+				"type": "call",
+				"name": "tagged_manifests",
+				"args": [
+					{
+						"type": "binOp",
+						"op": "==",
+						"left": {
+							"type": "binOp",
+							"op": "",
+							"left": {
+								"type": "field",
+								"name": ".build"
+							},
+							"right": {
+								"type": "field",
+								"name": ".arch"
+							}
+						},
+						"right": {
+							"type": "var",
+							"name": "$arch"
+						}
+					},
+					{
+						"type": "binOp",
+						"op": "",
+						"left": {
+							"type": "index",
+							"expr": {
+								"type": "binOp",
+								"op": "",
+								"left": {
+									"type": "field",
+									"name": ".source"
+								},
+								"right": {
+									"type": "field",
+									"name": ".arches"
+								}
+							},
+							"key": {
+								"type": "binOp",
+								"op": "",
+								"left": {
+									"type": "field",
+									"name": ".build"
+								},
+								"right": {
+									"type": "field",
+									"name": ".arch"
+								}
+							}
+						},
+						"right": {
+							"type": "field",
+							"name": ".archTags"
+						}
+					}
+				]
+			}
+		},
+		{
+			"type": "funcDef",
+			"name": "deploy_objects",
+			"leadingComments": [
+				"# input: output of tagged_manifests (map of tag -\u003e list of OCI descriptors)",
+				"# output: array of input objects for \"cmd/deploy\" ({ \"type\": \"manifest\", \"refs\": [ ... ], \"data\": { ... } })"
+			],
+			"body": {
+				"type": "pipe",
+				"left": {
+					"type": "reduce",
+					"expr": {
+						"type": "index",
+						"expr": {
+							"type": "call",
+							"name": "to_entries"
+						}
+					},
+					"pattern": {
+						"type": "var",
+						"name": "$in"
+					},
+					"init": {
+						"type": "object",
+						"fields": []
+					},
+					"update": {
+						"type": "as",
+						"expr": {
+							"type": "binOp",
+							"op": "",
+							"left": {
+								"type": "var",
+								"name": "$in"
+							},
+							"right": {
+								"type": "field",
+								"name": ".key"
+							}
+						},
+						"pattern": {
+							"type": "var",
+							"name": "$ref"
+						},
+						"body": {
+							"type": "as",
+							"expr": {
+								"type": "paren",
+								"expr": {
+									"type": "pipe",
+									"left": {
+										"type": "binOp",
+										"op": "",
+										"left": {
+											"type": "var",
+											"name": "$in"
+										},
+										"right": {
+											"type": "field",
+											"name": ".value"
+										}
+									},
+									"right": {
+										"type": "pipe",
+										"left": {
+											"type": "commented",
+											"expr": {
+												"type": "call",
+												"name": "map",
+												"args": [
+													{
+														"type": "call",
+														"name": "normalize_descriptor"
+													}
+												]
+											},
+											"trailingComment": "# normalized platforms *and* normalized field ordering"
+										},
+										"right": {
+											"type": "call",
+											"name": "sort_manifests"
+										}
+									}
+								}
+							},
+							"pattern": {
+								"type": "var",
+								"name": "$manifests"
+							},
+							"body": {
+								"type": "as",
+								"expr": {
+									"type": "paren",
+									"expr": {
+										"type": "pipe",
+										"left": {
+											"type": "array",
+											"elem": {
+												"type": "binOp",
+												"op": "",
+												"left": {
+													"type": "index",
+													"expr": {
+														"type": "var",
+														"name": "$manifests"
+													}
+												},
+												"right": {
+													"type": "field",
+													"name": ".digest"
+												}
+											}
+										},
+										"right": {
+											"type": "call",
+											"name": "join",
+											"args": [
+												{
+													"type": "string",
+													"raw": "\"\\n\""
+												}
+											]
+										}
+									}
+								},
+								"pattern": {
+									"type": "var",
+									"name": "$key"
+								},
+								"body": {
+									"type": "binOp",
+									"op": "|=",
+									"left": {
+										"type": "index",
+										"expr": {
+											"type": "identity"
+										},
+										"key": {
+											"type": "var",
+											"name": "$key"
+										}
+									},
+									"right": {
+										"type": "paren",
+										"expr": {
+											"type": "if",
+											"cond": {
+												"type": "identity"
+											},
+											"then": {
+												"type": "binOp",
+												"op": "+=",
+												"left": {
+													"type": "field",
+													"name": ".refs"
+												},
+												"right": {
+													"type": "array",
+													"elem": {
+														"type": "var",
+														"name": "$ref"
+													}
+												}
+											},
+											"else": {
+												"type": "object",
+												"fields": [
+													{
+														"key": {
+															"type": "ident",
+															"name": "type"
+														},
+														"value": {
+															"type": "string",
+															"raw": "\"manifest\""
+														}
+													},
+													{
+														"key": {
+															"type": "ident",
+															"name": "refs"
+														},
+														"value": {
+															"type": "array",
+															"elem": {
+																"type": "var",
+																"name": "$ref"
+															}
+														}
+													},
+													{
+														"key": {
+															"type": "ident",
+															"name": "lookup"
+														},
+														"value": {
+															"type": "paren",
+															"expr": {
+																"type": "pipe",
+																"left": {
+																	"type": "var",
+																	"name": "$manifests"
+																},
+																"right": {
+																	"type": "pipe",
+																	"left": {
+																		"type": "call",
+																		"name": "map",
+																		"args": [
+																			{
+																				"type": "object",
+																				"fields": [
+																					{
+																						"key": {
+																							"type": "ident",
+																							"name": "key"
+																						},
+																						"value": {
+																							"type": "field",
+																							"name": ".digest"
+																						}
+																					},
+																					{
+																						"key": {
+																							"type": "ident",
+																							"name": "value"
+																						},
+																						"value": {
+																							"type": "paren",
+																							"expr": {
+																								"type": "as",
+																								"expr": {
+																									"type": "field",
+																									"name": ".digest"
+																								},
+																								"pattern": {
+																									"type": "var",
+																									"name": "$dig"
+																								},
+																								"body": {
+																									"type": "pipe",
+																									"left": {
+																										"type": "index",
+																										"expr": {
+																											"type": "field",
+																											"name": ".annotations"
+																										},
+																										"key": {
+																											"type": "string",
+																											"raw": "\"org.opencontainers.image.ref.name\""
+																										}
+																									},
+																									"right": {
+																										"type": "call",
+																										"name": "rtrimstr",
+																										"args": [
+																											{
+																												"type": "binOp",
+																												"op": "+",
+																												"left": {
+																													"type": "string",
+																													"raw": "\"@\""
+																												},
+																												"right": {
+																													"type": "var",
+																													"name": "$dig"
+																												}
+																											}
+																										]
+																									}
+																								}
+																							}
+																						}
+																					}
+																				]
+																			}
+																		]
+																	},
+																	"right": {
+																		"type": "call",
+																		"name": "from_entries"
+																	}
+																}
+															}
+														},
+														"leadingComments": [
+															"# add appropriate \"lookup\" values for copying child objects properly"
+														]
+													},
+													{
+														"key": {
+															"type": "ident",
+															"name": "data"
+														},
+														"value": {
+															"type": "object",
+															"fields": [
+																{
+																	"key": {
+																		"type": "ident",
+																		"name": "schemaVersion"
+																	},
+																	"value": {
+																		"type": "number",
+																		"raw": "2"
+																	}
+																},
+																{
+																	"key": {
+																		"type": "ident",
+																		"name": "mediaType"
+																	},
+																	"value": {
+																		"type": "paren",
+																		"expr": {
+																			"type": "if",
+																			"cond": {
+																				"type": "binOp",
+																				"op": "==",
+																				"left": {
+																					"type": "binOp",
+																					"op": "",
+																					"left": {
+																						"type": "index",
+																						"expr": {
+																							"type": "var",
+																							"name": "$manifests"
+																						},
+																						"key": {
+																							"type": "number",
+																							"raw": "0"
+																						}
+																					},
+																					"right": {
+																						"type": "field",
+																						"name": ".mediaType"
+																					}
+																				},
+																				"right": {
+																					"type": "call",
+																					"name": "media_type_dockerv2_image"
+																				}
+																			},
+																			"then": {
+																				"type": "call",
+																				"name": "media_type_dockerv2_list"
+																			},
+																			"else": {
+																				"type": "call",
+																				"name": "media_type_oci_index"
+																			}
+																		}
+																	}
+																},
+																{
+																	"key": {
+																		"type": "ident",
+																		"name": "manifests"
+																	},
+																	"value": {
+																		"type": "paren",
+																		"expr": {
+																			"type": "pipe",
+																			"left": {
+																				"type": "var",
+																				"name": "$manifests"
+																			},
+																			"right": {
+																				"type": "call",
+																				"name": "del",
+																				"args": [
+																					{
+																						"type": "index",
+																						"expr": {
+																							"type": "binOp",
+																							"op": "",
+																							"left": {
+																								"type": "index",
+																								"expr": {
+																									"type": "identity"
+																								}
+																							},
+																							"right": {
+																								"type": "field",
+																								"name": ".annotations"
+																							}
+																						},
+																						"key": {
+																							"type": "string",
+																							"raw": "\"org.opencontainers.image.ref.name\""
+																						}
+																					}
+																				]
+																			}
+																		}
+																	}
+																}
+															]
+														},
+														"leadingComments": [
+															"# convert the list of \"manifests\" into a full (canonical!) index/manifest list for deploying"
+														]
+													}
+												]
+											}
+										}
+									}
+								}
+							}
+						}
+					}
+				},
+				"right": {
+					"type": "commented",
+					"expr": {
+						"type": "array",
+						"elem": {
+							"type": "index",
+							"expr": {
+								"type": "identity"
+							}
+						}
+					},
+					"trailingComment": "# strip off our synthetic map keys to avoid leaking our implementation detail"
+				}
+			}
+		}
+	]
+}

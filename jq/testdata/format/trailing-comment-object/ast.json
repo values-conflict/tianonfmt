@@ -1,0 +1,32 @@
+{
+	"type": "jq",
+	"query": {
+		"type": "object",
+		"fields": [
+			{
+				"key": {
+					"type": "ident",
+					"name": "key"
+				},
+				"value": {
+					"type": "commented",
+					"expr": {
+						"type": "call",
+						"name": "value"
+					},
+					"trailingComment": "# trailing comment forces multiline"
+				}
+			},
+			{
+				"key": {
+					"type": "ident",
+					"name": "other"
+				},
+				"value": {
+					"type": "call",
+					"name": "thing"
+				}
+			}
+		]
+	}
+}

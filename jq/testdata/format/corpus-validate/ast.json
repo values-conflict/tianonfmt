@@ -1,0 +1,485 @@
+{
+	"type": "jq",
+	"funcDefs": [
+		{
+			"type": "funcDef",
+			"name": "validate",
+			"params": [
+				"selector",
+				"condition",
+				"err"
+			],
+			"leadingComments": [
+				"# a set of ~generic validation helpers",
+				"# usage: validate(.some.value; . \u003e= 123; \"must be 123 or bigger\")",
+				"# will also \"nest\" sanely: validate(.some; validate(.value; . \u003e= 123; \"123+\"))"
+			],
+			"body": {
+				"type": "as",
+				"expr": {
+					"type": "array",
+					"elem": {
+						"type": "commented",
+						"leadingComments": [
+							"# if \"selector\" contains something like \"$foo\", \"path($foo)\" will break, but emit the first few things (so \"path(.foo, $foo, .bar)\" will emit [\"foo\"] before the exception is caught on the second round)"
+						],
+						"expr": {
+							"type": "try",
+							"body": {
+								"type": "call",
+								"name": "path",
+								"args": [
+									{
+										"type": "call",
+										"name": "selector"
+									}
+								]
+							},
+							"handler": {
+								"type": "string",
+								"raw": "\"BORKBORKBORK\""
+							}
+						}
+					}
+				},
+				"pattern": {
+					"type": "var",
+					"name": "$paths"
+				},
+				"body": {
+					"type": "as",
+					"expr": {
+						"type": "call",
+						"name": "IN",
+						"args": [
+							{
+								"type": "index",
+								"expr": {
+									"type": "var",
+									"name": "$paths"
+								}
+							},
+							{
+								"type": "string",
+								"raw": "\"BORKBORKBORK\""
+							}
+						]
+					},
+					"pattern": {
+						"type": "var",
+						"name": "$bork"
+					},
+					"body": {
+						"type": "as",
+						"expr": {
+							"type": "paren",
+							"expr": {
+								"type": "if",
+								"cond": {
+									"type": "var",
+									"name": "$bork"
+								},
+								"then": {
+									"type": "array",
+									"elem": {
+										"type": "call",
+										"name": "selector"
+									}
+								},
+								"else": {
+									"type": "var",
+									"name": "$paths"
+								}
+							}
+						},
+						"pattern": {
+							"type": "var",
+							"name": "$data"
+						},
+						"body": {
+							"type": "reduce",
+							"expr": {
+								"type": "index",
+								"expr": {
+									"type": "var",
+									"name": "$data"
+								}
+							},
+							"pattern": {
+								"type": "var",
+								"name": "$maybepath"
+							},
+							"init": {
+								"type": "identity"
+							},
+							"update": {
+								"type": "as",
+								"expr": {
+									"type": "paren",
+									"expr": {
+										"type": "if",
+										"cond": {
+											"type": "var",
+											"name": "$bork"
+										},
+										"then": {
+											"type": "var",
+											"name": "$maybepath"
+										},
+										"else": {
+											"type": "call",
+											"name": "getpath",
+											"args": [
+												{
+													"type": "var",
+													"name": "$maybepath"
+												}
+											]
+										}
+									}
+								},
+								"pattern": {
+									"type": "var",
+									"name": "$val"
+								},
+								"body": {
+									"type": "try",
+									"body": {
+										"type": "paren",
+										"expr": {
+											"type": "if",
+											"cond": {
+												"type": "pipe",
+												"left": {
+													"type": "var",
+													"name": "$val"
+												},
+												"right": {
+													"type": "call",
+													"name": "condition"
+												}
+											},
+											"then": {
+												"type": "identity"
+											},
+											"else": {
+												"type": "call",
+												"name": "error",
+												"args": [
+													{
+														"type": "string",
+														"raw": "\"\""
+													}
+												]
+											}
+										}
+									},
+									"handler": {
+										"type": "paren",
+										"expr": {
+											"type": "call",
+											"name": "error",
+											"args": [
+												{
+													"type": "binOp",
+													"op": "+",
+													"left": {
+														"type": "binOp",
+														"op": "+",
+														"left": {
+															"type": "binOp",
+															"op": "+",
+															"left": {
+																"type": "binOp",
+																"op": "+",
+																"left": {
+																	"type": "commented",
+																	"leadingComments": [
+																		"# invalid .[\"foo\"][\"bar\"]: ERROR MESSAGE HERE",
+																		"# value: {\"baz\":\"buzz\"}"
+																	],
+																	"expr": {
+																		"type": "string",
+																		"raw": "\"\\ninvalid \""
+																	}
+																},
+																"right": {
+																	"type": "if",
+																	"cond": {
+																		"type": "var",
+																		"name": "$bork"
+																	},
+																	"then": {
+																		"type": "string",
+																		"raw": "\"value\""
+																	},
+																	"else": {
+																		"type": "string",
+																		"raw": "\".\\($maybepath | map(\"[\\(tojson)]\") | add // \"\")\""
+																	}
+																}
+															},
+															"right": {
+																"type": "string",
+																"raw": "\":\\n\\t\\($val | tojson)\""
+															}
+														},
+														"right": {
+															"type": "paren",
+															"expr": {
+																"type": "pipe",
+																"left": {
+																	"type": "var",
+																	"name": "$val"
+																},
+																"right": {
+																	"type": "pipe",
+																	"left": {
+																		"type": "call",
+																		"name": "err"
+																	},
+																	"right": {
+																		"type": "if",
+																		"cond": {
+																			"type": "binOp",
+																			"op": "and",
+																			"left": {
+																				"type": "identity"
+																			},
+																			"right": {
+																				"type": "binOp",
+																				"op": "\u003e",
+																				"left": {
+																					"type": "call",
+																					"name": "length"
+																				},
+																				"right": {
+																					"type": "number",
+																					"raw": "0"
+																				}
+																			}
+																		},
+																		"then": {
+																			"type": "string",
+																			"raw": "\"\\n\\(.)\""
+																		},
+																		"else": {
+																			"type": "string",
+																			"raw": "\"\""
+																		}
+																	}
+																}
+															}
+														}
+													},
+													"right": {
+														"type": "paren",
+														"expr": {
+															"type": "pipe",
+															"left": {
+																"type": "call",
+																"name": "ltrimstr",
+																"args": [
+																	{
+																		"type": "string",
+																		"raw": "\"\\n\""
+																	}
+																]
+															},
+															"right": {
+																"type": "if",
+																"cond": {
+																	"type": "binOp",
+																	"op": "and",
+																	"left": {
+																		"type": "identity"
+																	},
+																	"right": {
+																		"type": "binOp",
+																		"op": "\u003e",
+																		"left": {
+																			"type": "call",
+																			"name": "length"
+																		},
+																		"right": {
+																			"type": "number",
+																			"raw": "0"
+																		}
+																	}
+																},
+																"then": {
+																	"type": "string",
+																	"raw": "\"\\n\\(.)\""
+																},
+																"else": {
+																	"type": "string",
+																	"raw": "\"\""
+																}
+															}
+														}
+													}
+												}
+											]
+										}
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+		},
+		{
+			"type": "funcDef",
+			"name": "validate",
+			"params": [
+				"selector",
+				"condition"
+			],
+			"body": {
+				"type": "call",
+				"name": "validate",
+				"args": [
+					{
+						"type": "call",
+						"name": "selector"
+					},
+					{
+						"type": "call",
+						"name": "condition"
+					},
+					{
+						"type": "null"
+					}
+				]
+			}
+		},
+		{
+			"type": "funcDef",
+			"name": "validate",
+			"params": [
+				"condition"
+			],
+			"body": {
+				"type": "call",
+				"name": "validate",
+				"args": [
+					{
+						"type": "identity"
+					},
+					{
+						"type": "call",
+						"name": "condition"
+					}
+				]
+			}
+		},
+		{
+			"type": "funcDef",
+			"name": "validate_IN",
+			"params": [
+				"selector",
+				"options"
+			],
+			"leadingComments": [
+				"# usage: validate_IN(.some[].mediaType; \"foo/bar\", \"baz/buzz\")"
+			],
+			"body": {
+				"type": "call",
+				"name": "validate",
+				"args": [
+					{
+						"type": "call",
+						"name": "selector"
+					},
+					{
+						"type": "call",
+						"name": "IN",
+						"args": [
+							{
+								"type": "call",
+								"name": "options"
+							}
+						]
+					},
+					{
+						"type": "string",
+						"raw": "\"valid:\\n\\t\\([ options | tojson ] | join(\"\\n\\t\"))\""
+					}
+				]
+			}
+		},
+		{
+			"type": "funcDef",
+			"name": "validate_length",
+			"params": [
+				"selector",
+				"lengths"
+			],
+			"leadingComments": [
+				"# usage: validate_length(.manifests; 1, 2)"
+			],
+			"body": {
+				"type": "call",
+				"name": "validate",
+				"args": [
+					{
+						"type": "call",
+						"name": "selector"
+					},
+					{
+						"type": "call",
+						"name": "IN",
+						"args": [
+							{
+								"type": "call",
+								"name": "length"
+							},
+							{
+								"type": "call",
+								"name": "lengths"
+							}
+						]
+					},
+					{
+						"type": "string",
+						"raw": "\"length (\\(length)) must be: \\([ lengths | tojson ] | join(\", \"))\""
+					}
+				]
+			}
+		},
+		{
+			"type": "funcDef",
+			"name": "validate_one",
+			"leadingComments": [
+				"# usage: (jq --slurp) validate_one | .some.thing"
+			],
+			"body": {
+				"type": "pipe",
+				"left": {
+					"type": "call",
+					"name": "validate_length",
+					"args": [
+						{
+							"type": "identity"
+						},
+						{
+							"type": "number",
+							"raw": "1"
+						}
+					]
+				},
+				"right": {
+					"type": "index",
+					"expr": {
+						"type": "identity"
+					},
+					"key": {
+						"type": "number",
+						"raw": "0"
+					}
+				}
+			}
+		}
+	]
+}

@@ -23,7 +23,7 @@ func TestMain(m *testing.M) {
 // ── format ────────────────────────────────────────────────────────────────────
 
 func TestFormat(t *testing.T) {
-	testutil.Golden(t, "testdata/format", ".dockerfile", ".dockerfile", func(input string) (string, error) {
+	testutil.Golden(t, "testdata/format", "input.dockerfile", "output.dockerfile", func(input string) (string, error) {
 		f, err := dockerfile.Parse(input)
 		if err != nil {
 			return "", err
@@ -33,7 +33,7 @@ func TestFormat(t *testing.T) {
 }
 
 func TestFormatIdempotent(t *testing.T) {
-	testutil.Golden(t, "testdata/format", ".dockerfile", ".dockerfile", func(input string) (string, error) {
+	testutil.Golden(t, "testdata/format", "input.dockerfile", "output.dockerfile", func(input string) (string, error) {
 		f, err := dockerfile.Parse(input)
 		if err != nil {
 			return "", err
@@ -50,7 +50,7 @@ func TestFormatIdempotent(t *testing.T) {
 // ── tidy ──────────────────────────────────────────────────────────────────────
 
 func TestTidy(t *testing.T) {
-	testutil.Golden(t, "testdata/tidy", ".dockerfile", ".dockerfile", func(input string) (string, error) {
+	testutil.Golden(t, "testdata/tidy", "input.dockerfile", "output.dockerfile", func(input string) (string, error) {
 		f, err := dockerfile.Parse(input)
 		if err != nil {
 			return "", err
@@ -186,92 +186,21 @@ func TestParse_Directives(t *testing.T) {
 	}
 }
 
-// ── MarshalFile ───────────────────────────────────────────────────────────────
+// ── MarshalAST golden ─────────────────────────────────────────────────────────
 
-func TestMarshalFile(t *testing.T) {
-	src := "FROM golang:1.21 AS builder\nCOPY --from=builder /app /app\nCMD [\"/app\"]\n"
-	f, err := dockerfile.Parse(src)
-	if err != nil {
-		t.Fatal(err)
-	}
-	v := dockerfile.MarshalFile(f, "Dockerfile")
-	b, err := json.Marshal(v)
-	if err != nil {
-		t.Fatal(err)
-	}
-	got := string(b)
-	checks := []string{
-		`"type":"dockerfile"`,
-		`"file":"Dockerfile"`,
-		`"type":"FROM"`,
-		`"ref":"golang:1.21"`,
-		`"alias":"builder"`,
-		`"type":"COPY"`,
-		`"from":"builder"`,
-		`"form":"plain"`,  // COPY with plain path syntax
-		`"type":"CMD"`,
-		`"form":"exec"`,   // CMD with JSON exec form
-	}
-	for _, want := range checks {
-		if !strings.Contains(got, want) {
-			t.Errorf("MarshalFile JSON missing %q\ngot: %s", want, got)
+// TestMarshalAST pins the full JSON AST output for every format fixture.
+func TestMarshalAST(t *testing.T) {
+	testutil.Golden(t, "testdata/format", "input.dockerfile", "ast.json", func(src string) (string, error) {
+		f, err := dockerfile.Parse(src)
+		if err != nil {
+			return "", err
 		}
-	}
-}
-
-func TestMarshalFile_HEALTHCHECK(t *testing.T) {
-	src := "FROM scratch\nHEALTHCHECK --interval=30s CMD curl -f http://localhost/\nHEALTHCHECK NONE\n"
-	f, _ := dockerfile.Parse(src)
-	v := dockerfile.MarshalFile(f, "-")
-	b, _ := json.Marshal(v)
-	got := string(b)
-	if !strings.Contains(got, `"HEALTHCHECK"`) {
-		t.Errorf("HEALTHCHECK not in output: %s", got)
-	}
-	if !strings.Contains(got, `"none"`) {
-		t.Errorf("HEALTHCHECK NONE not in output: %s", got)
-	}
-	if !strings.Contains(got, `"interval"`) {
-		t.Errorf("HEALTHCHECK --interval not in output: %s", got)
-	}
-}
-
-func TestMarshalFile_VolumeExecForm(t *testing.T) {
-	src := "FROM scratch\nVOLUME [\"/var/log\", \"/var/data\"]\n"
-	f, _ := dockerfile.Parse(src)
-	v := dockerfile.MarshalFile(f, "-")
-	b, _ := json.Marshal(v)
-	got := string(b)
-	if !strings.Contains(got, `"form":"json"`) {
-		t.Errorf("JSON-form VOLUME should have form=json: %s", got)
-	}
-}
-
-func TestMarshalFile_COPYWithMultipleFlags(t *testing.T) {
-	// parseCOPYArgs with both --from and --chown flags
-	src := "FROM scratch\nCOPY --from=builder --chown=user:group /src /dst\n"
-	f, _ := dockerfile.Parse(src)
-	v := dockerfile.MarshalFile(f, "-")
-	b, _ := json.Marshal(v)
-	got := string(b)
-	if !strings.Contains(got, `"from":"builder"`) {
-		t.Errorf("COPY --from not parsed with multiple flags: %s", got)
-	}
-	if !strings.Contains(got, `"form":"plain"`) {
-		t.Errorf("COPY plain form not detected: %s", got)
-	}
-}
-
-func TestMarshalFile_COPYExecForm(t *testing.T) {
-	// parseCOPYArgs json form detection
-	src := "FROM scratch\nCOPY --from=builder [\"/src\", \"/dst\"]\n"
-	f, _ := dockerfile.Parse(src)
-	v := dockerfile.MarshalFile(f, "-")
-	b, _ := json.Marshal(v)
-	got := string(b)
-	if !strings.Contains(got, `"form":"json"`) {
-		t.Errorf("COPY json form not detected: %s", got)
-	}
+		b, err := json.MarshalIndent(dockerfile.MarshalFile(f, "input.dockerfile"), "", "\t")
+		if err != nil {
+			return "", err
+		}
+		return string(b) + "\n", nil
+	})
 }
 
 func TestTidyCmdEntrypoint_EmptyArgs(t *testing.T) {
@@ -364,18 +293,6 @@ func TestPedanticCmdEntrypoint_WrapsShellFeatures(t *testing.T) {
 				t.Errorf("ENTRYPOINT missing trailing -- : %q", instr.Args)
 			}
 		}
-	}
-}
-
-func TestMarshalFile_ENVNormalization(t *testing.T) {
-	src := "FROM scratch\nENV FOO=bar\n"
-	f, _ := dockerfile.Parse(src)
-	out := dockerfile.Format(f)
-	if strings.Contains(out, "FOO=bar") {
-		t.Errorf("ENV KEY=VALUE not normalized to KEY VALUE: %q", out)
-	}
-	if !strings.Contains(out, "FOO bar") {
-		t.Errorf("ENV not normalized to 'FOO bar' form: %q", out)
 	}
 }
 

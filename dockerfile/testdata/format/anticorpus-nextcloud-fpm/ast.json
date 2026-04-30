@@ -1,0 +1,909 @@
+{
+	"type": "dockerfile",
+	"file": "input.dockerfile",
+	"instructions": [
+		{
+			"type": "COMMENT",
+			"args": "# DO NOT EDIT: created by update.sh from Dockerfile-debian.template",
+			"lines": [
+				{
+					"kind": "comment",
+					"text": "# DO NOT EDIT: created by update.sh from Dockerfile-debian.template"
+				}
+			],
+			"startLine": 1,
+			"endLine": 1
+		},
+		{
+			"type": "FROM",
+			"ref": "php:8.3-fpm-trixie",
+			"lines": [
+				{
+					"kind": "instruction",
+					"text": "FROM php:8.3-fpm-trixie"
+				}
+			],
+			"startLine": 2,
+			"endLine": 2
+		},
+		{
+			"type": "blank",
+			"lines": [
+				{
+					"kind": "blank"
+				}
+			],
+			"startLine": 3,
+			"endLine": 3
+		},
+		{
+			"type": "COMMENT",
+			"args": "# entrypoint.sh and cron.sh dependencies",
+			"lines": [
+				{
+					"kind": "comment",
+					"text": "# entrypoint.sh and cron.sh dependencies"
+				}
+			],
+			"startLine": 4,
+			"endLine": 4
+		},
+		{
+			"type": "RUN",
+			"form": "shell",
+			"args": "set -ex;      apt-get update;     apt-get install -y --no-install-recommends         busybox-static         bzip2         libldap-common         libmagickcore-7.q16-10-extra         rsync     ;     apt-get dist-clean;      mkdir -p /var/spool/cron/crontabs;     echo '*/5 * * * * php -f /var/www/html/cron.php' \u003e /var/spool/cron/crontabs/www-data",
+			"lines": [
+				{
+					"kind": "instruction",
+					"text": "RUN set -ex; \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "    \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "    apt-get update; \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "    apt-get install -y --no-install-recommends \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "        busybox-static \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "        bzip2 \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "        libldap-common \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "        libmagickcore-7.q16-10-extra \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "        rsync \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "    ; \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "    apt-get dist-clean; \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "    \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "    mkdir -p /var/spool/cron/crontabs; \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "    echo '*/5 * * * * php -f /var/www/html/cron.php' \u003e /var/spool/cron/crontabs/www-data"
+				}
+			],
+			"startLine": 5,
+			"endLine": 18
+		},
+		{
+			"type": "blank",
+			"lines": [
+				{
+					"kind": "blank"
+				}
+			],
+			"startLine": 19,
+			"endLine": 19
+		},
+		{
+			"type": "COMMENT",
+			"args": "# install the PHP extensions we need",
+			"lines": [
+				{
+					"kind": "comment",
+					"text": "# install the PHP extensions we need"
+				}
+			],
+			"startLine": 20,
+			"endLine": 20
+		},
+		{
+			"type": "COMMENT",
+			"args": "# see https://docs.nextcloud.com/server/stable/admin_manual/installation/source_installation.html",
+			"lines": [
+				{
+					"kind": "comment",
+					"text": "# see https://docs.nextcloud.com/server/stable/admin_manual/installation/source_installation.html"
+				}
+			],
+			"startLine": 21,
+			"endLine": 21
+		},
+		{
+			"type": "ENV",
+			"args": "PHP_MEMORY_LIMIT 512M",
+			"lines": [
+				{
+					"kind": "instruction",
+					"text": "ENV PHP_MEMORY_LIMIT 512M"
+				}
+			],
+			"startLine": 22,
+			"endLine": 22
+		},
+		{
+			"type": "ENV",
+			"args": "PHP_UPLOAD_LIMIT 512M",
+			"lines": [
+				{
+					"kind": "instruction",
+					"text": "ENV PHP_UPLOAD_LIMIT 512M"
+				}
+			],
+			"startLine": 23,
+			"endLine": 23
+		},
+		{
+			"type": "ENV",
+			"args": "PHP_OPCACHE_MEMORY_CONSUMPTION 128",
+			"lines": [
+				{
+					"kind": "instruction",
+					"text": "ENV PHP_OPCACHE_MEMORY_CONSUMPTION 128"
+				}
+			],
+			"startLine": 24,
+			"endLine": 24
+		},
+		{
+			"type": "RUN",
+			"form": "shell",
+			"args": "set -ex;      savedAptMark=\"$(apt-mark showmanual)\";      apt-get update;     apt-get install -y --no-install-recommends         libcurl4-openssl-dev         libevent-dev         libfreetype6-dev         libgmp-dev         libicu-dev         libjpeg-dev         libldap2-dev         liblz4-dev         libmagickwand-dev         libmemcached-dev         libpng-dev         libpq-dev         libwebp-dev         libxml2-dev         libzip-dev     ;      debMultiarch=\"$(dpkg-architecture --query DEB_BUILD_MULTIARCH)\";     docker-php-ext-configure ftp --with-openssl-dir=/usr;     docker-php-ext-configure gd --with-freetype --with-jpeg --with-webp;     docker-php-ext-configure ldap --with-libdir=\"lib/$debMultiarch\";     docker-php-ext-install -j \"$(nproc)\"         bcmath         exif         ftp         gd         gmp         intl         ldap         pcntl         pdo_mysql         pdo_pgsql         sysvsem         zip     ;      pecl install APCu-5.1.28;     pecl install igbinary-3.2.16;     pecl install imagick-3.8.1;     pecl install --configureoptions 'enable-memcached-igbinary=\"yes\"'         memcached-3.4.0;     pecl install --configureoptions 'enable-redis-igbinary=\"yes\" enable-redis-zstd=\"yes\" enable-redis-lz4=\"yes\"'         redis-6.3.0;      docker-php-ext-enable         apcu         igbinary         imagick         memcached         redis     ;     rm -r /tmp/pear;      apt-mark auto '.*' \u003e /dev/null;     apt-mark manual $savedAptMark;     ldd \"$(php -r 'echo ini_get(\"extension_dir\");')\"/*.so         | awk '/=\u003e/ { so = $(NF-1); if (index(so, \"/usr/local/\") == 1) { next }; gsub(\"^/(usr/)?\", \"\", so); print so }'         | sort -u         | xargs -rt dpkg-query --search         | awk 'sub(\":$\", \"\", $1) { print $1 }'         | sort -u         | xargs -rt apt-mark manual;      apt-get purge -y --auto-remove -o APT::AutoRemove::RecommendsImportant=false;     apt-get dist-clean",
+			"lines": [
+				{
+					"kind": "instruction",
+					"text": "RUN set -ex; \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "    \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "    savedAptMark=\"$(apt-mark showmanual)\"; \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "    \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "    apt-get update; \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "    apt-get install -y --no-install-recommends \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "        libcurl4-openssl-dev \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "        libevent-dev \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "        libfreetype6-dev \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "        libgmp-dev \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "        libicu-dev \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "        libjpeg-dev \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "        libldap2-dev \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "        liblz4-dev \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "        libmagickwand-dev \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "        libmemcached-dev \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "        libpng-dev \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "        libpq-dev \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "        libwebp-dev \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "        libxml2-dev \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "        libzip-dev \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "    ; \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "    \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "    debMultiarch=\"$(dpkg-architecture --query DEB_BUILD_MULTIARCH)\"; \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "    docker-php-ext-configure ftp --with-openssl-dir=/usr; \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "    docker-php-ext-configure gd --with-freetype --with-jpeg --with-webp; \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "    docker-php-ext-configure ldap --with-libdir=\"lib/$debMultiarch\"; \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "    docker-php-ext-install -j \"$(nproc)\" \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "        bcmath \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "        exif \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "        ftp \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "        gd \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "        gmp \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "        intl \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "        ldap \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "        pcntl \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "        pdo_mysql \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "        pdo_pgsql \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "        sysvsem \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "        zip \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "    ; \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "    \\"
+				},
+				{
+					"kind": "comment",
+					"text": "# pecl will claim success even if one install fails, so we need to perform each install separately"
+				},
+				{
+					"kind": "continuation",
+					"text": "    pecl install APCu-5.1.28; \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "    pecl install igbinary-3.2.16; \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "    pecl install imagick-3.8.1; \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "    pecl install --configureoptions 'enable-memcached-igbinary=\"yes\"' \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "        memcached-3.4.0; \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "    pecl install --configureoptions 'enable-redis-igbinary=\"yes\" enable-redis-zstd=\"yes\" enable-redis-lz4=\"yes\"' \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "        redis-6.3.0; \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "    \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "    docker-php-ext-enable \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "        apcu \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "        igbinary \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "        imagick \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "        memcached \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "        redis \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "    ; \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "    rm -r /tmp/pear; \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "    \\"
+				},
+				{
+					"kind": "comment",
+					"text": "# reset apt-mark's \"manual\" list so that \"purge --auto-remove\" will remove all build dependencies"
+				},
+				{
+					"kind": "continuation",
+					"text": "    apt-mark auto '.*' \u003e /dev/null; \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "    apt-mark manual $savedAptMark; \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "    ldd \"$(php -r 'echo ini_get(\"extension_dir\");')\"/*.so \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "        | awk '/=\u003e/ { so = $(NF-1); if (index(so, \"/usr/local/\") == 1) { next }; gsub(\"^/(usr/)?\", \"\", so); print so }' \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "        | sort -u \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "        | xargs -rt dpkg-query --search \\"
+				},
+				{
+					"kind": "comment",
+					"text": "# https://manpages.debian.org/trixie/dpkg/dpkg-query.1.en.html#S (we ignore diversions and it'll be really unusual for more than one package to provide any given .so file)"
+				},
+				{
+					"kind": "continuation",
+					"text": "        | awk 'sub(\":$\", \"\", $1) { print $1 }' \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "        | sort -u \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "        | xargs -rt apt-mark manual; \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "    \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "    apt-get purge -y --auto-remove -o APT::AutoRemove::RecommendsImportant=false; \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "    apt-get dist-clean"
+				}
+			],
+			"startLine": 25,
+			"endLine": 98
+		},
+		{
+			"type": "blank",
+			"lines": [
+				{
+					"kind": "blank"
+				}
+			],
+			"startLine": 99,
+			"endLine": 99
+		},
+		{
+			"type": "COMMENT",
+			"args": "# set recommended PHP.ini settings",
+			"lines": [
+				{
+					"kind": "comment",
+					"text": "# set recommended PHP.ini settings"
+				}
+			],
+			"startLine": 100,
+			"endLine": 100
+		},
+		{
+			"type": "COMMENT",
+			"args": "# see https://docs.nextcloud.com/server/latest/admin_manual/installation/server_tuning.html#enable-php-opcache",
+			"lines": [
+				{
+					"kind": "comment",
+					"text": "# see https://docs.nextcloud.com/server/latest/admin_manual/installation/server_tuning.html#enable-php-opcache"
+				}
+			],
+			"startLine": 101,
+			"endLine": 101
+		},
+		{
+			"type": "RUN",
+			"form": "shell",
+			"args": "{         echo 'opcache.enable=1';         echo 'opcache.interned_strings_buffer=32';         echo 'opcache.max_accelerated_files=10000';         echo 'opcache.memory_consumption=${PHP_OPCACHE_MEMORY_CONSUMPTION}';         echo 'opcache.save_comments=1';         echo 'opcache.revalidate_freq=60';         echo 'opcache.jit=1255';         echo 'opcache.jit_buffer_size=8M';     } \u003e \"${PHP_INI_DIR}/conf.d/opcache-recommended.ini\";      echo 'apc.enable_cli=1' \u003e\u003e \"${PHP_INI_DIR}/conf.d/docker-php-ext-apcu.ini\";      {         echo 'apc.serializer=igbinary';         echo 'session.serialize_handler=igbinary';     } \u003e\u003e \"${PHP_INI_DIR}/conf.d/docker-php-ext-igbinary.ini\";      {         echo 'memory_limit=${PHP_MEMORY_LIMIT}';         echo 'upload_max_filesize=${PHP_UPLOAD_LIMIT}';         echo 'post_max_size=${PHP_UPLOAD_LIMIT}';     } \u003e \"${PHP_INI_DIR}/conf.d/nextcloud.ini\";      mkdir /var/www/data;     mkdir -p /docker-entrypoint-hooks.d/pre-installation              /docker-entrypoint-hooks.d/post-installation              /docker-entrypoint-hooks.d/pre-upgrade              /docker-entrypoint-hooks.d/post-upgrade              /docker-entrypoint-hooks.d/before-starting;     chown -R www-data:root /var/www;     chmod -R g=u /var/www",
+			"lines": [
+				{
+					"kind": "instruction",
+					"text": "RUN { \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "        echo 'opcache.enable=1'; \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "        echo 'opcache.interned_strings_buffer=32'; \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "        echo 'opcache.max_accelerated_files=10000'; \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "        echo 'opcache.memory_consumption=${PHP_OPCACHE_MEMORY_CONSUMPTION}'; \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "        echo 'opcache.save_comments=1'; \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "        echo 'opcache.revalidate_freq=60'; \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "        echo 'opcache.jit=1255'; \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "        echo 'opcache.jit_buffer_size=8M'; \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "    } \u003e \"${PHP_INI_DIR}/conf.d/opcache-recommended.ini\"; \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "    \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "    echo 'apc.enable_cli=1' \u003e\u003e \"${PHP_INI_DIR}/conf.d/docker-php-ext-apcu.ini\"; \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "    \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "    { \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "        echo 'apc.serializer=igbinary'; \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "        echo 'session.serialize_handler=igbinary'; \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "    } \u003e\u003e \"${PHP_INI_DIR}/conf.d/docker-php-ext-igbinary.ini\"; \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "    \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "    { \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "        echo 'memory_limit=${PHP_MEMORY_LIMIT}'; \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "        echo 'upload_max_filesize=${PHP_UPLOAD_LIMIT}'; \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "        echo 'post_max_size=${PHP_UPLOAD_LIMIT}'; \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "    } \u003e \"${PHP_INI_DIR}/conf.d/nextcloud.ini\"; \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "    \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "    mkdir /var/www/data; \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "    mkdir -p /docker-entrypoint-hooks.d/pre-installation \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "             /docker-entrypoint-hooks.d/post-installation \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "             /docker-entrypoint-hooks.d/pre-upgrade \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "             /docker-entrypoint-hooks.d/post-upgrade \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "             /docker-entrypoint-hooks.d/before-starting; \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "    chown -R www-data:root /var/www; \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "    chmod -R g=u /var/www"
+				}
+			],
+			"startLine": 102,
+			"endLine": 133
+		},
+		{
+			"type": "blank",
+			"lines": [
+				{
+					"kind": "blank"
+				}
+			],
+			"startLine": 134,
+			"endLine": 134
+		},
+		{
+			"type": "VOLUME",
+			"form": "plain",
+			"args": "/var/www/html",
+			"lines": [
+				{
+					"kind": "instruction",
+					"text": "VOLUME /var/www/html"
+				}
+			],
+			"startLine": 135,
+			"endLine": 135
+		},
+		{
+			"type": "blank",
+			"lines": [
+				{
+					"kind": "blank"
+				}
+			],
+			"startLine": 136,
+			"endLine": 136
+		},
+		{
+			"type": "blank",
+			"lines": [
+				{
+					"kind": "blank"
+				}
+			],
+			"startLine": 137,
+			"endLine": 137
+		},
+		{
+			"type": "ENV",
+			"args": "NEXTCLOUD_VERSION 32.0.8",
+			"lines": [
+				{
+					"kind": "instruction",
+					"text": "ENV NEXTCLOUD_VERSION 32.0.8"
+				}
+			],
+			"startLine": 138,
+			"endLine": 138
+		},
+		{
+			"type": "blank",
+			"lines": [
+				{
+					"kind": "blank"
+				}
+			],
+			"startLine": 139,
+			"endLine": 139
+		},
+		{
+			"type": "RUN",
+			"form": "shell",
+			"args": "set -ex;     fetchDeps=\"         gnupg         dirmngr     \";     apt-get update;     apt-get install -y --no-install-recommends $fetchDeps;      curl -fsSL -o nextcloud.tar.bz2 \"https://github.com/nextcloud-releases/server/releases/download/v32.0.8/nextcloud-32.0.8.tar.bz2\";     curl -fsSL -o nextcloud.tar.bz2.asc \"https://github.com/nextcloud-releases/server/releases/download/v32.0.8/nextcloud-32.0.8.tar.bz2.asc\";     export GNUPGHOME=\"$(mktemp -d)\";     gpg --batch --keyserver keyserver.ubuntu.com --recv-keys 28806A878AE423A28372792ED75899B9A724937A;     gpg --batch --verify nextcloud.tar.bz2.asc nextcloud.tar.bz2;     tar -xjf nextcloud.tar.bz2 -C /usr/src/;     gpgconf --kill all;     rm nextcloud.tar.bz2.asc nextcloud.tar.bz2;     rm -rf \"$GNUPGHOME\" /usr/src/nextcloud/updater;     mkdir -p /usr/src/nextcloud/data;     mkdir -p /usr/src/nextcloud/custom_apps;     chmod +x /usr/src/nextcloud/occ;      apt-get purge -y --auto-remove -o APT::AutoRemove::RecommendsImportant=false $fetchDeps;     apt-get dist-clean",
+			"lines": [
+				{
+					"kind": "instruction",
+					"text": "RUN set -ex; \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "    fetchDeps=\" \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "        gnupg \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "        dirmngr \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "    \"; \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "    apt-get update; \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "    apt-get install -y --no-install-recommends $fetchDeps; \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "    \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "    curl -fsSL -o nextcloud.tar.bz2 \"https://github.com/nextcloud-releases/server/releases/download/v32.0.8/nextcloud-32.0.8.tar.bz2\"; \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "    curl -fsSL -o nextcloud.tar.bz2.asc \"https://github.com/nextcloud-releases/server/releases/download/v32.0.8/nextcloud-32.0.8.tar.bz2.asc\"; \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "    export GNUPGHOME=\"$(mktemp -d)\"; \\"
+				},
+				{
+					"kind": "comment",
+					"text": "# gpg key from https://nextcloud.com/nextcloud.asc"
+				},
+				{
+					"kind": "continuation",
+					"text": "    gpg --batch --keyserver keyserver.ubuntu.com --recv-keys 28806A878AE423A28372792ED75899B9A724937A; \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "    gpg --batch --verify nextcloud.tar.bz2.asc nextcloud.tar.bz2; \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "    tar -xjf nextcloud.tar.bz2 -C /usr/src/; \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "    gpgconf --kill all; \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "    rm nextcloud.tar.bz2.asc nextcloud.tar.bz2; \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "    rm -rf \"$GNUPGHOME\" /usr/src/nextcloud/updater; \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "    mkdir -p /usr/src/nextcloud/data; \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "    mkdir -p /usr/src/nextcloud/custom_apps; \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "    chmod +x /usr/src/nextcloud/occ; \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "    \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "    apt-get purge -y --auto-remove -o APT::AutoRemove::RecommendsImportant=false $fetchDeps; \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "    apt-get dist-clean"
+				}
+			],
+			"startLine": 140,
+			"endLine": 163
+		},
+		{
+			"type": "blank",
+			"lines": [
+				{
+					"kind": "blank"
+				}
+			],
+			"startLine": 164,
+			"endLine": 164
+		},
+		{
+			"type": "COPY",
+			"form": "plain",
+			"paths": "*.sh upgrade.exclude /",
+			"lines": [
+				{
+					"kind": "instruction",
+					"text": "COPY *.sh upgrade.exclude /"
+				}
+			],
+			"startLine": 165,
+			"endLine": 165
+		},
+		{
+			"type": "COPY",
+			"form": "plain",
+			"paths": "config/* /usr/src/nextcloud/config/",
+			"lines": [
+				{
+					"kind": "instruction",
+					"text": "COPY config/* /usr/src/nextcloud/config/"
+				}
+			],
+			"startLine": 166,
+			"endLine": 166
+		},
+		{
+			"type": "blank",
+			"lines": [
+				{
+					"kind": "blank"
+				}
+			],
+			"startLine": 167,
+			"endLine": 167
+		},
+		{
+			"type": "ENTRYPOINT",
+			"form": "exec",
+			"args": [
+				"/entrypoint.sh"
+			],
+			"lines": [
+				{
+					"kind": "instruction",
+					"text": "ENTRYPOINT [\"/entrypoint.sh\"]"
+				}
+			],
+			"startLine": 168,
+			"endLine": 168
+		},
+		{
+			"type": "CMD",
+			"form": "exec",
+			"args": [
+				"php-fpm"
+			],
+			"lines": [
+				{
+					"kind": "instruction",
+					"text": "CMD [\"php-fpm\"]"
+				}
+			],
+			"startLine": 169,
+			"endLine": 169
+		}
+	]
+}

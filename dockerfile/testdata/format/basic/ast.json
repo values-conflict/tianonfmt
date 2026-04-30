@@ -1,0 +1,115 @@
+{
+	"type": "dockerfile",
+	"file": "input.dockerfile",
+	"instructions": [
+		{
+			"type": "FROM",
+			"ref": "debian:bookworm-slim",
+			"lines": [
+				{
+					"kind": "instruction",
+					"text": "FROM debian:bookworm-slim"
+				}
+			],
+			"startLine": 1,
+			"endLine": 1
+		},
+		{
+			"type": "blank",
+			"lines": [
+				{
+					"kind": "blank"
+				}
+			],
+			"startLine": 2,
+			"endLine": 2
+		},
+		{
+			"type": "RUN",
+			"form": "shell",
+			"args": "set -eux; \tapt-get update; \tapt-get install -y --no-install-recommends \t\tca-certificates \t\tcurl \t; \trm -rf /var/lib/apt/lists/*",
+			"lines": [
+				{
+					"kind": "instruction",
+					"text": "RUN set -eux; \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "\tapt-get update; \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "\tapt-get install -y --no-install-recommends \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "\t\tca-certificates \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "\t\tcurl \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "\t; \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "\trm -rf /var/lib/apt/lists/*"
+				}
+			],
+			"startLine": 3,
+			"endLine": 9
+		},
+		{
+			"type": "blank",
+			"lines": [
+				{
+					"kind": "blank"
+				}
+			],
+			"startLine": 10,
+			"endLine": 10
+		},
+		{
+			"type": "WORKDIR",
+			"args": "/app",
+			"lines": [
+				{
+					"kind": "instruction",
+					"text": "WORKDIR /app"
+				}
+			],
+			"startLine": 11,
+			"endLine": 11
+		},
+		{
+			"type": "COPY",
+			"form": "plain",
+			"paths": ". .",
+			"lines": [
+				{
+					"kind": "instruction",
+					"text": "COPY . ."
+				}
+			],
+			"startLine": 12,
+			"endLine": 12
+		},
+		{
+			"type": "CMD",
+			"form": "exec",
+			"args": [
+				"/app/server"
+			],
+			"lines": [
+				{
+					"kind": "instruction",
+					"text": "CMD [\"/app/server\"]"
+				}
+			],
+			"startLine": 13,
+			"endLine": 13
+		}
+	]
+}

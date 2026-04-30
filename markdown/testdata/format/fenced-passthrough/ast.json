@@ -1,0 +1,22 @@
+{
+	"blocks": [
+		{
+			"level": 1,
+			"text": "Title",
+			"type": "heading"
+		},
+		{
+			"type": "blank"
+		},
+		{
+			"content": "* star not converted\n+ plus not converted",
+			"lang": "bash",
+			"type": "codeBlock"
+		},
+		{
+			"type": "blank"
+		}
+	],
+	"file": "input.md",
+	"type": "markdown"
+}

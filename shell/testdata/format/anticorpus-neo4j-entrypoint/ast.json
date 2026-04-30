@@ -1,0 +1,2549 @@
+{
+	"type": "shell",
+	"file": "input.sh",
+	"stmts": [
+		{
+			"type": "call",
+			"assigns": [
+				"cmd=\"$1\""
+			],
+			"args": []
+		},
+		{
+			"type": "funcDecl",
+			"name": "running_as_root",
+			"body": {
+				"type": "block",
+				"stmts": [
+					{
+						"type": "call",
+						"args": [
+							"test",
+							"\"$(id -u)\"",
+							"=",
+							"\"0\""
+						]
+					}
+				]
+			}
+		},
+		{
+			"type": "funcDecl",
+			"name": "secure_mode_enabled",
+			"body": {
+				"type": "block",
+				"stmts": [
+					{
+						"type": "call",
+						"args": [
+							"test",
+							"\"${SECURE_FILE_PERMISSIONS:=no}\"",
+							"=",
+							"\"yes\""
+						]
+					}
+				]
+			}
+		},
+		{
+			"type": "funcDecl",
+			"name": "containsElement",
+			"body": {
+				"type": "block",
+				"stmts": [
+					{
+						"args": [
+							"e",
+							"match=\"$1\""
+						],
+						"type": "local"
+					},
+					{
+						"type": "call",
+						"args": [
+							"shift"
+						]
+					},
+					{
+						"type": "for",
+						"loop": {
+							"type": "wordIter",
+							"name": "e"
+						},
+						"do": [
+							{
+								"type": "binary",
+								"op": "\u0026\u0026",
+								"x": {
+									"type": "testClause",
+									"x": ""
+								},
+								"y": {
+									"type": "call",
+									"args": [
+										"return",
+										"0"
+									]
+								}
+							}
+						]
+					},
+					{
+						"type": "call",
+						"args": [
+							"return",
+							"1"
+						]
+					}
+				]
+			}
+		},
+		{
+			"type": "funcDecl",
+			"name": "is_readable",
+			"body": {
+				"type": "block",
+				"stmts": [
+					{
+						"args": [
+							"_file=${1}"
+						],
+						"type": "local"
+					},
+					{
+						"type": "call",
+						"assigns": [
+							"perm=$(stat -c %a \"${_file}\")"
+						],
+						"args": []
+					},
+					{
+						"type": "if",
+						"cond": [
+							{
+								"type": "testClause",
+								"x": ""
+							}
+						],
+						"then": [
+							{
+								"type": "call",
+								"args": [
+									"return",
+									"0"
+								]
+							}
+						]
+					},
+					{
+						"type": "if",
+						"cond": [
+							{
+								"type": "testClause",
+								"x": ""
+							}
+						],
+						"then": [
+							{
+								"type": "if",
+								"cond": [
+									{
+										"type": "binary",
+										"op": "||",
+										"x": {
+											"type": "testClause",
+											"x": ""
+										},
+										"y": {
+											"type": "testClause",
+											"x": ""
+										}
+									}
+								],
+								"then": [
+									{
+										"type": "call",
+										"args": [
+											"return",
+											"0"
+										]
+									}
+								]
+							}
+						]
+					},
+					{
+						"type": "if",
+						"cond": [
+							{
+								"type": "testClause",
+								"x": ""
+							}
+						],
+						"then": [
+							{
+								"type": "if",
+								"cond": [
+									{
+										"type": "binary",
+										"op": "||",
+										"x": {
+											"type": "call",
+											"args": [
+												"containsElement",
+												"\"$(stat -c %g ${_file})\"",
+												"\"${groups[@]}\""
+											]
+										},
+										"y": {
+											"type": "call",
+											"args": [
+												"containsElement",
+												"\"$(stat -c %G ${_file})\"",
+												"\"${groups[@]}\""
+											]
+										}
+									}
+								],
+								"then": [
+									{
+										"type": "call",
+										"args": [
+											"return",
+											"0"
+										]
+									}
+								]
+							}
+						]
+					},
+					{
+						"type": "call",
+						"args": [
+							"return",
+							"1"
+						]
+					}
+				]
+			}
+		},
+		{
+			"type": "funcDecl",
+			"name": "is_writable",
+			"body": {
+				"type": "block",
+				"stmts": [
+					{
+						"args": [
+							"_file=${1}"
+						],
+						"type": "local"
+					},
+					{
+						"type": "call",
+						"assigns": [
+							"perm=$(stat -c %a \"${_file}\")"
+						],
+						"args": []
+					},
+					{
+						"type": "if",
+						"cond": [
+							{
+								"type": "call",
+								"args": [
+									"containsElement",
+									"${perm:2:1}",
+									"2",
+									"3",
+									"6",
+									"7"
+								]
+							}
+						],
+						"then": [
+							{
+								"type": "call",
+								"args": [
+									"return",
+									"0"
+								]
+							}
+						]
+					},
+					{
+						"type": "if",
+						"cond": [
+							{
+								"type": "call",
+								"args": [
+									"containsElement",
+									"${perm:0:1}",
+									"2",
+									"3",
+									"6",
+									"7"
+								]
+							}
+						],
+						"then": [
+							{
+								"type": "if",
+								"cond": [
+									{
+										"type": "binary",
+										"op": "||",
+										"x": {
+											"type": "testClause",
+											"x": ""
+										},
+										"y": {
+											"type": "testClause",
+											"x": ""
+										}
+									}
+								],
+								"then": [
+									{
+										"type": "call",
+										"args": [
+											"return",
+											"0"
+										]
+									}
+								]
+							}
+						]
+					},
+					{
+						"type": "if",
+						"cond": [
+							{
+								"type": "call",
+								"args": [
+									"containsElement",
+									"${perm:1:1}",
+									"2",
+									"3",
+									"6",
+									"7"
+								]
+							}
+						],
+						"then": [
+							{
+								"type": "if",
+								"cond": [
+									{
+										"type": "binary",
+										"op": "||",
+										"x": {
+											"type": "call",
+											"args": [
+												"containsElement",
+												"\"$(stat -c %g ${_file})\"",
+												"\"${groups[@]}\""
+											]
+										},
+										"y": {
+											"type": "call",
+											"args": [
+												"containsElement",
+												"\"$(stat -c %G ${_file})\"",
+												"\"${groups[@]}\""
+											]
+										}
+									}
+								],
+								"then": [
+									{
+										"type": "call",
+										"args": [
+											"return",
+											"0"
+										]
+									}
+								]
+							}
+						]
+					},
+					{
+						"type": "call",
+						"args": [
+							"return",
+							"1"
+						]
+					}
+				]
+			}
+		},
+		{
+			"type": "funcDecl",
+			"name": "expand_commands_optionally",
+			"body": {
+				"type": "block",
+				"stmts": [
+					{
+						"type": "if",
+						"cond": [
+							{
+								"type": "call",
+								"args": [
+									"[",
+									"\"${EXTENDED_CONF+\"yes\"}\"",
+									"==",
+									"\"yes\"",
+									"]"
+								]
+							}
+						],
+						"then": [
+							{
+								"type": "call",
+								"args": [
+									"echo",
+									"\"--expand-commands\""
+								]
+							}
+						]
+					}
+				]
+			}
+		},
+		{
+			"type": "funcDecl",
+			"name": "print_permissions_advice_and_fail",
+			"body": {
+				"type": "block",
+				"stmts": [
+					{
+						"type": "call",
+						"assigns": [
+							"_directory=${1}"
+						],
+						"args": []
+					},
+					{
+						"type": "stmt",
+						"cmd": {
+							"type": "call",
+							"args": [
+								"echo",
+								"\"\nFolder ${_directory} is not accessible for user: ${userid} or group ${groupid} or groups ${groups[@]}, this is commonly a file permissions issue on the mounted folder.\n\nHints to solve the issue:\n1) Make sure the folder exists before mounting it. Docker will create the folder using root permissions before starting the Neo4j container. The root permissions disallow Neo4j from writing to the mounted folder.\n2) Pass the folder owner's user ID and group ID to docker run, so that docker runs as that user.\nIf the folder is owned by the current user, this can be done by adding this flag to your docker run command:\n  --user=\\$(id -u):\\$(id -g)\n       \""
+							]
+						},
+						"redirs": [
+							{
+								"op": "\u003e\u0026",
+								"word": "2"
+							}
+						]
+					},
+					{
+						"type": "call",
+						"args": [
+							"exit",
+							"1"
+						]
+					}
+				]
+			}
+		},
+		{
+			"type": "funcDecl",
+			"name": "check_mounted_folder_readable",
+			"body": {
+				"type": "block",
+				"stmts": [
+					{
+						"args": [
+							"_directory=${1}"
+						],
+						"type": "local"
+					},
+					{
+						"type": "if",
+						"cond": [
+							{
+								"type": "stmt",
+								"cmd": {
+									"type": "call",
+									"args": [
+										"is_readable",
+										"\"${_directory}\""
+									]
+								},
+								"negated": true
+							}
+						],
+						"then": [
+							{
+								"type": "call",
+								"args": [
+									"print_permissions_advice_and_fail",
+									"\"${_directory}\""
+								]
+							}
+						]
+					}
+				]
+			}
+		},
+		{
+			"type": "funcDecl",
+			"name": "check_mounted_folder_writable_with_chown",
+			"body": {
+				"type": "block",
+				"stmts": [
+					{
+						"args": [
+							"mountFolder=${1}"
+						],
+						"type": "local"
+					},
+					{
+						"type": "if",
+						"cond": [
+							{
+								"type": "call",
+								"args": [
+									"running_as_root"
+								]
+							}
+						],
+						"then": [
+							{
+								"type": "if",
+								"cond": [
+									{
+										"type": "stmt",
+										"cmd": {
+											"type": "call",
+											"args": [
+												"secure_mode_enabled"
+											]
+										},
+										"negated": true
+									}
+								],
+								"then": [
+									{
+										"type": "if",
+										"cond": [
+											{
+												"type": "stmt",
+												"cmd": {
+													"type": "call",
+													"args": [
+														"is_writable",
+														"\"${mountFolder}\""
+													]
+												},
+												"negated": true
+											}
+										],
+										"then": [
+											{
+												"type": "call",
+												"args": [
+													"echo",
+													"\"Warning: Folder mounted to \\\"${mountFolder}\\\" is not writable from inside container. Changing folder owner to ${userid}.\""
+												]
+											},
+											{
+												"type": "call",
+												"args": [
+													"chown",
+													"-R",
+													"\"${userid}\":\"${groupid}\"",
+													"\"${mountFolder}\""
+												]
+											}
+										],
+										"elifs": [
+											{
+												"cond": [
+													{
+														"type": "call",
+														"args": [
+															"[",
+															"$(gosu \"${userid}\":\"${groupid}\" find \"${mountFolder}\" -not -writable | wc -l)",
+															"-gt",
+															"0",
+															"]"
+														]
+													}
+												],
+												"then": [
+													{
+														"type": "call",
+														"args": [
+															"echo",
+															"\"Warning: Some files inside \\\"${mountFolder}\\\" are not writable from inside container. Changing folder owner to ${userid}.\""
+														]
+													},
+													{
+														"type": "call",
+														"args": [
+															"chown",
+															"-R",
+															"\"${userid}\":\"${groupid}\"",
+															"\"${mountFolder}\""
+														]
+													}
+												]
+											}
+										]
+									}
+								]
+							}
+						],
+						"else": [
+							{
+								"type": "if",
+								"cond": [
+									{
+										"type": "binary",
+										"op": "\u0026\u0026",
+										"x": {
+											"type": "testClause",
+											"x": ""
+										},
+										"y": {
+											"type": "testClause",
+											"x": ""
+										}
+									}
+								],
+								"then": [
+									{
+										"type": "call",
+										"args": [
+											"print_permissions_advice_and_fail",
+											"\"${mountFolder}\""
+										]
+									}
+								]
+							}
+						]
+					}
+				]
+			}
+		},
+		{
+			"type": "funcDecl",
+			"name": "load_plugin_from_github",
+			"body": {
+				"type": "block",
+				"stmts": [
+					{
+						"args": [
+							"_plugin_name=\"${1}\""
+						],
+						"type": "local"
+					},
+					{
+						"args": [
+							"_plugins_dir=\"${NEO4J_HOME}/plugins\""
+						],
+						"type": "local"
+					},
+					{
+						"type": "if",
+						"cond": [
+							{
+								"type": "call",
+								"args": [
+									"[",
+									"-d",
+									"/plugins",
+									"]"
+								]
+							}
+						],
+						"then": [
+							{
+								"args": [
+									"_plugins_dir=\"/plugins\""
+								],
+								"type": "local"
+							}
+						]
+					},
+					{
+						"args": [
+							"_versions_json_url=\"$(jq --raw-output \"with_entries( select(.key==\\\"${_plugin_name}\\\") ) | to_entries[] | .value.versions\" /neo4jlabs-plugins.json)\""
+						],
+						"type": "local"
+					},
+					{
+						"args": [
+							"_destination=\"${_plugins_dir}/${_plugin_name}.jar\""
+						],
+						"type": "local"
+					},
+					{
+						"args": [
+							"_neo4j_version=\"$(neo4j --version | cut -d' ' -f2)\""
+						],
+						"type": "local"
+					},
+					{
+						"type": "call",
+						"args": [
+							"echo",
+							"\"Fetching versions.json for Plugin '${_plugin_name}' from ${_versions_json_url}\""
+						]
+					},
+					{
+						"args": [
+							"_versions_json=\"$(wget -q --timeout 300 --tries 30 -O - \"${_versions_json_url}\")\""
+						],
+						"type": "local"
+					},
+					{
+						"args": [
+							"_plugin_jar_url=\"$(echo \"${_versions_json}\" | jq --raw-output \".[] | select(.neo4j==\\\"${_neo4j_version}\\\") | .jar\")\""
+						],
+						"type": "local"
+					},
+					{
+						"type": "if",
+						"cond": [
+							{
+								"type": "testClause",
+								"x": ""
+							}
+						],
+						"then": [
+							{
+								"type": "stmt",
+								"cmd": {
+									"type": "call",
+									"args": [
+										"echo",
+										"\"Error: No jar URL found for version '${_neo4j_version}' in versions.json from '${_versions_json_url}'\""
+									]
+								},
+								"redirs": [
+									{
+										"op": "\u003e\u0026",
+										"word": "2"
+									}
+								]
+							},
+							{
+								"type": "stmt",
+								"cmd": {
+									"type": "call",
+									"args": [
+										"echo",
+										"\"${_versions_json}\""
+									]
+								},
+								"redirs": [
+									{
+										"op": "\u003e\u0026",
+										"word": "2"
+									}
+								]
+							},
+							{
+								"type": "call",
+								"args": [
+									"exit",
+									"1"
+								]
+							}
+						]
+					},
+					{
+						"type": "call",
+						"args": [
+							"echo",
+							"\"Installing Plugin '${_plugin_name}' from ${_plugin_jar_url} to ${_destination} \""
+						]
+					},
+					{
+						"type": "call",
+						"args": [
+							"wget",
+							"-q",
+							"--timeout",
+							"300",
+							"--tries",
+							"30",
+							"--output-document=\"${_destination}\"",
+							"\"${_plugin_jar_url}\""
+						]
+					},
+					{
+						"type": "if",
+						"cond": [
+							{
+								"type": "stmt",
+								"cmd": {
+									"type": "call",
+									"args": [
+										"is_readable",
+										"\"${_destination}\""
+									]
+								},
+								"negated": true
+							}
+						],
+						"then": [
+							{
+								"type": "stmt",
+								"cmd": {
+									"type": "call",
+									"args": [
+										"echo",
+										"\"Plugin at '${_destination}' is not readable\""
+									]
+								},
+								"redirs": [
+									{
+										"op": "\u003e\u0026",
+										"word": "2"
+									}
+								]
+							},
+							{
+								"type": "call",
+								"args": [
+									"exit",
+									"1"
+								]
+							}
+						]
+					}
+				]
+			}
+		},
+		{
+			"type": "funcDecl",
+			"name": "apply_plugin_default_configuration",
+			"body": {
+				"type": "block",
+				"stmts": [
+					{
+						"args": [
+							"_plugin_name=\"${1}\""
+						],
+						"type": "local"
+					},
+					{
+						"args": [
+							"_reference_conf=\"${2}\""
+						],
+						"type": "local"
+					},
+					{
+						"args": [
+							"_neo4j_conf=\"${NEO4J_HOME}/conf/neo4j.conf\""
+						],
+						"type": "local"
+					},
+					{
+						"args": [
+							"_property",
+							"_value"
+						],
+						"type": "local"
+					},
+					{
+						"type": "call",
+						"args": [
+							"echo",
+							"\"Applying default values for plugin ${_plugin_name} to neo4j.conf\""
+						]
+					},
+					{
+						"type": "for",
+						"loop": {
+							"type": "wordIter",
+							"name": "_entry",
+							"items": [
+								"$(jq --compact-output --raw-output \"with_entries( select(.key==\\\"${_plugin_name}\\\") ) | to_entries[] | .value.properties | to_entries[]\" /neo4jlabs-plugins.json)"
+							]
+						},
+						"do": [
+							{
+								"type": "call",
+								"assigns": [
+									"_property=\"$(jq --raw-output '.key' \u003c\u003c\u003c\"${_entry}\")\""
+								],
+								"args": []
+							},
+							{
+								"type": "call",
+								"assigns": [
+									"_value=\"$(jq --raw-output '.value' \u003c\u003c\u003c\"${_entry}\")\""
+								],
+								"args": []
+							},
+							{
+								"type": "if",
+								"cond": [
+									{
+										"type": "binary",
+										"op": "|",
+										"x": {
+											"type": "call",
+											"args": [
+												"grep",
+												"-o",
+												"\"^[^#]*\"",
+												"\"${_reference_conf}\""
+											]
+										},
+										"y": {
+											"type": "call",
+											"args": [
+												"grep",
+												"-q",
+												"--fixed-strings",
+												"\"${_property}=\""
+											]
+										}
+									}
+								],
+								"then": [
+									{
+										"type": "call",
+										"args": [
+											"echo",
+											"\"Skipping ${_property} for plugin ${_plugin_name} because it is already set\""
+										]
+									}
+								],
+								"else": [
+									{
+										"type": "if",
+										"cond": [
+											{
+												"type": "binary",
+												"op": "|",
+												"x": {
+													"type": "call",
+													"args": [
+														"grep",
+														"-o",
+														"\"^[^#]*\"",
+														"\"${_neo4j_conf}\""
+													]
+												},
+												"y": {
+													"type": "call",
+													"args": [
+														"grep",
+														"-q",
+														"--fixed-strings",
+														"\"${_property}=\""
+													]
+												}
+											}
+										],
+										"then": [
+											{
+												"type": "call",
+												"args": [
+													"sed",
+													"--in-place",
+													"\"s/${_property}=/\u0026${_value},/\"",
+													"\"${_neo4j_conf}\""
+												]
+											}
+										],
+										"else": [
+											{
+												"type": "stmt",
+												"cmd": {
+													"type": "call",
+													"args": [
+														"echo",
+														"\"${_property}=${_value}\""
+													]
+												},
+												"redirs": [
+													{
+														"op": "\u003e\u003e",
+														"word": "\"${_neo4j_conf}\""
+													}
+												]
+											}
+										]
+									}
+								]
+							}
+						]
+					}
+				]
+			}
+		},
+		{
+			"type": "funcDecl",
+			"name": "install_neo4j_labs_plugins",
+			"body": {
+				"type": "block",
+				"stmts": [
+					{
+						"args": [
+							"_old_config=\"$(mktemp)\""
+						],
+						"type": "local"
+					},
+					{
+						"type": "call",
+						"args": [
+							"cp",
+							"\"${NEO4J_HOME}\"/conf/neo4j.conf",
+							"\"${_old_config}\""
+						]
+					},
+					{
+						"type": "for",
+						"loop": {
+							"type": "wordIter",
+							"name": "plugin_name",
+							"items": [
+								"$(echo \"${NEO4JLABS_PLUGINS}\" | jq --raw-output '.[]')"
+							]
+						},
+						"do": [
+							{
+								"type": "call",
+								"args": [
+									"load_plugin_from_github",
+									"\"${plugin_name}\""
+								]
+							},
+							{
+								"type": "call",
+								"args": [
+									"apply_plugin_default_configuration",
+									"\"${plugin_name}\"",
+									"\"${_old_config}\""
+								]
+							}
+						]
+					},
+					{
+						"type": "call",
+						"args": [
+							"rm",
+							"\"${_old_config}\""
+						]
+					}
+				]
+			}
+		},
+		{
+			"type": "funcDecl",
+			"name": "add_docker_default_to_conf",
+			"body": {
+				"type": "block",
+				"stmts": [
+					{
+						"args": [
+							"_setting=\"${1}\""
+						],
+						"type": "local"
+					},
+					{
+						"args": [
+							"_value=\"${2}\""
+						],
+						"type": "local"
+					},
+					{
+						"args": [
+							"_neo4j_home=\"${3}\""
+						],
+						"type": "local"
+					},
+					{
+						"type": "if",
+						"cond": [
+							{
+								"type": "stmt",
+								"cmd": {
+									"type": "call",
+									"args": [
+										"grep",
+										"-q",
+										"\"^${_setting}=\"",
+										"\"${_neo4j_home}\"/conf/neo4j.conf"
+									]
+								},
+								"negated": true
+							}
+						],
+						"then": [
+							{
+								"type": "stmt",
+								"cmd": {
+									"type": "call",
+									"args": [
+										"echo",
+										"-e",
+										"\"\\n\"${_setting}=${_value}"
+									]
+								},
+								"redirs": [
+									{
+										"op": "\u003e\u003e",
+										"word": "\"${_neo4j_home}\"/conf/neo4j.conf"
+									}
+								]
+							}
+						]
+					}
+				]
+			}
+		},
+		{
+			"type": "funcDecl",
+			"name": "add_env_setting_to_conf",
+			"body": {
+				"type": "block",
+				"stmts": [
+					{
+						"args": [
+							"_setting=${1}"
+						],
+						"type": "local"
+					},
+					{
+						"args": [
+							"_value=${2}"
+						],
+						"type": "local"
+					},
+					{
+						"args": [
+							"_neo4j_home=${3}"
+						],
+						"type": "local"
+					},
+					{
+						"type": "if",
+						"cond": [
+							{
+								"type": "call",
+								"args": [
+									"grep",
+									"-q",
+									"-F",
+									"\"${_setting}=\"",
+									"\"${_neo4j_home}\"/conf/neo4j.conf"
+								]
+							}
+						],
+						"then": [
+							{
+								"type": "call",
+								"args": [
+									"sed",
+									"--in-place",
+									"\"/^${_setting}=.*/d\"",
+									"\"${_neo4j_home}\"/conf/neo4j.conf"
+								]
+							}
+						]
+					},
+					{
+						"type": "stmt",
+						"cmd": {
+							"type": "call",
+							"args": [
+								"echo",
+								"\"${_setting}=${_value}\""
+							]
+						},
+						"redirs": [
+							{
+								"op": "\u003e\u003e",
+								"word": "\"${_neo4j_home}\"/conf/neo4j.conf"
+							}
+						]
+					}
+				]
+			}
+		},
+		{
+			"type": "funcDecl",
+			"name": "set_initial_password",
+			"body": {
+				"type": "block",
+				"stmts": [
+					{
+						"args": [
+							"_neo4j_auth=\"${1}\""
+						],
+						"type": "local"
+					},
+					{
+						"type": "if",
+						"cond": [
+							{
+								"type": "call",
+								"args": [
+									"[",
+									"\"${cmd}\"",
+									"==",
+									"\"neo4j\"",
+									"]"
+								]
+							}
+						],
+						"then": [
+							{
+								"type": "if",
+								"cond": [
+									{
+										"type": "call",
+										"args": [
+											"[",
+											"\"${_neo4j_auth:-}\"",
+											"==",
+											"\"none\"",
+											"]"
+										]
+									}
+								],
+								"then": [
+									{
+										"type": "call",
+										"args": [
+											"add_env_setting_to_conf",
+											"\"dbms.security.auth_enabled\"",
+											"\"false\"",
+											"\"${NEO4J_HOME}\""
+										]
+									}
+								],
+								"elifs": [
+									{
+										"cond": [
+											{
+												"type": "testClause",
+												"x": ""
+											}
+										],
+										"then": [
+											{
+												"type": "call",
+												"assigns": [
+													"admin_user=\"${BASH_REMATCH[1]}\""
+												],
+												"args": []
+											},
+											{
+												"type": "call",
+												"assigns": [
+													"password=\"${BASH_REMATCH[2]}\""
+												],
+												"args": []
+											},
+											{
+												"type": "call",
+												"assigns": [
+													"do_reset=\"${BASH_REMATCH[3]}\""
+												],
+												"args": []
+											},
+											{
+												"type": "if",
+												"cond": [
+													{
+														"type": "call",
+														"args": [
+															"[",
+															"\"${password}\"",
+															"==",
+															"\"neo4j\"",
+															"]"
+														]
+													}
+												],
+												"then": [
+													{
+														"type": "stmt",
+														"cmd": {
+															"type": "call",
+															"args": [
+																"echo",
+																"\"Invalid value for password. It cannot be 'neo4j', which is the default.\""
+															]
+														},
+														"redirs": [
+															{
+																"op": "\u003e\u0026",
+																"word": "2"
+															}
+														]
+													},
+													{
+														"type": "call",
+														"args": [
+															"exit",
+															"1"
+														]
+													}
+												]
+											},
+											{
+												"type": "if",
+												"cond": [
+													{
+														"type": "call",
+														"args": [
+															"[",
+															"\"${admin_user}\"",
+															"!=",
+															"\"neo4j\"",
+															"]"
+														]
+													}
+												],
+												"then": [
+													{
+														"type": "stmt",
+														"cmd": {
+															"type": "call",
+															"args": [
+																"echo",
+																"\"Invalid admin username, it must be neo4j\""
+															]
+														},
+														"redirs": [
+															{
+																"op": "\u003e\u0026",
+																"word": "2"
+															}
+														]
+													},
+													{
+														"type": "call",
+														"args": [
+															"exit",
+															"1"
+														]
+													}
+												]
+											},
+											{
+												"type": "if",
+												"cond": [
+													{
+														"type": "call",
+														"args": [
+															"running_as_root"
+														]
+													}
+												],
+												"then": [
+													{
+														"type": "call",
+														"args": [
+															"mkdir",
+															"-p",
+															"/data/dbms"
+														]
+													},
+													{
+														"type": "call",
+														"args": [
+															"chown",
+															"\"${userid}\":\"${groupid}\"",
+															"/data/dbms"
+														]
+													}
+												]
+											},
+											{
+												"type": "if",
+												"cond": [
+													{
+														"type": "call",
+														"args": [
+															"[",
+															"\"${do_reset}\"",
+															"==",
+															"\"true\"",
+															"]"
+														]
+													}
+												],
+												"then": [
+													{
+														"type": "binary",
+														"op": "||",
+														"x": {
+															"type": "stmt",
+															"cmd": {
+																"type": "call",
+																"args": [
+																	"${neo4j_admin_cmd}",
+																	"set-initial-password",
+																	"\"${password}\"",
+																	"--require-password-change",
+																	"$(expand_commands_optionally)"
+																]
+															},
+															"redirs": [
+																{
+																	"op": "\u003e",
+																	"word": "/dev/null",
+																	"n": "2"
+																}
+															]
+														},
+														"y": {
+															"type": "call",
+															"args": [
+																"true"
+															]
+														}
+													}
+												],
+												"else": [
+													{
+														"type": "binary",
+														"op": "||",
+														"x": {
+															"type": "stmt",
+															"cmd": {
+																"type": "call",
+																"args": [
+																	"${neo4j_admin_cmd}",
+																	"set-initial-password",
+																	"\"${password}\"",
+																	"$(expand_commands_optionally)"
+																]
+															},
+															"redirs": [
+																{
+																	"op": "\u003e",
+																	"word": "/dev/null",
+																	"n": "2"
+																}
+															]
+														},
+														"y": {
+															"type": "call",
+															"args": [
+																"true"
+															]
+														}
+													}
+												]
+											}
+										]
+									},
+									{
+										"cond": [
+											{
+												"type": "call",
+												"args": [
+													"[",
+													"-n",
+													"\"${_neo4j_auth:-}\"",
+													"]"
+												]
+											}
+										],
+										"then": [
+											{
+												"type": "call",
+												"args": [
+													"echo",
+													"\"$_neo4j_auth is invalid\""
+												]
+											},
+											{
+												"type": "stmt",
+												"cmd": {
+													"type": "call",
+													"args": [
+														"echo",
+														"\"Invalid value for NEO4J_AUTH: '${_neo4j_auth}'\""
+													]
+												},
+												"redirs": [
+													{
+														"op": "\u003e\u0026",
+														"word": "2"
+													}
+												]
+											},
+											{
+												"type": "call",
+												"args": [
+													"exit",
+													"1"
+												]
+											}
+										]
+									}
+								]
+							}
+						]
+					}
+				]
+			}
+		},
+		{
+			"type": "if",
+			"cond": [
+				{
+					"type": "call",
+					"args": [
+						"running_as_root"
+					]
+				}
+			],
+			"then": [
+				{
+					"type": "call",
+					"assigns": [
+						"userid=\"neo4j\""
+					],
+					"args": []
+				},
+				{
+					"type": "call",
+					"assigns": [
+						"groupid=\"neo4j\""
+					],
+					"args": []
+				},
+				{
+					"type": "call",
+					"assigns": [
+						"groups=($(id -G neo4j))"
+					],
+					"args": []
+				},
+				{
+					"type": "call",
+					"assigns": [
+						"exec_cmd=\"exec gosu neo4j:neo4j\""
+					],
+					"args": []
+				},
+				{
+					"type": "call",
+					"assigns": [
+						"neo4j_admin_cmd=\"gosu neo4j:neo4j neo4j-admin\""
+					],
+					"args": []
+				}
+			],
+			"else": [
+				{
+					"type": "call",
+					"assigns": [
+						"userid=\"$(id -u)\""
+					],
+					"args": []
+				},
+				{
+					"type": "call",
+					"assigns": [
+						"groupid=\"$(id -g)\""
+					],
+					"args": []
+				},
+				{
+					"type": "call",
+					"assigns": [
+						"groups=($(id -G))"
+					],
+					"args": []
+				},
+				{
+					"type": "call",
+					"assigns": [
+						"exec_cmd=\"exec\""
+					],
+					"args": []
+				},
+				{
+					"type": "call",
+					"assigns": [
+						"neo4j_admin_cmd=\"neo4j-admin\""
+					],
+					"args": []
+				}
+			]
+		},
+		{
+			"args": [
+				"userid"
+			],
+			"type": "readonly"
+		},
+		{
+			"args": [
+				"groupid"
+			],
+			"type": "readonly"
+		},
+		{
+			"args": [
+				"groups"
+			],
+			"type": "readonly"
+		},
+		{
+			"args": [
+				"exec_cmd"
+			],
+			"type": "readonly"
+		},
+		{
+			"args": [
+				"neo4j_admin_cmd"
+			],
+			"type": "readonly"
+		},
+		{
+			"type": "if",
+			"cond": [
+				{
+					"type": "call",
+					"args": [
+						"running_as_root"
+					]
+				}
+			],
+			"then": [
+				{
+					"type": "call",
+					"args": [
+						"chown",
+						"-R",
+						"\"${userid}\":\"${groupid}\"",
+						"\"${NEO4J_HOME}\""
+					]
+				},
+				{
+					"type": "call",
+					"args": [
+						"chmod",
+						"700",
+						"\"${NEO4J_HOME}\""
+					]
+				},
+				{
+					"type": "call",
+					"args": [
+						"find",
+						"\"${NEO4J_HOME}\"",
+						"-mindepth",
+						"1",
+						"-maxdepth",
+						"1",
+						"-type",
+						"d",
+						"-exec",
+						"chmod",
+						"-R",
+						"700",
+						"{}",
+						"\\;"
+					]
+				},
+				{
+					"type": "call",
+					"args": [
+						"find",
+						"\"${NEO4J_HOME}\"/conf",
+						"-type",
+						"f",
+						"-exec",
+						"chmod",
+						"-R",
+						"600",
+						"{}",
+						"\\;"
+					]
+				}
+			]
+		},
+		{
+			"type": "if",
+			"cond": [
+				{
+					"type": "testClause",
+					"x": ""
+				}
+			],
+			"then": [
+				{
+					"type": "if",
+					"cond": [
+						{
+							"type": "call",
+							"args": [
+								"[",
+								"\"${NEO4J_EDITION}\"",
+								"==",
+								"\"enterprise\"",
+								"]"
+							]
+						}
+					],
+					"then": [
+						{
+							"type": "if",
+							"cond": [
+								{
+									"type": "call",
+									"args": [
+										"[",
+										"\"${NEO4J_ACCEPT_LICENSE_AGREEMENT:=no}\"",
+										"!=",
+										"\"yes\"",
+										"]"
+									]
+								}
+							],
+							"then": [
+								{
+									"type": "stmt",
+									"cmd": {
+										"type": "call",
+										"args": [
+											"echo",
+											"\"\nIn order to use Neo4j Enterprise Edition you must accept the license agreement.\n\n(c) Neo4j Sweden AB. 2021.  All Rights Reserved.\nUse of this Software without a proper commercial license with Neo4j,\nInc. or its affiliates is prohibited.\n\nEmail inquiries can be directed to: licensing@neo4j.com\n\nMore information is also available at: https://neo4j.com/licensing/\n\n\nTo accept the license agreement set the environment variable\nNEO4J_ACCEPT_LICENSE_AGREEMENT=yes\n\nTo do this you can use the following docker argument:\n\n        --env=NEO4J_ACCEPT_LICENSE_AGREEMENT=yes\n\""
+										]
+									},
+									"redirs": [
+										{
+											"op": "\u003e\u0026",
+											"word": "2"
+										}
+									]
+								},
+								{
+									"type": "call",
+									"args": [
+										"exit",
+										"1"
+									]
+								}
+							]
+						}
+					]
+				}
+			]
+		},
+		{
+			"type": "call",
+			"args": [
+				":",
+				"${NEO4J_dbms_tx__log_rotation_retention__policy:=${NEO4J_dbms_txLog_rotation_retentionPolicy:-}}"
+			]
+		},
+		{
+			"type": "call",
+			"args": [
+				":",
+				"${NEO4J_dbms_unmanaged__extension__classes:=${NEO4J_dbms_unmanagedExtensionClasses:-}}"
+			]
+		},
+		{
+			"type": "call",
+			"args": [
+				":",
+				"${NEO4J_dbms_allow__format__migration:=${NEO4J_dbms_allowFormatMigration:-}}"
+			]
+		},
+		{
+			"type": "call",
+			"args": [
+				":",
+				"${NEO4J_dbms_connectors_default__advertised__address:=${NEO4J_dbms_connectors_defaultAdvertisedAddress:-}}"
+			]
+		},
+		{
+			"type": "if",
+			"cond": [
+				{
+					"type": "call",
+					"args": [
+						"[",
+						"\"${NEO4J_EDITION}\"",
+						"==",
+						"\"enterprise\"",
+						"]"
+					]
+				}
+			],
+			"then": [
+				{
+					"type": "call",
+					"args": [
+						":",
+						"${NEO4J_causal__clustering_expected__core__cluster__size:=${NEO4J_causalClustering_expectedCoreClusterSize:-}}"
+					]
+				},
+				{
+					"type": "call",
+					"args": [
+						":",
+						"${NEO4J_causal__clustering_initial__discovery__members:=${NEO4J_causalClustering_initialDiscoveryMembers:-}}"
+					]
+				},
+				{
+					"type": "call",
+					"args": [
+						":",
+						"${NEO4J_causal__clustering_discovery__advertised__address:=${NEO4J_causalClustering_discoveryAdvertisedAddress:-}}"
+					]
+				},
+				{
+					"type": "call",
+					"args": [
+						":",
+						"${NEO4J_causal__clustering_transaction__advertised__address:=${NEO4J_causalClustering_transactionAdvertisedAddress:-}}"
+					]
+				},
+				{
+					"type": "call",
+					"args": [
+						":",
+						"${NEO4J_causal__clustering_raft__advertised__address:=${NEO4J_causalClustering_raftAdvertisedAddress:-}}"
+					]
+				}
+			]
+		},
+		{
+			"type": "call",
+			"args": [
+				"unset",
+				"NEO4J_dbms_txLog_rotation_retentionPolicy",
+				"NEO4J_UDC_SOURCE",
+				"NEO4J_dbms_unmanagedExtensionClasses",
+				"NEO4J_dbms_allowFormatMigration",
+				"NEO4J_dbms_connectors_defaultAdvertisedAddress",
+				"NEO4J_ha_serverId",
+				"NEO4J_ha_initialHosts",
+				"NEO4J_causalClustering_expectedCoreClusterSize",
+				"NEO4J_causalClustering_initialDiscoveryMembers",
+				"NEO4J_causalClustering_discoveryListenAddress",
+				"NEO4J_causalClustering_discoveryAdvertisedAddress",
+				"NEO4J_causalClustering_transactionListenAddress",
+				"NEO4J_causalClustering_transactionAdvertisedAddress",
+				"NEO4J_causalClustering_raftListenAddress",
+				"NEO4J_causalClustering_raftAdvertisedAddress"
+			]
+		},
+		{
+			"type": "if",
+			"cond": [
+				{
+					"type": "call",
+					"args": [
+						"[",
+						"-d",
+						"/conf",
+						"]"
+					]
+				}
+			],
+			"then": [
+				{
+					"type": "call",
+					"args": [
+						"check_mounted_folder_readable",
+						"\"/conf\""
+					]
+				},
+				{
+					"type": "call",
+					"args": [
+						"rm",
+						"-rf",
+						"\"${NEO4J_HOME}\"/conf/*"
+					]
+				},
+				{
+					"type": "call",
+					"args": [
+						"find",
+						"/conf",
+						"-type",
+						"f",
+						"-exec",
+						"cp",
+						"--preserve=ownership,mode",
+						"{}",
+						"\"${NEO4J_HOME}\"/conf",
+						"\\;"
+					]
+				}
+			]
+		},
+		{
+			"type": "if",
+			"cond": [
+				{
+					"type": "call",
+					"args": [
+						"[",
+						"-d",
+						"/ssl",
+						"]"
+					]
+				}
+			],
+			"then": [
+				{
+					"type": "call",
+					"args": [
+						"check_mounted_folder_readable",
+						"\"/ssl\""
+					]
+				},
+				{
+					"type": "call",
+					"args": [
+						"rm",
+						"-rf",
+						"\"${NEO4J_HOME}\"/certificates"
+					]
+				},
+				{
+					"type": "call",
+					"args": [
+						"ln",
+						"-s",
+						"/ssl",
+						"\"${NEO4J_HOME}\"/certificates"
+					]
+				}
+			]
+		},
+		{
+			"type": "if",
+			"cond": [
+				{
+					"type": "call",
+					"args": [
+						"[",
+						"-d",
+						"/plugins",
+						"]"
+					]
+				}
+			],
+			"then": [
+				{
+					"type": "if",
+					"cond": [
+						{
+							"type": "testClause",
+							"x": ""
+						}
+					],
+					"then": [
+						{
+							"type": "call",
+							"args": [
+								"check_mounted_folder_writable_with_chown",
+								"\"/plugins\""
+							]
+						}
+					]
+				},
+				{
+					"type": "call",
+					"args": [
+						"check_mounted_folder_readable",
+						"\"/plugins\""
+					]
+				},
+				{
+					"type": "call",
+					"args": [
+						":",
+						"${NEO4J_dbms_directories_plugins:=\"/plugins\"}"
+					]
+				}
+			]
+		},
+		{
+			"type": "if",
+			"cond": [
+				{
+					"type": "call",
+					"args": [
+						"[",
+						"-d",
+						"/import",
+						"]"
+					]
+				}
+			],
+			"then": [
+				{
+					"type": "call",
+					"args": [
+						"check_mounted_folder_readable",
+						"\"/import\""
+					]
+				},
+				{
+					"type": "call",
+					"args": [
+						":",
+						"${NEO4J_dbms_directories_import:=\"/import\"}"
+					]
+				}
+			]
+		},
+		{
+			"type": "if",
+			"cond": [
+				{
+					"type": "call",
+					"args": [
+						"[",
+						"-d",
+						"/metrics",
+						"]"
+					]
+				}
+			],
+			"then": [
+				{
+					"type": "call",
+					"args": [
+						"check_mounted_folder_writable_with_chown",
+						"\"/metrics\""
+					]
+				},
+				{
+					"type": "call",
+					"args": [
+						":",
+						"${NEO4J_dbms_directories_metrics:=\"/metrics\"}"
+					]
+				}
+			]
+		},
+		{
+			"type": "if",
+			"cond": [
+				{
+					"type": "call",
+					"args": [
+						"[",
+						"-d",
+						"/logs",
+						"]"
+					]
+				}
+			],
+			"then": [
+				{
+					"type": "call",
+					"args": [
+						"check_mounted_folder_writable_with_chown",
+						"\"/logs\""
+					]
+				},
+				{
+					"type": "call",
+					"args": [
+						":",
+						"${NEO4J_dbms_directories_logs:=\"/logs\"}"
+					]
+				}
+			]
+		},
+		{
+			"type": "if",
+			"cond": [
+				{
+					"type": "call",
+					"args": [
+						"[",
+						"-d",
+						"/data",
+						"]"
+					]
+				}
+			],
+			"then": [
+				{
+					"type": "call",
+					"args": [
+						"check_mounted_folder_writable_with_chown",
+						"\"/data\""
+					]
+				},
+				{
+					"type": "if",
+					"cond": [
+						{
+							"type": "call",
+							"args": [
+								"[",
+								"-d",
+								"/data/databases",
+								"]"
+							]
+						}
+					],
+					"then": [
+						{
+							"type": "call",
+							"args": [
+								"check_mounted_folder_writable_with_chown",
+								"\"/data/databases\""
+							]
+						}
+					]
+				},
+				{
+					"type": "if",
+					"cond": [
+						{
+							"type": "call",
+							"args": [
+								"[",
+								"-d",
+								"/data/dbms",
+								"]"
+							]
+						}
+					],
+					"then": [
+						{
+							"type": "call",
+							"args": [
+								"check_mounted_folder_writable_with_chown",
+								"\"/data/dbms\""
+							]
+						}
+					]
+				},
+				{
+					"type": "if",
+					"cond": [
+						{
+							"type": "call",
+							"args": [
+								"[",
+								"-d",
+								"/data/transactions",
+								"]"
+							]
+						}
+					],
+					"then": [
+						{
+							"type": "call",
+							"args": [
+								"check_mounted_folder_writable_with_chown",
+								"\"/data/transactions\""
+							]
+						}
+					]
+				}
+			]
+		},
+		{
+			"type": "if",
+			"cond": [
+				{
+					"type": "call",
+					"args": [
+						"[",
+						"-d",
+						"/licenses",
+						"]"
+					]
+				}
+			],
+			"then": [
+				{
+					"type": "call",
+					"args": [
+						"check_mounted_folder_readable",
+						"\"/licenses\""
+					]
+				},
+				{
+					"type": "call",
+					"args": [
+						":",
+						"${NEO4J_dbms_directories_licenses:=\"/licenses\"}"
+					]
+				}
+			]
+		},
+		{
+			"type": "call",
+			"args": [
+				"add_docker_default_to_conf",
+				"\"dbms.tx_log.rotation.retention_policy\"",
+				"\"100M size\"",
+				"\"${NEO4J_HOME}\""
+			]
+		},
+		{
+			"type": "call",
+			"args": [
+				"add_docker_default_to_conf",
+				"\"dbms.memory.pagecache.size\"",
+				"\"512M\"",
+				"\"${NEO4J_HOME}\""
+			]
+		},
+		{
+			"type": "call",
+			"args": [
+				"add_docker_default_to_conf",
+				"\"dbms.default_listen_address\"",
+				"\"0.0.0.0\"",
+				"\"${NEO4J_HOME}\""
+			]
+		},
+		{
+			"type": "if",
+			"cond": [
+				{
+					"type": "call",
+					"args": [
+						"[",
+						"\"${NEO4J_EDITION}\"",
+						"==",
+						"\"enterprise\"",
+						"]"
+					]
+				}
+			],
+			"then": [
+				{
+					"type": "call",
+					"args": [
+						"add_docker_default_to_conf",
+						"\"causal_clustering.discovery_advertised_address\"",
+						"\"$(hostname):5000\"",
+						"\"${NEO4J_HOME}\""
+					]
+				},
+				{
+					"type": "call",
+					"args": [
+						"add_docker_default_to_conf",
+						"\"causal_clustering.transaction_advertised_address\"",
+						"\"$(hostname):6000\"",
+						"\"${NEO4J_HOME}\""
+					]
+				},
+				{
+					"type": "call",
+					"args": [
+						"add_docker_default_to_conf",
+						"\"causal_clustering.raft_advertised_address\"",
+						"\"$(hostname):7000\"",
+						"\"${NEO4J_HOME}\""
+					]
+				}
+			]
+		},
+		{
+			"type": "call",
+			"assigns": [
+				"temp_neo4j_home=\"${NEO4J_HOME}\""
+			],
+			"args": []
+		},
+		{
+			"type": "call",
+			"assigns": [
+				"temp_neo4j_auth=\"${NEO4J_AUTH:-}\""
+			],
+			"args": []
+		},
+		{
+			"type": "call",
+			"args": [
+				"unset",
+				"NEO4J_AUTH",
+				"NEO4J_SHA256",
+				"NEO4J_TARBALL",
+				"NEO4J_EDITION",
+				"NEO4J_ACCEPT_LICENSE_AGREEMENT",
+				"NEO4J_HOME"
+			]
+		},
+		{
+			"type": "for",
+			"loop": {
+				"type": "wordIter",
+				"name": "i",
+				"items": [
+					"$(set | grep ^NEO4J_ | awk -F'=' '{print $1}' | sort -rn)"
+				]
+			},
+			"do": [
+				{
+					"type": "call",
+					"assigns": [
+						"setting=$(echo \"${i}\" | sed 's|^NEO4J_||' | sed 's|_|.|g' | sed 's|\\.\\.|_|g')"
+					],
+					"args": []
+				},
+				{
+					"type": "call",
+					"assigns": [
+						"value=$(echo \"${!i}\")"
+					],
+					"args": []
+				},
+				{
+					"type": "if",
+					"cond": [
+						{
+							"type": "testClause",
+							"x": ""
+						}
+					],
+					"then": [
+						{
+							"type": "if",
+							"cond": [
+								{
+									"type": "testClause",
+									"x": ""
+								}
+							],
+							"then": [
+								{
+									"type": "call",
+									"args": [
+										"add_env_setting_to_conf",
+										"\"${setting}\"",
+										"\"${value}\"",
+										"\"${temp_neo4j_home}\""
+									]
+								}
+							],
+							"else": [
+								{
+									"type": "stmt",
+									"cmd": {
+										"type": "call",
+										"args": [
+											"echo",
+											"\"WARNING: ${setting} not written to conf file because settings that start with a number are not permitted\""
+										]
+									},
+									"redirs": [
+										{
+											"op": "\u003e\u0026",
+											"word": "2"
+										}
+									]
+								}
+							]
+						}
+					]
+				}
+			]
+		},
+		{
+			"args": [
+				"NEO4J_HOME=\"${temp_neo4j_home}\""
+			],
+			"type": "export"
+		},
+		{
+			"type": "call",
+			"args": [
+				"unset",
+				"temp_neo4j_home"
+			]
+		},
+		{
+			"type": "call",
+			"args": [
+				"set_initial_password",
+				"\"${temp_neo4j_auth}\""
+			]
+		},
+		{
+			"type": "if",
+			"cond": [
+				{
+					"type": "testClause",
+					"x": ""
+				}
+			],
+			"then": [
+				{
+					"type": "call",
+					"args": [
+						"install_neo4j_labs_plugins"
+					]
+				}
+			]
+		},
+		{
+			"type": "binary",
+			"op": "\u0026\u0026",
+			"x": {
+				"type": "call",
+				"args": [
+					"[",
+					"-f",
+					"\"${EXTENSION_SCRIPT:-}\"",
+					"]"
+				]
+			},
+			"y": {
+				"type": "call",
+				"args": [
+					".",
+					"${EXTENSION_SCRIPT}"
+				]
+			}
+		},
+		{
+			"type": "if",
+			"cond": [
+				{
+					"type": "call",
+					"args": [
+						"[",
+						"\"${cmd}\"",
+						"==",
+						"\"dump-config\"",
+						"]"
+					]
+				}
+			],
+			"then": [
+				{
+					"type": "if",
+					"cond": [
+						{
+							"type": "stmt",
+							"cmd": {
+								"type": "call",
+								"args": [
+									"is_writable",
+									"\"/conf\""
+								]
+							},
+							"negated": true
+						}
+					],
+					"then": [
+						{
+							"type": "call",
+							"args": [
+								"print_permissions_advice_and_fail",
+								"\"/conf\""
+							]
+						}
+					]
+				},
+				{
+					"type": "call",
+					"args": [
+						"cp",
+						"--recursive",
+						"\"${NEO4J_HOME}\"/conf/*",
+						"/conf"
+					]
+				},
+				{
+					"type": "call",
+					"args": [
+						"echo",
+						"\"Config Dumped\""
+					]
+				},
+				{
+					"type": "call",
+					"args": [
+						"exit",
+						"0"
+					]
+				}
+			]
+		},
+		{
+			"type": "if",
+			"cond": [
+				{
+					"type": "call",
+					"args": [
+						"[",
+						"\"${cmd}\"",
+						"==",
+						"\"neo4j\"",
+						"]"
+					]
+				}
+			],
+			"then": [
+				{
+					"type": "if",
+					"cond": [
+						{
+							"type": "call",
+							"args": [
+								"[",
+								"\"${EXTENDED_CONF+\"yes\"}\"",
+								"==",
+								"\"yes\"",
+								"]"
+							]
+						}
+					],
+					"then": [
+						{
+							"type": "call",
+							"args": [
+								"${exec_cmd}",
+								"neo4j",
+								"console",
+								"--expand-commands"
+							]
+						}
+					],
+					"else": [
+						{
+							"type": "call",
+							"args": [
+								"${exec_cmd}",
+								"neo4j",
+								"console"
+							]
+						}
+					]
+				}
+			],
+			"else": [
+				{
+					"type": "call",
+					"args": [
+						"${exec_cmd}",
+						"\"$@\""
+					]
+				}
+			]
+		}
+	]
+}

@@ -1,0 +1,21 @@
+{
+	"type": "jq",
+	"query": {
+		"type": "pipe",
+		"left": {
+			"type": "field",
+			"name": ".foo"
+		},
+		"right": {
+			"type": "pipe",
+			"left": {
+				"type": "field",
+				"name": ".bar"
+			},
+			"right": {
+				"type": "field",
+				"name": ".baz"
+			}
+		}
+	}
+}

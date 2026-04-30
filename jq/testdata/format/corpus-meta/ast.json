@@ -1,0 +1,2284 @@
+{
+	"type": "jq",
+	"imports": [
+		{
+			"type": "import",
+			"include": true,
+			"path": "\"doi\""
+		}
+	],
+	"funcDefs": [
+		{
+			"type": "funcDef",
+			"name": "needs_build",
+			"leadingComments": [
+				"# \"build_should_sbom\", etc.",
+				"# input: \"build\" object (with \"buildId\" top level key)",
+				"# output: boolean"
+			],
+			"body": {
+				"type": "binOp",
+				"op": "==",
+				"left": {
+					"type": "binOp",
+					"op": "",
+					"left": {
+						"type": "field",
+						"name": ".build"
+					},
+					"right": {
+						"type": "field",
+						"name": ".resolved"
+					}
+				},
+				"right": {
+					"type": "null"
+				}
+			}
+		},
+		{
+			"type": "funcDef",
+			"name": "normalized_builder",
+			"leadingComments": [
+				"# input: \"build\" object (with \"buildId\" top level key)",
+				"# output: string (\"Builder\", but normalized)"
+			],
+			"body": {
+				"type": "as",
+				"expr": {
+					"type": "binOp",
+					"op": "",
+					"left": {
+						"type": "field",
+						"name": ".build"
+					},
+					"right": {
+						"type": "field",
+						"name": ".arch"
+					}
+				},
+				"pattern": {
+					"type": "var",
+					"name": "$arch"
+				},
+				"body": {
+					"type": "pipe",
+					"left": {
+						"type": "binOp",
+						"op": "",
+						"left": {
+							"type": "index",
+							"expr": {
+								"type": "binOp",
+								"op": "",
+								"left": {
+									"type": "field",
+									"name": ".source"
+								},
+								"right": {
+									"type": "field",
+									"name": ".entries"
+								}
+							},
+							"key": {
+								"type": "number",
+								"raw": "0"
+							}
+						},
+						"right": {
+							"type": "field",
+							"name": ".Builder"
+						}
+					},
+					"right": {
+						"type": "if",
+						"cond": {
+							"type": "binOp",
+							"op": "==",
+							"left": {
+								"type": "identity"
+							},
+							"right": {
+								"type": "string",
+								"raw": "\"\""
+							}
+						},
+						"then": {
+							"type": "if",
+							"cond": {
+								"type": "pipe",
+								"left": {
+									"type": "var",
+									"name": "$arch"
+								},
+								"right": {
+									"type": "call",
+									"name": "startswith",
+									"args": [
+										{
+											"type": "string",
+											"raw": "\"windows-\""
+										}
+									]
+								}
+							},
+							"then": {
+								"type": "commented",
+								"leadingComments": [
+									"# https://github.com/microsoft/Windows-Containers/issues/34"
+								],
+								"expr": {
+									"type": "string",
+									"raw": "\"classic\""
+								}
+							},
+							"else": {
+								"type": "string",
+								"raw": "\"buildkit\""
+							}
+						},
+						"else": {
+							"type": "identity"
+						}
+					}
+				}
+			}
+		},
+		{
+			"type": "funcDef",
+			"name": "normalize_ref_to_docker",
+			"leadingComments": [
+				"# input: \"docker.io/library/foo:bar\"",
+				"# output: \"foo:bar\""
+			],
+			"body": {
+				"type": "pipe",
+				"left": {
+					"type": "call",
+					"name": "ltrimstr",
+					"args": [
+						{
+							"type": "string",
+							"raw": "\"docker.io/\""
+						}
+					]
+				},
+				"right": {
+					"type": "call",
+					"name": "ltrimstr",
+					"args": [
+						{
+							"type": "string",
+							"raw": "\"library/\""
+						}
+					]
+				}
+			}
+		},
+		{
+			"type": "funcDef",
+			"name": "pull_command",
+			"leadingComments": [
+				"# input: \"build\" object (with \"buildId\" top level key)",
+				"# output: string \"pull command\" (\"docker pull ...\"), may be multiple lines, expects to run in Bash with \"set -Eeuo pipefail\", might be empty"
+			],
+			"body": {
+				"type": "as",
+				"expr": {
+					"type": "call",
+					"name": "normalized_builder"
+				},
+				"pattern": {
+					"type": "var",
+					"name": "$builder"
+				},
+				"body": {
+					"type": "if",
+					"cond": {
+						"type": "binOp",
+						"op": "==",
+						"left": {
+							"type": "var",
+							"name": "$builder"
+						},
+						"right": {
+							"type": "string",
+							"raw": "\"classic\""
+						}
+					},
+					"then": {
+						"type": "pipe",
+						"left": {
+							"type": "array",
+							"elem": {
+								"type": "comma",
+								"left": {
+									"type": "paren",
+									"expr": {
+										"type": "as",
+										"expr": {
+											"type": "pipe",
+											"left": {
+												"type": "binOp",
+												"op": "",
+												"left": {
+													"type": "field",
+													"name": ".build"
+												},
+												"right": {
+													"type": "field",
+													"name": ".resolvedParents"
+												}
+											},
+											"right": {
+												"type": "pipe",
+												"left": {
+													"type": "index",
+													"expr": {
+														"type": "call",
+														"name": "to_entries"
+													}
+												},
+												"right": {
+													"type": "paren",
+													"expr": {
+														"type": "pipe",
+														"left": {
+															"type": "binOp",
+															"op": "//",
+															"left": {
+																"type": "index",
+																"expr": {
+																	"type": "binOp",
+																	"op": "",
+																	"left": {
+																		"type": "index",
+																		"expr": {
+																			"type": "binOp",
+																			"op": "",
+																			"left": {
+																				"type": "field",
+																				"name": ".value"
+																			},
+																			"right": {
+																				"type": "field",
+																				"name": ".manifests"
+																			}
+																		},
+																		"key": {
+																			"type": "number",
+																			"raw": "0"
+																		}
+																	},
+																	"right": {
+																		"type": "field",
+																		"name": ".annotations"
+																	}
+																},
+																"key": {
+																	"type": "string",
+																	"raw": "\"org.opencontainers.image.ref.name\""
+																}
+															},
+															"right": {
+																"type": "binOp",
+																"op": "//",
+																"left": {
+																	"type": "index",
+																	"expr": {
+																		"type": "binOp",
+																		"op": "",
+																		"left": {
+																			"type": "field",
+																			"name": ".value"
+																		},
+																		"right": {
+																			"type": "field",
+																			"name": ".annotations"
+																		}
+																	},
+																	"key": {
+																		"type": "string",
+																		"raw": "\"org.opencontainers.image.ref.name\""
+																	}
+																},
+																"right": {
+																	"type": "call",
+																	"name": "error",
+																	"args": [
+																		{
+																			"type": "string",
+																			"raw": "\"parent \\(.key) missing ref\""
+																		}
+																	]
+																}
+															}
+														},
+														"right": {
+															"type": "call",
+															"name": "normalize_ref_to_docker"
+														}
+													}
+												}
+											}
+										},
+										"pattern": {
+											"type": "var",
+											"name": "$ref"
+										},
+										"body": {
+											"type": "comma",
+											"left": {
+												"type": "format",
+												"name": "sh",
+												"str": {
+													"type": "string",
+													"raw": "\"docker pull \\($ref)\""
+												}
+											},
+											"right": {
+												"type": "format",
+												"name": "sh",
+												"str": {
+													"type": "string",
+													"raw": "\"docker tag \\($ref) \\(.key)\""
+												}
+											}
+										}
+									}
+								},
+								"right": {
+									"type": "call",
+									"name": "empty"
+								}
+							}
+						},
+						"right": {
+							"type": "call",
+							"name": "join",
+							"args": [
+								{
+									"type": "string",
+									"raw": "\"\\n\""
+								}
+							]
+						}
+					},
+					"elseIfs": [
+						{
+							"cond": {
+								"type": "binOp",
+								"op": "==",
+								"left": {
+									"type": "var",
+									"name": "$builder"
+								},
+								"right": {
+									"type": "string",
+									"raw": "\"buildkit\""
+								}
+							},
+							"then": {
+								"type": "commented",
+								"expr": {
+									"type": "string",
+									"raw": "\"\""
+								},
+								"trailingComment": "# buildkit has to pull during build 🙈"
+							}
+						},
+						{
+							"cond": {
+								"type": "binOp",
+								"op": "==",
+								"left": {
+									"type": "var",
+									"name": "$builder"
+								},
+								"right": {
+									"type": "string",
+									"raw": "\"oci-import\""
+								}
+							},
+							"then": {
+								"type": "commented",
+								"expr": {
+									"type": "string",
+									"raw": "\"\""
+								},
+								"trailingComment": "# \"oci-import\" is essentially \"FROM scratch\""
+							}
+						}
+					],
+					"else": {
+						"type": "call",
+						"name": "error",
+						"args": [
+							{
+								"type": "string",
+								"raw": "\"unknown/unimplemented Builder: \\($builder)\""
+							}
+						]
+					}
+				}
+			}
+		},
+		{
+			"type": "funcDef",
+			"name": "git_build_url",
+			"leadingComments": [
+				"# input: \"build\" object (with \"buildId\" top level key)",
+				"# output: string \"giturl\" (\"https://github.com/docker-library/golang.git#commit:directory), used for \"docker buildx build giturl\""
+			],
+			"body": {
+				"type": "pipe",
+				"left": {
+					"type": "index",
+					"expr": {
+						"type": "binOp",
+						"op": "",
+						"left": {
+							"type": "field",
+							"name": ".source"
+						},
+						"right": {
+							"type": "field",
+							"name": ".entries"
+						}
+					},
+					"key": {
+						"type": "number",
+						"raw": "0"
+					}
+				},
+				"right": {
+					"type": "binOp",
+					"op": "+",
+					"left": {
+						"type": "binOp",
+						"op": "+",
+						"left": {
+							"type": "binOp",
+							"op": "+",
+							"left": {
+								"type": "binOp",
+								"op": "+",
+								"left": {
+									"type": "paren",
+									"expr": {
+										"type": "pipe",
+										"left": {
+											"type": "field",
+											"name": ".GitRepo"
+										},
+										"right": {
+											"type": "if",
+											"cond": {
+												"type": "paren",
+												"expr": {
+													"type": "pipe",
+													"left": {
+														"type": "call",
+														"name": "endswith",
+														"args": [
+															{
+																"type": "string",
+																"raw": "\".git\""
+															}
+														]
+													},
+													"right": {
+														"type": "call",
+														"name": "not"
+													}
+												}
+											},
+											"then": {
+												"type": "if",
+												"cond": {
+													"type": "call",
+													"name": "test",
+													"args": [
+														{
+															"type": "string",
+															"raw": "\"^https?://github.com/\""
+														}
+													]
+												},
+												"then": {
+													"type": "binOp",
+													"op": "+",
+													"left": {
+														"type": "commented",
+														"leadingComments": [
+															"# without \".git\" in the url \"docker buildx build url\" fails and tries to build the html repo page as a Dockerfile",
+															"# https://github.com/moby/buildkit/blob/0e1e36ba9eb8142968b2c5cfa2f12549bf9246d9/util/gitutil/git_ref.go#L81-L87",
+															"# https://github.com/docker/cli/issues/1738"
+														],
+														"expr": {
+															"type": "identity"
+														}
+													},
+													"right": {
+														"type": "string",
+														"raw": "\".git\""
+													}
+												},
+												"else": {
+													"type": "call",
+													"name": "error",
+													"args": [
+														{
+															"type": "string",
+															"raw": "\"\\(.) does not end in '.git' so build will fail to recognize it as a Git URL\""
+														}
+													]
+												}
+											},
+											"else": {
+												"type": "identity"
+											}
+										}
+									}
+								},
+								"right": {
+									"type": "string",
+									"raw": "\"#\""
+								}
+							},
+							"right": {
+								"type": "field",
+								"name": ".GitCommit"
+							}
+						},
+						"right": {
+							"type": "string",
+							"raw": "\":\""
+						}
+					},
+					"right": {
+						"type": "field",
+						"name": ".Directory"
+					}
+				}
+			}
+		},
+		{
+			"type": "funcDef",
+			"name": "build_annotations",
+			"params": [
+				"$buildUrl"
+			],
+			"leadingComments": [
+				"# input: \"build\" object (with \"buildId\" top level key)",
+				"# output: map of annotations to set"
+			],
+			"body": {
+				"type": "pipe",
+				"left": {
+					"type": "binOp",
+					"op": "+",
+					"left": {
+						"type": "object",
+						"fields": [
+							{
+								"key": {
+									"type": "string",
+									"raw": "\"org.opencontainers.image.source\""
+								},
+								"value": {
+									"type": "var",
+									"name": "$buildUrl"
+								},
+								"leadingComments": [
+									"# https://github.com/opencontainers/image-spec/blob/v1.1.0/annotations.md#pre-defined-annotation-keys"
+								]
+							},
+							{
+								"key": {
+									"type": "string",
+									"raw": "\"org.opencontainers.image.revision\""
+								},
+								"value": {
+									"type": "binOp",
+									"op": "",
+									"left": {
+										"type": "index",
+										"expr": {
+											"type": "binOp",
+											"op": "",
+											"left": {
+												"type": "field",
+												"name": ".source"
+											},
+											"right": {
+												"type": "field",
+												"name": ".entries"
+											}
+										},
+										"key": {
+											"type": "number",
+											"raw": "0"
+										}
+									},
+									"right": {
+										"type": "field",
+										"name": ".GitCommit"
+									}
+								}
+							},
+							{
+								"key": {
+									"type": "string",
+									"raw": "\"org.opencontainers.image.created\""
+								},
+								"value": {
+									"type": "paren",
+									"expr": {
+										"type": "pipe",
+										"left": {
+											"type": "if",
+											"cond": {
+												"type": "binOp",
+												"op": "==",
+												"left": {
+													"type": "binOp",
+													"op": "",
+													"left": {
+														"type": "index",
+														"expr": {
+															"type": "binOp",
+															"op": "",
+															"left": {
+																"type": "field",
+																"name": ".source"
+															},
+															"right": {
+																"type": "field",
+																"name": ".entries"
+															}
+														},
+														"key": {
+															"type": "number",
+															"raw": "0"
+														}
+													},
+													"right": {
+														"type": "field",
+														"name": ".Builder"
+													}
+												},
+												"right": {
+													"type": "string",
+													"raw": "\"oci-import\""
+												}
+											},
+											"then": {
+												"type": "binOp",
+												"op": "",
+												"left": {
+													"type": "index",
+													"expr": {
+														"type": "binOp",
+														"op": "",
+														"left": {
+															"type": "field",
+															"name": ".source"
+														},
+														"right": {
+															"type": "field",
+															"name": ".entries"
+														}
+													},
+													"key": {
+														"type": "number",
+														"raw": "0"
+													}
+												},
+												"right": {
+													"type": "field",
+													"name": ".SOURCE_DATE_EPOCH"
+												}
+											},
+											"else": {
+												"type": "pipe",
+												"left": {
+													"type": "binOp",
+													"op": "//",
+													"left": {
+														"type": "binOp",
+														"op": "",
+														"left": {
+															"type": "call",
+															"name": "env"
+														},
+														"right": {
+															"type": "field",
+															"name": ".SOURCE_DATE_EPOCH"
+														}
+													},
+													"right": {
+														"type": "call",
+														"name": "now"
+													}
+												},
+												"right": {
+													"type": "call",
+													"name": "tonumber"
+												}
+											}
+										},
+										"right": {
+											"type": "call",
+											"name": "strftime",
+											"args": [
+												{
+													"type": "string",
+													"raw": "\"%FT%TZ\""
+												}
+											]
+										}
+									}
+								}
+							},
+							{
+								"key": {
+									"type": "string",
+									"raw": "\"org.opencontainers.image.version\""
+								},
+								"value": {
+									"type": "paren",
+									"expr": {
+										"type": "pipe",
+										"left": {
+											"type": "call",
+											"name": "first",
+											"args": [
+												{
+													"type": "pipe",
+													"left": {
+														"type": "index",
+														"expr": {
+															"type": "binOp",
+															"op": "",
+															"left": {
+																"type": "index",
+																"expr": {
+																	"type": "binOp",
+																	"op": "",
+																	"left": {
+																		"type": "field",
+																		"name": ".source"
+																	},
+																	"right": {
+																		"type": "field",
+																		"name": ".arches"
+																	}
+																},
+																"key": {
+																	"type": "commented",
+																	"expr": {
+																		"type": "binOp",
+																		"op": "",
+																		"left": {
+																			"type": "field",
+																			"name": ".build"
+																		},
+																		"right": {
+																			"type": "field",
+																			"name": ".arch"
+																		}
+																	},
+																	"trailingComment": "# value of the first image tag"
+																}
+															},
+															"right": {
+																"type": "field",
+																"name": ".tags"
+															}
+														}
+													},
+													"right": {
+														"type": "call",
+														"name": "select",
+														"args": [
+															{
+																"type": "call",
+																"name": "contains",
+																"args": [
+																	{
+																		"type": "string",
+																		"raw": "\":\""
+																	}
+																]
+															}
+														]
+													}
+												}
+											]
+										},
+										"right": {
+											"type": "call",
+											"name": "sub",
+											"args": [
+												{
+													"type": "string",
+													"raw": "\"^.*:\""
+												},
+												{
+													"type": "string",
+													"raw": "\"\""
+												}
+											]
+										}
+									}
+								},
+								"leadingComments": [
+									"# TODO come up with less assuming values here? (Docker Hub assumption, tag ordering assumption)"
+								]
+							},
+							{
+								"key": {
+									"type": "string",
+									"raw": "\"org.opencontainers.image.url\""
+								},
+								"value": {
+									"type": "paren",
+									"expr": {
+										"type": "pipe",
+										"left": {
+											"type": "call",
+											"name": "first",
+											"args": [
+												{
+													"type": "pipe",
+													"left": {
+														"type": "index",
+														"expr": {
+															"type": "binOp",
+															"op": "",
+															"left": {
+																"type": "index",
+																"expr": {
+																	"type": "binOp",
+																	"op": "",
+																	"left": {
+																		"type": "field",
+																		"name": ".source"
+																	},
+																	"right": {
+																		"type": "field",
+																		"name": ".arches"
+																	}
+																},
+																"key": {
+																	"type": "commented",
+																	"expr": {
+																		"type": "binOp",
+																		"op": "",
+																		"left": {
+																			"type": "field",
+																			"name": ".build"
+																		},
+																		"right": {
+																			"type": "field",
+																			"name": ".arch"
+																		}
+																	},
+																	"trailingComment": "# URL to Docker Hub"
+																}
+															},
+															"right": {
+																"type": "field",
+																"name": ".tags"
+															}
+														}
+													},
+													"right": {
+														"type": "call",
+														"name": "select",
+														"args": [
+															{
+																"type": "call",
+																"name": "contains",
+																"args": [
+																	{
+																		"type": "string",
+																		"raw": "\":\""
+																	}
+																]
+															}
+														]
+													}
+												}
+											]
+										},
+										"right": {
+											"type": "pipe",
+											"left": {
+												"type": "call",
+												"name": "sub",
+												"args": [
+													{
+														"type": "string",
+														"raw": "\":.*$\""
+													},
+													{
+														"type": "string",
+														"raw": "\"\""
+													}
+												]
+											},
+											"right": {
+												"type": "pipe",
+												"left": {
+													"type": "if",
+													"cond": {
+														"type": "call",
+														"name": "contains",
+														"args": [
+															{
+																"type": "string",
+																"raw": "\"/\""
+															}
+														]
+													},
+													"then": {
+														"type": "binOp",
+														"op": "+",
+														"left": {
+															"type": "string",
+															"raw": "\"r/\""
+														},
+														"right": {
+															"type": "identity"
+														}
+													},
+													"else": {
+														"type": "binOp",
+														"op": "+",
+														"left": {
+															"type": "string",
+															"raw": "\"_/\""
+														},
+														"right": {
+															"type": "identity"
+														}
+													}
+												},
+												"right": {
+													"type": "binOp",
+													"op": "+",
+													"left": {
+														"type": "string",
+														"raw": "\"https://hub.docker.com/\""
+													},
+													"right": {
+														"type": "identity"
+													}
+												}
+											}
+										}
+									}
+								}
+							},
+							{
+								"key": {
+									"type": "string",
+									"raw": "\"com.docker.official-images.bashbrew.arch\""
+								},
+								"value": {
+									"type": "binOp",
+									"op": "",
+									"left": {
+										"type": "field",
+										"name": ".build"
+									},
+									"right": {
+										"type": "field",
+										"name": ".arch"
+									}
+								},
+								"leadingComments": [
+									"# TODO org.opencontainers.image.vendor ? (feels leaky to put \"Docker Official Images\" here when this is all otherwise mostly generic)"
+								]
+							}
+						]
+					},
+					"right": {
+						"type": "paren",
+						"expr": {
+							"type": "as",
+							"expr": {
+								"type": "binOp",
+								"op": "",
+								"left": {
+									"type": "index",
+									"expr": {
+										"type": "binOp",
+										"op": "",
+										"left": {
+											"type": "field",
+											"name": ".source"
+										},
+										"right": {
+											"type": "field",
+											"name": ".arches"
+										}
+									},
+									"key": {
+										"type": "binOp",
+										"op": "",
+										"left": {
+											"type": "field",
+											"name": ".build"
+										},
+										"right": {
+											"type": "field",
+											"name": ".arch"
+										}
+									}
+								},
+								"right": {
+									"type": "field",
+									"name": ".lastStageFrom"
+								}
+							},
+							"pattern": {
+								"type": "var",
+								"name": "$lastStageFrom"
+							},
+							"body": {
+								"type": "if",
+								"cond": {
+									"type": "var",
+									"name": "$lastStageFrom"
+								},
+								"then": {
+									"type": "as",
+									"expr": {
+										"type": "index",
+										"expr": {
+											"type": "binOp",
+											"op": "",
+											"left": {
+												"type": "field",
+												"name": ".build"
+											},
+											"right": {
+												"type": "field",
+												"name": ".parents"
+											}
+										},
+										"key": {
+											"type": "var",
+											"name": "$lastStageFrom"
+										}
+									},
+									"pattern": {
+										"type": "var",
+										"name": "$lastStageDigest"
+									},
+									"body": {
+										"type": "binOp",
+										"op": "+",
+										"left": {
+											"type": "object",
+											"fields": [
+												{
+													"key": {
+														"type": "string",
+														"raw": "\"org.opencontainers.image.base.name\""
+													},
+													"value": {
+														"type": "var",
+														"name": "$lastStageFrom"
+													}
+												}
+											]
+										},
+										"right": {
+											"type": "if",
+											"cond": {
+												"type": "var",
+												"name": "$lastStageDigest"
+											},
+											"then": {
+												"type": "object",
+												"fields": [
+													{
+														"key": {
+															"type": "string",
+															"raw": "\"org.opencontainers.image.base.digest\""
+														},
+														"value": {
+															"type": "index",
+															"expr": {
+																"type": "binOp",
+																"op": "",
+																"left": {
+																	"type": "field",
+																	"name": ".build"
+																},
+																"right": {
+																	"type": "field",
+																	"name": ".parents"
+																}
+															},
+															"key": {
+																"type": "var",
+																"name": "$lastStageFrom"
+															}
+														}
+													}
+												]
+											},
+											"else": {
+												"type": "object",
+												"fields": []
+											}
+										}
+									}
+								},
+								"else": {
+									"type": "object",
+									"fields": []
+								}
+							}
+						}
+					}
+				},
+				"right": {
+					"type": "commented",
+					"expr": {
+						"type": "call",
+						"name": "with_entries",
+						"args": [
+							{
+								"type": "call",
+								"name": "select",
+								"args": [
+									{
+										"type": "field",
+										"name": ".value"
+									}
+								]
+							}
+						]
+					},
+					"trailingComment": "# strip off anything missing a value (possibly \"source\", \"url\", \"version\", \"base.digest\", etc)"
+				}
+			}
+		},
+		{
+			"type": "funcDef",
+			"name": "build_annotations",
+			"body": {
+				"type": "call",
+				"name": "build_annotations",
+				"args": [
+					{
+						"type": "call",
+						"name": "git_build_url"
+					}
+				]
+			}
+		},
+		{
+			"type": "funcDef",
+			"name": "unindent_and_decomment_jq",
+			"params": [
+				"$indents"
+			],
+			"leadingComments": [
+				"# input: multi-line string with indentation and comments",
+				"# output: multi-line string with less indentation and no comments"
+			],
+			"body": {
+				"type": "pipe",
+				"left": {
+					"type": "call",
+					"name": "gsub",
+					"args": [
+						{
+							"type": "commented",
+							"leadingComments": [
+								"# trim out comment lines and unnecessary indentation"
+							],
+							"expr": {
+								"type": "string",
+								"raw": "\"(?m)^(\\t+#[^\\n]*\\n?|\\t{\\($indents)}(?\u003cextra\u003e.*)$)\""
+							}
+						},
+						{
+							"type": "string",
+							"raw": "\"\\(.extra // \"\")\""
+						}
+					]
+				},
+				"right": {
+					"type": "commented",
+					"leadingComments": [
+						"# trim out empty lines"
+					],
+					"expr": {
+						"type": "call",
+						"name": "gsub",
+						"args": [
+							{
+								"type": "string",
+								"raw": "\"\\n\\n+\""
+							},
+							{
+								"type": "string",
+								"raw": "\"\\n\""
+							}
+						]
+					}
+				}
+			}
+		},
+		{
+			"type": "funcDef",
+			"name": "build_command",
+			"leadingComments": [
+				"# input: \"build\" object (with \"buildId\" top level key)",
+				"# output: string \"build command\" (\"docker buildx build ...\"), may be multiple lines, expects to run in Bash with \"set -Eeuo pipefail\""
+			],
+			"body": {
+				"type": "as",
+				"expr": {
+					"type": "call",
+					"name": "normalized_builder"
+				},
+				"pattern": {
+					"type": "var",
+					"name": "$builder"
+				},
+				"body": {
+					"type": "if",
+					"cond": {
+						"type": "binOp",
+						"op": "==",
+						"left": {
+							"type": "var",
+							"name": "$builder"
+						},
+						"right": {
+							"type": "string",
+							"raw": "\"buildkit\""
+						}
+					},
+					"then": {
+						"type": "as",
+						"expr": {
+							"type": "call",
+							"name": "git_build_url"
+						},
+						"pattern": {
+							"type": "var",
+							"name": "$buildUrl"
+						},
+						"body": {
+							"type": "pipe",
+							"left": {
+								"type": "array",
+								"elem": {
+									"type": "comma",
+									"left": {
+										"type": "comma",
+										"left": {
+											"type": "comma",
+											"left": {
+												"type": "comma",
+												"left": {
+													"type": "comma",
+													"left": {
+														"type": "comma",
+														"left": {
+															"type": "paren",
+															"expr": {
+																"type": "pipe",
+																"left": {
+																	"type": "array",
+																	"elem": {
+																		"type": "comma",
+																		"left": {
+																			"type": "comma",
+																			"left": {
+																				"type": "comma",
+																				"left": {
+																					"type": "commented",
+																					"expr": {
+																						"type": "comma",
+																						"left": {
+																							"type": "commented",
+																							"expr": {
+																								"type": "comma",
+																								"left": {
+																									"type": "comma",
+																									"left": {
+																										"type": "comma",
+																										"left": {
+																											"type": "comma",
+																											"left": {
+																												"type": "comma",
+																												"left": {
+																													"type": "comma",
+																													"left": {
+																														"type": "comma",
+																														"left": {
+																															"type": "comma",
+																															"left": {
+																																"type": "commented",
+																																"leadingComments": [
+																																	"# TODO EXPERIMENTAL_BUILDKIT_SOURCE_POLICY=\u003c(jq ...)"
+																																],
+																																"expr": {
+																																	"type": "string",
+																																	"raw": "\"docker buildx build --progress=plain\""
+																																}
+																															},
+																															"right": {
+																																"type": "format",
+																																"name": "sh",
+																																"str": {
+																																	"type": "string",
+																																	"raw": "\"--provenance=mode=max,builder-id=\\(buildkit_provenance_builder_id)\""
+																																}
+																															}
+																														},
+																														"right": {
+																															"type": "if",
+																															"cond": {
+																																"type": "call",
+																																"name": "build_should_sbom"
+																															},
+																															"then": {
+																																"type": "string",
+																																"raw": "\"--sbom=generator=\\\"$BASHBREW_BUILDKIT_SBOM_GENERATOR\\\"\""
+																															},
+																															"else": {
+																																"type": "call",
+																																"name": "empty"
+																															}
+																														}
+																													},
+																													"right": {
+																														"type": "binOp",
+																														"op": "+",
+																														"left": {
+																															"type": "string",
+																															"raw": "\"--output \""
+																														},
+																														"right": {
+																															"type": "paren",
+																															"expr": {
+																																"type": "pipe",
+																																"left": {
+																																	"type": "array",
+																																	"elem": {
+																																		"type": "comma",
+																																		"left": {
+																																			"type": "comma",
+																																			"left": {
+																																				"type": "string",
+																																				"raw": "\"type=oci\""
+																																			},
+																																			"right": {
+																																				"type": "string",
+																																				"raw": "\"dest=temp.tar\""
+																																			}
+																																		},
+																																		"right": {
+																																			"type": "call",
+																																			"name": "empty"
+																																		}
+																																	}
+																																},
+																																"right": {
+																																	"type": "pipe",
+																																	"left": {
+																																		"type": "format",
+																																		"name": "csv"
+																																	},
+																																	"right": {
+																																		"type": "format",
+																																		"name": "sh"
+																																	}
+																																}
+																															}
+																														}
+																													}
+																												},
+																												"right": {
+																													"type": "paren",
+																													"expr": {
+																														"type": "pipe",
+																														"left": {
+																															"type": "call",
+																															"name": "build_annotations",
+																															"args": [
+																																{
+																																	"type": "var",
+																																	"name": "$buildUrl"
+																																}
+																															]
+																														},
+																														"right": {
+																															"type": "pipe",
+																															"left": {
+																																"type": "index",
+																																"expr": {
+																																	"type": "call",
+																																	"name": "to_entries"
+																																}
+																															},
+																															"right": {
+																																"type": "format",
+																																"name": "sh",
+																																"str": {
+																																	"type": "string",
+																																	"raw": "\"--annotation \\(\"manifest,manifest-descriptor:\\(.key + \"=\" + .value)\")\""
+																																}
+																															}
+																														}
+																													}
+																												}
+																											},
+																											"right": {
+																												"type": "paren",
+																												"expr": {
+																													"type": "pipe",
+																													"left": {
+																														"type": "comma",
+																														"left": {
+																															"type": "paren",
+																															"expr": {
+																																"type": "pipe",
+																																"left": {
+																																	"type": "index",
+																																	"expr": {
+																																		"type": "binOp",
+																																		"op": "",
+																																		"left": {
+																																			"type": "field",
+																																			"name": ".source"
+																																		},
+																																		"right": {
+																																			"type": "field",
+																																			"name": ".arches"
+																																		}
+																																	},
+																																	"key": {
+																																		"type": "binOp",
+																																		"op": "",
+																																		"left": {
+																																			"type": "field",
+																																			"name": ".build"
+																																		},
+																																		"right": {
+																																			"type": "field",
+																																			"name": ".arch"
+																																		}
+																																	}
+																																},
+																																"right": {
+																																	"type": "comma",
+																																	"left": {
+																																		"type": "index",
+																																		"expr": {
+																																			"type": "field",
+																																			"name": ".tags"
+																																		}
+																																	},
+																																	"right": {
+																																		"type": "index",
+																																		"expr": {
+																																			"type": "field",
+																																			"name": ".archTags"
+																																		}
+																																	}
+																																}
+																															}
+																														},
+																														"right": {
+																															"type": "binOp",
+																															"op": "",
+																															"left": {
+																																"type": "field",
+																																"name": ".build"
+																															},
+																															"right": {
+																																"type": "field",
+																																"name": ".img"
+																															}
+																														}
+																													},
+																													"right": {
+																														"type": "binOp",
+																														"op": "+",
+																														"left": {
+																															"type": "string",
+																															"raw": "\"--tag \""
+																														},
+																														"right": {
+																															"type": "format",
+																															"name": "sh"
+																														}
+																													}
+																												}
+																											}
+																										},
+																										"right": {
+																											"type": "format",
+																											"name": "sh",
+																											"str": {
+																												"type": "string",
+																												"raw": "\"--platform \\(.source.arches[.build.arch].platformString)\""
+																											}
+																										}
+																									},
+																									"right": {
+																										"type": "paren",
+																										"expr": {
+																											"type": "pipe",
+																											"left": {
+																												"type": "binOp",
+																												"op": "",
+																												"left": {
+																													"type": "field",
+																													"name": ".build"
+																												},
+																												"right": {
+																													"type": "field",
+																													"name": ".resolvedParents"
+																												}
+																											},
+																											"right": {
+																												"type": "pipe",
+																												"left": {
+																													"type": "index",
+																													"expr": {
+																														"type": "call",
+																														"name": "to_entries"
+																													}
+																												},
+																												"right": {
+																													"type": "pipe",
+																													"left": {
+																														"type": "binOp",
+																														"op": "+",
+																														"left": {
+																															"type": "binOp",
+																															"op": "+",
+																															"left": {
+																																"type": "field",
+																																"name": ".key"
+																															},
+																															"right": {
+																																"type": "string",
+																																"raw": "\"=docker-image://\""
+																															}
+																														},
+																														"right": {
+																															"type": "paren",
+																															"expr": {
+																																"type": "pipe",
+																																"left": {
+																																	"type": "binOp",
+																																	"op": "//",
+																																	"left": {
+																																		"type": "index",
+																																		"expr": {
+																																			"type": "binOp",
+																																			"op": "",
+																																			"left": {
+																																				"type": "index",
+																																				"expr": {
+																																					"type": "binOp",
+																																					"op": "",
+																																					"left": {
+																																						"type": "field",
+																																						"name": ".value"
+																																					},
+																																					"right": {
+																																						"type": "field",
+																																						"name": ".manifests"
+																																					}
+																																				},
+																																				"key": {
+																																					"type": "number",
+																																					"raw": "0"
+																																				}
+																																			},
+																																			"right": {
+																																				"type": "field",
+																																				"name": ".annotations"
+																																			}
+																																		},
+																																		"key": {
+																																			"type": "string",
+																																			"raw": "\"org.opencontainers.image.ref.name\""
+																																		}
+																																	},
+																																	"right": {
+																																		"type": "binOp",
+																																		"op": "//",
+																																		"left": {
+																																			"type": "index",
+																																			"expr": {
+																																				"type": "binOp",
+																																				"op": "",
+																																				"left": {
+																																					"type": "field",
+																																					"name": ".value"
+																																				},
+																																				"right": {
+																																					"type": "field",
+																																					"name": ".annotations"
+																																				}
+																																			},
+																																			"key": {
+																																				"type": "string",
+																																				"raw": "\"org.opencontainers.image.ref.name\""
+																																			}
+																																		},
+																																		"right": {
+																																			"type": "call",
+																																			"name": "error",
+																																			"args": [
+																																				{
+																																					"type": "string",
+																																					"raw": "\"parent \\(.key) missing ref\""
+																																				}
+																																			]
+																																		}
+																																	}
+																																},
+																																"right": {
+																																	"type": "call",
+																																	"name": "normalize_ref_to_docker"
+																																}
+																															}
+																														}
+																													},
+																													"right": {
+																														"type": "binOp",
+																														"op": "+",
+																														"left": {
+																															"type": "string",
+																															"raw": "\"--build-context \""
+																														},
+																														"right": {
+																															"type": "format",
+																															"name": "sh"
+																														}
+																													}
+																												}
+																											}
+																										}
+																									}
+																								},
+																								"right": {
+																									"type": "string",
+																									"raw": "\"--build-arg BUILDKIT_SYNTAX=\\\"$BASHBREW_BUILDKIT_SYNTAX\\\"\""
+																								}
+																							},
+																							"trailingComment": "# TODO .doi/.bin/bashbrew-buildkit-env-setup.sh"
+																						},
+																						"right": {
+																							"type": "string",
+																							"raw": "\"--build-arg BUILDKIT_DOCKERFILE_CHECK=skip=all\""
+																						}
+																					},
+																					"trailingComment": "# disable linting (https://github.com/moby/buildkit/pull/4962)"
+																				},
+																				"right": {
+																					"type": "format",
+																					"name": "sh",
+																					"str": {
+																						"type": "string",
+																						"raw": "\"--file \\(.source.entries[0].File)\""
+																					}
+																				}
+																			},
+																			"right": {
+																				"type": "paren",
+																				"expr": {
+																					"type": "pipe",
+																					"left": {
+																						"type": "var",
+																						"name": "$buildUrl"
+																					},
+																					"right": {
+																						"type": "format",
+																						"name": "sh"
+																					}
+																				}
+																			}
+																		},
+																		"right": {
+																			"type": "call",
+																			"name": "empty"
+																		}
+																	}
+																},
+																"right": {
+																	"type": "call",
+																	"name": "join",
+																	"args": [
+																		{
+																			"type": "string",
+																			"raw": "\" \\\\\\n\\t\""
+																		}
+																	]
+																}
+															}
+														},
+														"right": {
+															"type": "commented",
+															"leadingComments": [
+																"# munge the tarball into a suitable \"oci layout\" directory (ready for \"crane push\")"
+															],
+															"expr": {
+																"type": "string",
+																"raw": "\"mkdir temp\""
+															}
+														}
+													},
+													"right": {
+														"type": "string",
+														"raw": "\"tar -xvf temp.tar -C temp\""
+													}
+												},
+												"right": {
+													"type": "string",
+													"raw": "\"rm temp.tar\""
+												}
+											},
+											"right": {
+												"type": "commented",
+												"leadingComments": [
+													"# TODO munge the image config here to remove any label that doesn't have a \".\" in the name (https://github.com/docker-library/official-images/pull/18692#issuecomment-2797149554; \"thanks UBI/OpenShift/RedHat!\")",
+													"# munge the index to what crane wants (\"Error: layout contains 5 entries, consider --index\")"
+												],
+												"expr": {
+													"type": "format",
+													"name": "sh",
+													"str": {
+														"type": "string",
+														"raw": "\"jq \\(\"\n\t\t\t\t.manifests |= (\n\t\t\t\t\tunique_by([ .digest, .size, .mediaType ])\n\t\t\t\t\t| if length != 1 then\n\t\t\t\t\t\terror(\\\"unexpected number of manifests: \\\\(length)\\\")\n\t\t\t\t\telse . end\n\t\t\t\t)\n\t\t\t\" | unindent_and_decomment_jq(3)) temp/index.json \u003e temp/index.json.new\""
+													}
+												}
+											}
+										},
+										"right": {
+											"type": "string",
+											"raw": "\"mv temp/index.json.new temp/index.json\""
+										}
+									},
+									"right": {
+										"type": "commented",
+										"leadingComments": [
+											"# possible improvements in buildkit/buildx that could help us:",
+											"# - allowing OCI output directly to a directory instead of a tar (thus getting symmetry with the oci-layout:// inputs it can take)",
+											"# - allowing tag as one thing and push as something else, potentially mutually exclusive",
+											"# - allowing annotations that are set for both \"manifest\" and \"manifest-descriptor\" simultaneously",
+											"# - direct-to-containerd image storage"
+										],
+										"expr": {
+											"type": "call",
+											"name": "empty"
+										}
+									}
+								}
+							},
+							"right": {
+								"type": "call",
+								"name": "join",
+								"args": [
+									{
+										"type": "string",
+										"raw": "\"\\n\""
+									}
+								]
+							}
+						}
+					},
+					"elseIfs": [
+						{
+							"cond": {
+								"type": "binOp",
+								"op": "==",
+								"left": {
+									"type": "var",
+									"name": "$builder"
+								},
+								"right": {
+									"type": "string",
+									"raw": "\"classic\""
+								}
+							},
+							"then": {
+								"type": "as",
+								"expr": {
+									"type": "call",
+									"name": "git_build_url"
+								},
+								"pattern": {
+									"type": "var",
+									"name": "$buildUrl"
+								},
+								"body": {
+									"type": "pipe",
+									"left": {
+										"type": "array",
+										"elem": {
+											"type": "comma",
+											"left": {
+												"type": "paren",
+												"expr": {
+													"type": "pipe",
+													"left": {
+														"type": "array",
+														"elem": {
+															"type": "comma",
+															"left": {
+																"type": "comma",
+																"left": {
+																	"type": "comma",
+																	"left": {
+																		"type": "comma",
+																		"left": {
+																			"type": "comma",
+																			"left": {
+																				"type": "comma",
+																				"left": {
+																					"type": "string",
+																					"raw": "\"DOCKER_BUILDKIT=0\""
+																				},
+																				"right": {
+																					"type": "string",
+																					"raw": "\"docker build\""
+																				}
+																			},
+																			"right": {
+																				"type": "paren",
+																				"expr": {
+																					"type": "pipe",
+																					"left": {
+																						"type": "comma",
+																						"left": {
+																							"type": "paren",
+																							"expr": {
+																								"type": "pipe",
+																								"left": {
+																									"type": "index",
+																									"expr": {
+																										"type": "binOp",
+																										"op": "",
+																										"left": {
+																											"type": "field",
+																											"name": ".source"
+																										},
+																										"right": {
+																											"type": "field",
+																											"name": ".arches"
+																										}
+																									},
+																									"key": {
+																										"type": "binOp",
+																										"op": "",
+																										"left": {
+																											"type": "field",
+																											"name": ".build"
+																										},
+																										"right": {
+																											"type": "field",
+																											"name": ".arch"
+																										}
+																									}
+																								},
+																								"right": {
+																									"type": "comma",
+																									"left": {
+																										"type": "index",
+																										"expr": {
+																											"type": "field",
+																											"name": ".tags"
+																										}
+																									},
+																									"right": {
+																										"type": "index",
+																										"expr": {
+																											"type": "field",
+																											"name": ".archTags"
+																										}
+																									}
+																								}
+																							}
+																						},
+																						"right": {
+																							"type": "binOp",
+																							"op": "",
+																							"left": {
+																								"type": "field",
+																								"name": ".build"
+																							},
+																							"right": {
+																								"type": "field",
+																								"name": ".img"
+																							}
+																						}
+																					},
+																					"right": {
+																						"type": "binOp",
+																						"op": "+",
+																						"left": {
+																							"type": "string",
+																							"raw": "\"--tag \""
+																						},
+																						"right": {
+																							"type": "format",
+																							"name": "sh"
+																						}
+																					}
+																				}
+																			}
+																		},
+																		"right": {
+																			"type": "format",
+																			"name": "sh",
+																			"str": {
+																				"type": "string",
+																				"raw": "\"--platform \\(.source.arches[.build.arch].platformString)\""
+																			}
+																		}
+																	},
+																	"right": {
+																		"type": "format",
+																		"name": "sh",
+																		"str": {
+																			"type": "string",
+																			"raw": "\"--file \\(.source.entries[0].File)\""
+																		}
+																	}
+																},
+																"right": {
+																	"type": "paren",
+																	"expr": {
+																		"type": "pipe",
+																		"left": {
+																			"type": "var",
+																			"name": "$buildUrl"
+																		},
+																		"right": {
+																			"type": "format",
+																			"name": "sh"
+																		}
+																	}
+																}
+															},
+															"right": {
+																"type": "call",
+																"name": "empty"
+															}
+														}
+													},
+													"right": {
+														"type": "call",
+														"name": "join",
+														"args": [
+															{
+																"type": "string",
+																"raw": "\" \\\\\\n\\t\""
+															}
+														]
+													}
+												}
+											},
+											"right": {
+												"type": "call",
+												"name": "empty"
+											}
+										}
+									},
+									"right": {
+										"type": "call",
+										"name": "join",
+										"args": [
+											{
+												"type": "string",
+												"raw": "\"\\n\""
+											}
+										]
+									}
+								}
+							}
+						},
+						{
+							"cond": {
+								"type": "binOp",
+								"op": "==",
+								"left": {
+									"type": "var",
+									"name": "$builder"
+								},
+								"right": {
+									"type": "string",
+									"raw": "\"oci-import\""
+								}
+							},
+							"then": {
+								"type": "pipe",
+								"left": {
+									"type": "array",
+									"elem": {
+										"type": "comma",
+										"left": {
+											"type": "comma",
+											"left": {
+												"type": "format",
+												"name": "sh",
+												"str": {
+													"type": "string",
+													"raw": "\"build=\\(tojson)\""
+												}
+											},
+											"right": {
+												"type": "string",
+												"raw": "\"\\\"$BASHBREW_META_SCRIPTS/helpers/oci-import.sh\\\" \u003c\u003c\u003c\\\"$build\\\" temp\""
+											}
+										},
+										"right": {
+											"type": "if",
+											"cond": {
+												"type": "call",
+												"name": "build_should_sbom"
+											},
+											"then": {
+												"type": "comma",
+												"left": {
+													"type": "comma",
+													"left": {
+														"type": "comma",
+														"left": {
+															"type": "comma",
+															"left": {
+																"type": "string",
+																"raw": "\"# SBOM\""
+															},
+															"right": {
+																"type": "string",
+																"raw": "\"mv temp temp.orig\""
+															}
+														},
+														"right": {
+															"type": "string",
+															"raw": "\"\\\"$BASHBREW_META_SCRIPTS/helpers/oci-sbom.sh\\\" \u003c\u003c\u003c\\\"$build\\\" temp.orig temp\""
+														}
+													},
+													"right": {
+														"type": "string",
+														"raw": "\"rm -rf temp.orig\""
+													}
+												},
+												"right": {
+													"type": "call",
+													"name": "empty"
+												}
+											},
+											"else": {
+												"type": "call",
+												"name": "empty"
+											}
+										}
+									}
+								},
+								"right": {
+									"type": "call",
+									"name": "join",
+									"args": [
+										{
+											"type": "string",
+											"raw": "\"\\n\""
+										}
+									]
+								}
+							}
+						}
+					],
+					"else": {
+						"type": "call",
+						"name": "error",
+						"args": [
+							{
+								"type": "string",
+								"raw": "\"unknown/unimplemented Builder: \\($builder)\""
+							}
+						]
+					}
+				}
+			}
+		},
+		{
+			"type": "funcDef",
+			"name": "push_command",
+			"leadingComments": [
+				"# input: \"build\" object (with \"buildId\" top level key)",
+				"# output: string \"push command\" (\"docker push ...\"), may be multiple lines, expects to run in Bash with \"set -Eeuo pipefail\""
+			],
+			"body": {
+				"type": "as",
+				"expr": {
+					"type": "call",
+					"name": "normalized_builder"
+				},
+				"pattern": {
+					"type": "var",
+					"name": "$builder"
+				},
+				"body": {
+					"type": "if",
+					"cond": {
+						"type": "binOp",
+						"op": "==",
+						"left": {
+							"type": "var",
+							"name": "$builder"
+						},
+						"right": {
+							"type": "string",
+							"raw": "\"classic\""
+						}
+					},
+					"then": {
+						"type": "format",
+						"name": "sh",
+						"str": {
+							"type": "string",
+							"raw": "\"docker push \\(.build.img)\""
+						}
+					},
+					"elseIfs": [
+						{
+							"cond": {
+								"type": "call",
+								"name": "IN",
+								"args": [
+									{
+										"type": "var",
+										"name": "$builder"
+									},
+									{
+										"type": "comma",
+										"left": {
+											"type": "string",
+											"raw": "\"buildkit\""
+										},
+										"right": {
+											"type": "string",
+											"raw": "\"oci-import\""
+										}
+									}
+								]
+							},
+							"then": {
+								"type": "pipe",
+								"left": {
+									"type": "array",
+									"elem": {
+										"type": "comma",
+										"left": {
+											"type": "comma",
+											"left": {
+												"type": "format",
+												"name": "sh",
+												"str": {
+													"type": "string",
+													"raw": "\"crane push temp \\(.build.img)\""
+												}
+											},
+											"right": {
+												"type": "string",
+												"raw": "\"rm -rf temp\""
+											}
+										},
+										"right": {
+											"type": "call",
+											"name": "empty"
+										}
+									}
+								},
+								"right": {
+									"type": "call",
+									"name": "join",
+									"args": [
+										{
+											"type": "string",
+											"raw": "\"\\n\""
+										}
+									]
+								}
+							}
+						}
+					],
+					"else": {
+						"type": "call",
+						"name": "error",
+						"args": [
+							{
+								"type": "string",
+								"raw": "\"unknown/unimplemented Builder: \\($builder)\""
+							}
+						]
+					}
+				}
+			}
+		},
+		{
+			"type": "funcDef",
+			"name": "commands",
+			"leadingComments": [
+				"# input: \"build\" object (with \"buildId\" top level key)",
+				"# output: \"commands\" object with keys \"pull\", \"build\", \"push\""
+			],
+			"body": {
+				"type": "object",
+				"fields": [
+					{
+						"key": {
+							"type": "ident",
+							"name": "pull"
+						},
+						"value": {
+							"type": "call",
+							"name": "pull_command"
+						}
+					},
+					{
+						"key": {
+							"type": "ident",
+							"name": "build"
+						},
+						"value": {
+							"type": "call",
+							"name": "build_command"
+						}
+					},
+					{
+						"key": {
+							"type": "ident",
+							"name": "push"
+						},
+						"value": {
+							"type": "call",
+							"name": "push_command"
+						}
+					}
+				]
+			}
+		}
+	]
+}

@@ -1,0 +1,376 @@
+{
+	"type": "dockerfile",
+	"file": "input.dockerfile",
+	"instructions": [
+		{
+			"type": "COMMENT",
+			"args": "# (C) Copyright IBM Corporation 2021",
+			"lines": [
+				{
+					"kind": "comment",
+					"text": "# (C) Copyright IBM Corporation 2021"
+				}
+			],
+			"startLine": 1,
+			"endLine": 1
+		},
+		{
+			"type": "COMMENT",
+			"args": "#",
+			"lines": [
+				{
+					"kind": "comment",
+					"text": "#"
+				}
+			],
+			"startLine": 2,
+			"endLine": 2
+		},
+		{
+			"type": "COMMENT",
+			"args": "# Licensed under the Apache License, Version 2.0 (the \"License\");",
+			"lines": [
+				{
+					"kind": "comment",
+					"text": "# Licensed under the Apache License, Version 2.0 (the \"License\");"
+				}
+			],
+			"startLine": 3,
+			"endLine": 3
+		},
+		{
+			"type": "COMMENT",
+			"args": "# you may not use this file except in compliance with the License.",
+			"lines": [
+				{
+					"kind": "comment",
+					"text": "# you may not use this file except in compliance with the License."
+				}
+			],
+			"startLine": 4,
+			"endLine": 4
+		},
+		{
+			"type": "COMMENT",
+			"args": "# You may obtain a copy of the License at",
+			"lines": [
+				{
+					"kind": "comment",
+					"text": "# You may obtain a copy of the License at"
+				}
+			],
+			"startLine": 5,
+			"endLine": 5
+		},
+		{
+			"type": "COMMENT",
+			"args": "#",
+			"lines": [
+				{
+					"kind": "comment",
+					"text": "#"
+				}
+			],
+			"startLine": 6,
+			"endLine": 6
+		},
+		{
+			"type": "COMMENT",
+			"args": "#      https://www.apache.org/licenses/LICENSE-2.0",
+			"lines": [
+				{
+					"kind": "comment",
+					"text": "#      https://www.apache.org/licenses/LICENSE-2.0"
+				}
+			],
+			"startLine": 7,
+			"endLine": 7
+		},
+		{
+			"type": "COMMENT",
+			"args": "#",
+			"lines": [
+				{
+					"kind": "comment",
+					"text": "#"
+				}
+			],
+			"startLine": 8,
+			"endLine": 8
+		},
+		{
+			"type": "COMMENT",
+			"args": "# Unless required by applicable law or agreed to in writing, software",
+			"lines": [
+				{
+					"kind": "comment",
+					"text": "# Unless required by applicable law or agreed to in writing, software"
+				}
+			],
+			"startLine": 9,
+			"endLine": 9
+		},
+		{
+			"type": "COMMENT",
+			"args": "# distributed under the License is distributed on an \"AS IS\" BASIS,",
+			"lines": [
+				{
+					"kind": "comment",
+					"text": "# distributed under the License is distributed on an \"AS IS\" BASIS,"
+				}
+			],
+			"startLine": 10,
+			"endLine": 10
+		},
+		{
+			"type": "COMMENT",
+			"args": "# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.",
+			"lines": [
+				{
+					"kind": "comment",
+					"text": "# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied."
+				}
+			],
+			"startLine": 11,
+			"endLine": 11
+		},
+		{
+			"type": "COMMENT",
+			"args": "# See the License for the specific language governing permissions and",
+			"lines": [
+				{
+					"kind": "comment",
+					"text": "# See the License for the specific language governing permissions and"
+				}
+			],
+			"startLine": 12,
+			"endLine": 12
+		},
+		{
+			"type": "COMMENT",
+			"args": "# limitations under the License.",
+			"lines": [
+				{
+					"kind": "comment",
+					"text": "# limitations under the License."
+				}
+			],
+			"startLine": 13,
+			"endLine": 13
+		},
+		{
+			"type": "COMMENT",
+			"args": "#",
+			"lines": [
+				{
+					"kind": "comment",
+					"text": "#"
+				}
+			],
+			"startLine": 14,
+			"endLine": 14
+		},
+		{
+			"type": "blank",
+			"lines": [
+				{
+					"kind": "blank"
+				}
+			],
+			"startLine": 15,
+			"endLine": 15
+		},
+		{
+			"type": "FROM",
+			"ref": "mcr.microsoft.com/windows/servercore:ltsc2016",
+			"lines": [
+				{
+					"kind": "instruction",
+					"text": "FROM mcr.microsoft.com/windows/servercore:ltsc2016"
+				}
+			],
+			"startLine": 16,
+			"endLine": 16
+		},
+		{
+			"type": "blank",
+			"lines": [
+				{
+					"kind": "blank"
+				}
+			],
+			"startLine": 17,
+			"endLine": 17
+		},
+		{
+			"type": "COMMENT",
+			"args": "# $ProgressPreference: https://github.com/PowerShell/PowerShell/issues/2138#issuecomment-251261324",
+			"lines": [
+				{
+					"kind": "comment",
+					"text": "# $ProgressPreference: https://github.com/PowerShell/PowerShell/issues/2138#issuecomment-251261324"
+				}
+			],
+			"startLine": 18,
+			"endLine": 18
+		},
+		{
+			"type": "SHELL",
+			"form": "exec",
+			"args": [
+				"powershell",
+				"-Command",
+				"$ErrorActionPreference = 'Stop'; $ProgressPreference = 'SilentlyContinue';"
+			],
+			"lines": [
+				{
+					"kind": "instruction",
+					"text": "SHELL [\"powershell\", \"-Command\", \"$ErrorActionPreference = 'Stop'; $ProgressPreference = 'SilentlyContinue';\"]"
+				}
+			],
+			"startLine": 19,
+			"endLine": 19
+		},
+		{
+			"type": "blank",
+			"lines": [
+				{
+					"kind": "blank"
+				}
+			],
+			"startLine": 20,
+			"endLine": 20
+		},
+		{
+			"type": "ENV",
+			"args": "JAVA_VERSION jdk-11.0.12+7_openj9-0.27.0",
+			"lines": [
+				{
+					"kind": "instruction",
+					"text": "ENV JAVA_VERSION jdk-11.0.12+7_openj9-0.27.0"
+				}
+			],
+			"startLine": 21,
+			"endLine": 21
+		},
+		{
+			"type": "blank",
+			"lines": [
+				{
+					"kind": "blank"
+				}
+			],
+			"startLine": 22,
+			"endLine": 22
+		},
+		{
+			"type": "RUN",
+			"form": "shell",
+			"args": "Write-Host ('Downloading https://github.com/ibmruntimes/semeru11-binaries/releases/download/jdk-11.0.12%2B7_openj9-0.27.0/ibm-semeru-open-jre_x64_windows_11.0.12_7_openj9-0.27.0.msi ...');     [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12 ; Invoke-WebRequest -Uri https://github.com/ibmruntimes/semeru11-binaries/releases/download/jdk-11.0.12%2B7_openj9-0.27.0/ibm-semeru-open-jre_x64_windows_11.0.12_7_openj9-0.27.0.msi -O 'openjdk.msi' ;     Write-Host ('Verifying sha256 (51a31929d4745ebbd070d2aa68590e895483b8deef1fd31d0335286edb27a00f) ...');     if ((Get-FileHash openjdk.msi -Algorithm sha256).Hash -ne '51a31929d4745ebbd070d2aa68590e895483b8deef1fd31d0335286edb27a00f') {             Write-Host 'FAILED!';             exit 1;     };      New-Item -ItemType Directory -Path C:\\temp | Out-Null;      Write-Host 'Installing using MSI ...';     $proc = Start-Process -FilePath \"msiexec.exe\" -ArgumentList '/i', 'openjdk.msi', '/L*V', 'C:\\temp\\OpenJDK.log',     '/quiet', 'ADDLOCAL=FeatureEnvironment,FeatureJarFileRunWith,FeatureJavaHome', 'INSTALLDIR=C:\\openjdk-11' -Wait -Passthru;     $proc.WaitForExit() ;     if ($proc.ExitCode -ne 0) {             Write-Host 'FAILED installing MSI!' ;             exit 1;     };      Remove-Item -Path C:\\temp -Recurse | Out-Null;     Write-Host 'Removing openjdk.msi ...';     Remove-Item openjdk.msi -Force",
+			"lines": [
+				{
+					"kind": "instruction",
+					"text": "RUN Write-Host ('Downloading https://github.com/ibmruntimes/semeru11-binaries/releases/download/jdk-11.0.12%2B7_openj9-0.27.0/ibm-semeru-open-jre_x64_windows_11.0.12_7_openj9-0.27.0.msi ...'); \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12 ; Invoke-WebRequest -Uri https://github.com/ibmruntimes/semeru11-binaries/releases/download/jdk-11.0.12%2B7_openj9-0.27.0/ibm-semeru-open-jre_x64_windows_11.0.12_7_openj9-0.27.0.msi -O 'openjdk.msi' ; \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "    Write-Host ('Verifying sha256 (51a31929d4745ebbd070d2aa68590e895483b8deef1fd31d0335286edb27a00f) ...'); \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "    if ((Get-FileHash openjdk.msi -Algorithm sha256).Hash -ne '51a31929d4745ebbd070d2aa68590e895483b8deef1fd31d0335286edb27a00f') { \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "            Write-Host 'FAILED!'; \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "            exit 1; \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "    }; \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "    \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "    New-Item -ItemType Directory -Path C:\\temp | Out-Null; \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "    \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "    Write-Host 'Installing using MSI ...'; \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "    $proc = Start-Process -FilePath \"msiexec.exe\" -ArgumentList '/i', 'openjdk.msi', '/L*V', 'C:\\temp\\OpenJDK.log', \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "    '/quiet', 'ADDLOCAL=FeatureEnvironment,FeatureJarFileRunWith,FeatureJavaHome', 'INSTALLDIR=C:\\openjdk-11' -Wait -Passthru; \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "    $proc.WaitForExit() ; \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "    if ($proc.ExitCode -ne 0) { \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "            Write-Host 'FAILED installing MSI!' ; \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "            exit 1; \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "    }; \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "    \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "    Remove-Item -Path C:\\temp -Recurse | Out-Null; \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "    Write-Host 'Removing openjdk.msi ...'; \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "    Remove-Item openjdk.msi -Force"
+				}
+			],
+			"startLine": 23,
+			"endLine": 44
+		},
+		{
+			"type": "ENV",
+			"args": "JAVA_TOOL_OPTIONS=\"-XX:+IgnoreUnrecognizedVMOptions -XX:+PortableSharedCache -XX:+IdleTuningGcOnIdle -Xshareclasses:name=openj9_system_scc,cacheDir=/opt/java/.scc,readonly,nonFatal\"",
+			"lines": [
+				{
+					"kind": "instruction",
+					"text": "ENV JAVA_TOOL_OPTIONS=\"-XX:+IgnoreUnrecognizedVMOptions -XX:+PortableSharedCache -XX:+IdleTuningGcOnIdle -Xshareclasses:name=openj9_system_scc,cacheDir=/opt/java/.scc,readonly,nonFatal\""
+				}
+			],
+			"startLine": 45,
+			"endLine": 45
+		}
+	]
+}

@@ -1,0 +1,52 @@
+{
+	"type": "jq",
+	"query": {
+		"type": "if",
+		"cond": {
+			"type": "binOp",
+			"op": "==",
+			"left": {
+				"type": "field",
+				"name": ".arch"
+			},
+			"right": {
+				"type": "string",
+				"raw": "\"amd64\""
+			}
+		},
+		"then": {
+			"type": "string",
+			"raw": "\"x86_64\""
+		},
+		"elseIfs": [
+			{
+				"cond": {
+					"type": "binOp",
+					"op": "==",
+					"left": {
+						"type": "field",
+						"name": ".arch"
+					},
+					"right": {
+						"type": "string",
+						"raw": "\"arm64\""
+					}
+				},
+				"then": {
+					"type": "string",
+					"raw": "\"aarch64\""
+				}
+			}
+		],
+		"else": {
+			"type": "call",
+			"name": "error",
+			"args": [
+				{
+					"type": "string",
+					"raw": "\"unsupported arch: \\(.arch)\""
+				}
+			]
+		}
+	}
+}

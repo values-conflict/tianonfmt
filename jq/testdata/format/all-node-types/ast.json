@@ -1,0 +1,367 @@
+{
+	"type": "jq",
+	"module": {
+		"type": "module",
+		"meta": {
+			"type": "object",
+			"fields": []
+		}
+	},
+	"imports": [
+		{
+			"type": "import",
+			"include": false,
+			"path": "\"bar\"",
+			"binding": "$bar"
+		}
+	],
+	"funcDefs": [
+		{
+			"type": "funcDef",
+			"name": "f",
+			"params": [
+				"$x",
+				"$y"
+			],
+			"body": {
+				"type": "pipe",
+				"left": {
+					"type": "var",
+					"name": "$x"
+				},
+				"right": {
+					"type": "pipe",
+					"left": {
+						"type": "call",
+						"name": "not"
+					},
+					"right": {
+						"type": "var",
+						"name": "$y"
+					}
+				}
+			}
+		},
+		{
+			"type": "funcDef",
+			"name": "g",
+			"body": {
+				"type": "localFuncDef",
+				"name": "h",
+				"body": {
+					"type": "binOp",
+					"op": "+",
+					"left": {
+						"type": "identity"
+					},
+					"right": {
+						"type": "number",
+						"raw": "1"
+					}
+				},
+				"rest": {
+					"type": "call",
+					"name": "h"
+				}
+			}
+		}
+	],
+	"query": {
+		"type": "label",
+		"binding": "$lbl",
+		"body": {
+			"type": "as",
+			"expr": {
+				"type": "pipe",
+				"left": {
+					"type": "foreach",
+					"expr": {
+						"type": "index",
+						"expr": {
+							"type": "identity"
+						}
+					},
+					"pattern": {
+						"type": "var",
+						"name": "$item"
+					},
+					"init": {
+						"type": "number",
+						"raw": "0"
+					},
+					"update": {
+						"type": "binOp",
+						"op": "+",
+						"left": {
+							"type": "identity"
+						},
+						"right": {
+							"type": "var",
+							"name": "$item"
+						}
+					},
+					"extract": {
+						"type": "binOp",
+						"op": "*",
+						"left": {
+							"type": "identity"
+						},
+						"right": {
+							"type": "number",
+							"raw": "2"
+						}
+					}
+				},
+				"right": {
+					"type": "pipe",
+					"left": {
+						"type": "reduce",
+						"expr": {
+							"type": "index",
+							"expr": {
+								"type": "identity"
+							}
+						},
+						"pattern": {
+							"type": "var",
+							"name": "$x"
+						},
+						"init": {
+							"type": "number",
+							"raw": "0"
+						},
+						"update": {
+							"type": "binOp",
+							"op": "+",
+							"left": {
+								"type": "identity"
+							},
+							"right": {
+								"type": "var",
+								"name": "$x"
+							}
+						}
+					},
+					"right": {
+						"type": "pipe",
+						"left": {
+							"type": "if",
+							"cond": {
+								"type": "identity"
+							},
+							"then": {
+								"type": "field",
+								"name": ".a"
+							},
+							"elseIfs": [
+								{
+									"cond": {
+										"type": "field",
+										"name": ".b"
+									},
+									"then": {
+										"type": "field",
+										"name": ".c"
+									}
+								}
+							],
+							"else": {
+								"type": "field",
+								"name": ".d"
+							}
+						},
+						"right": {
+							"type": "pipe",
+							"left": {
+								"type": "try",
+								"body": {
+									"type": "field",
+									"name": ".e"
+								},
+								"handler": {
+									"type": "field",
+									"name": ".f"
+								}
+							},
+							"right": {
+								"type": "identity"
+							}
+						}
+					}
+				}
+			},
+			"pattern": {
+				"type": "var",
+				"name": "$y"
+			},
+			"body": {
+				"type": "as",
+				"expr": {
+					"type": "identity"
+				},
+				"pattern": {
+					"type": "arrayPattern",
+					"elems": [
+						{
+							"type": "var",
+							"name": "$first"
+						},
+						{
+							"type": "var",
+							"name": "$rest"
+						}
+					]
+				},
+				"body": {
+					"type": "as",
+					"expr": {
+						"type": "identity"
+					},
+					"pattern": {
+						"type": "objectPattern",
+						"fields": [
+							{
+								"key": "key",
+								"binding": "$val"
+							}
+						]
+					},
+					"body": {
+						"type": "pipe",
+						"left": {
+							"type": "slice",
+							"expr": {
+								"type": "field",
+								"name": ".g"
+							},
+							"start": {
+								"type": "number",
+								"raw": "0"
+							},
+							"end": {
+								"type": "number",
+								"raw": "2"
+							}
+						},
+						"right": {
+							"type": "pipe",
+							"left": {
+								"type": "index",
+								"expr": {
+									"type": "field",
+									"name": ".h"
+								},
+								"key": {
+									"type": "field",
+									"name": ".i"
+								}
+							},
+							"right": {
+								"type": "pipe",
+								"left": {
+									"type": "format",
+									"name": "base64"
+								},
+								"right": {
+									"type": "pipe",
+									"left": {
+										"type": "array",
+										"elem": {
+											"type": "comma",
+											"left": {
+												"type": "comma",
+												"left": {
+													"type": "field",
+													"name": ".j"
+												},
+												"right": {
+													"type": "field",
+													"name": ".k"
+												}
+											},
+											"right": {
+												"type": "call",
+												"name": "empty"
+											}
+										}
+									},
+									"right": {
+										"type": "pipe",
+										"left": {
+											"type": "object",
+											"fields": [
+												{
+													"key": {
+														"type": "ident",
+														"name": "l"
+													},
+													"value": {
+														"type": "field",
+														"name": ".m"
+													}
+												},
+												{
+													"key": {
+														"type": "string",
+														"raw": "\"n.o\""
+													},
+													"value": {
+														"type": "field",
+														"name": ".p"
+													}
+												},
+												{
+													"key": {
+														"type": "paren",
+														"expr": {
+															"type": "field",
+															"name": ".q"
+														}
+													},
+													"value": {
+														"type": "field",
+														"name": ".r"
+													}
+												}
+											]
+										},
+										"right": {
+											"type": "pipe",
+											"left": {
+												"type": "paren",
+												"expr": {
+													"type": "field",
+													"name": ".s"
+												}
+											},
+											"right": {
+												"type": "pipe",
+												"left": {
+													"type": "optional",
+													"expr": {
+														"type": "field",
+														"name": ".t"
+													}
+												},
+												"right": {
+													"type": "pipe",
+													"left": {
+														"type": "loc"
+													},
+													"right": {
+														"type": "break",
+														"binding": "$lbl"
+													}
+												}
+											}
+										}
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+}

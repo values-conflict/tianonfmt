@@ -1,0 +1,76 @@
+{
+	"type": "shell",
+	"file": "input.sh",
+	"stmts": [
+		{
+			"type": "call",
+			"args": [
+				"set",
+				"-Eeuo",
+				"pipefail"
+			]
+		},
+		{
+			"type": "call",
+			"assigns": [
+				"dir=\"$(mktemp -d)\""
+			],
+			"args": []
+		},
+		{
+			"type": "call",
+			"assigns": [
+				"exitTrap=\"$(printf 'rm -rf %q' \"$dir\")\""
+			],
+			"args": []
+		},
+		{
+			"type": "call",
+			"args": [
+				"trap",
+				"\"$exitTrap\"",
+				"EXIT"
+			]
+		},
+		{
+			"type": "for",
+			"loop": {
+				"type": "wordIter",
+				"name": "arch",
+				"items": [
+					"amd64",
+					"arm64"
+				]
+			},
+			"do": [
+				{
+					"type": "call",
+					"assigns": [
+						"file=\"$dir/$arch.tar\""
+					],
+					"args": []
+				},
+				{
+					"type": "call",
+					"args": [
+						"curl",
+						"-fsSL",
+						"\"https://example.com/$arch.tar\"",
+						"-o",
+						"\"$file\""
+					]
+				},
+				{
+					"type": "call",
+					"args": [
+						"tar",
+						"-xzf",
+						"\"$file\"",
+						"-C",
+						"\"$dir\""
+					]
+				}
+			]
+		}
+	]
+}

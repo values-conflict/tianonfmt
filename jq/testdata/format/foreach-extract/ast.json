@@ -1,0 +1,100 @@
+{
+	"type": "jq",
+	"query": {
+		"type": "foreach",
+		"expr": {
+			"type": "index",
+			"expr": {
+				"type": "identity"
+			}
+		},
+		"pattern": {
+			"type": "var",
+			"name": "$item"
+		},
+		"init": {
+			"type": "object",
+			"fields": [
+				{
+					"key": {
+						"type": "ident",
+						"name": "count"
+					},
+					"value": {
+						"type": "number",
+						"raw": "0"
+					}
+				},
+				{
+					"key": {
+						"type": "ident",
+						"name": "sum"
+					},
+					"value": {
+						"type": "number",
+						"raw": "0"
+					}
+				}
+			]
+		},
+		"update": {
+			"type": "object",
+			"fields": [
+				{
+					"key": {
+						"type": "ident",
+						"name": "count"
+					},
+					"value": {
+						"type": "paren",
+						"expr": {
+							"type": "binOp",
+							"op": "+",
+							"left": {
+								"type": "field",
+								"name": ".count"
+							},
+							"right": {
+								"type": "number",
+								"raw": "1"
+							}
+						}
+					}
+				},
+				{
+					"key": {
+						"type": "ident",
+						"name": "sum"
+					},
+					"value": {
+						"type": "paren",
+						"expr": {
+							"type": "binOp",
+							"op": "+",
+							"left": {
+								"type": "field",
+								"name": ".sum"
+							},
+							"right": {
+								"type": "var",
+								"name": "$item"
+							}
+						}
+					}
+				}
+			]
+		},
+		"extract": {
+			"type": "binOp",
+			"op": "/",
+			"left": {
+				"type": "field",
+				"name": ".sum"
+			},
+			"right": {
+				"type": "field",
+				"name": ".count"
+			}
+		}
+	}
+}

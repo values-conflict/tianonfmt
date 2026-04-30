@@ -1,0 +1,623 @@
+{
+	"type": "dockerfile",
+	"file": "input.dockerfile",
+	"instructions": [
+		{
+			"type": "FROM",
+			"ref": "ubuntu:24.04",
+			"alias": "base",
+			"lines": [
+				{
+					"kind": "instruction",
+					"text": "FROM ubuntu:24.04 AS base"
+				}
+			],
+			"startLine": 1,
+			"endLine": 1
+		},
+		{
+			"type": "LABEL",
+			"args": "maintainer=\"Swift Infrastructure \u003cswift-infrastructure@forums.swift.org\u003e\"",
+			"lines": [
+				{
+					"kind": "instruction",
+					"text": "LABEL maintainer=\"Swift Infrastructure \u003cswift-infrastructure@forums.swift.org\u003e\""
+				}
+			],
+			"startLine": 2,
+			"endLine": 2
+		},
+		{
+			"type": "LABEL",
+			"args": "description=\"Docker Container for the Swift programming language\"",
+			"lines": [
+				{
+					"kind": "instruction",
+					"text": "LABEL description=\"Docker Container for the Swift programming language\""
+				}
+			],
+			"startLine": 3,
+			"endLine": 3
+		},
+		{
+			"type": "blank",
+			"lines": [
+				{
+					"kind": "blank"
+				}
+			],
+			"startLine": 4,
+			"endLine": 4
+		},
+		{
+			"type": "RUN",
+			"form": "shell",
+			"args": "export DEBIAN_FRONTEND=noninteractive DEBCONF_NONINTERACTIVE_SEEN=true \u0026\u0026 apt-get -q update \u0026\u0026     apt-get -q install -y     binutils     curl     git     unzip     gnupg2     libc6-dev     libcurl4-openssl-dev     libncurses5-dev     libedit2     libgcc-13-dev     libpython3-dev     libsqlite3-0     libstdc++-13-dev     libxml2-dev     libz3-dev     pkg-config     tzdata     zlib1g-dev     \u0026\u0026 rm -r /var/lib/apt/lists/*",
+			"lines": [
+				{
+					"kind": "instruction",
+					"text": "RUN export DEBIAN_FRONTEND=noninteractive DEBCONF_NONINTERACTIVE_SEEN=true \u0026\u0026 apt-get -q update \u0026\u0026 \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "    apt-get -q install -y \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "    binutils \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "    curl \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "    git \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "    unzip \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "    gnupg2 \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "    libc6-dev \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "    libcurl4-openssl-dev \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "    libncurses5-dev       \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "    libedit2 \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "    libgcc-13-dev \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "    libpython3-dev \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "    libsqlite3-0 \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "    libstdc++-13-dev \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "    libxml2-dev \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "    libz3-dev \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "    pkg-config \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "    tzdata \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "    zlib1g-dev \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "    \u0026\u0026 rm -r /var/lib/apt/lists/*"
+				}
+			],
+			"startLine": 5,
+			"endLine": 25
+		},
+		{
+			"type": "COMMENT",
+			"args": "# Everything up to here should cache nicely between Swift versions, assuming dev dependencies change little",
+			"lines": [
+				{
+					"kind": "comment",
+					"text": "# Everything up to here should cache nicely between Swift versions, assuming dev dependencies change little"
+				}
+			],
+			"startLine": 26,
+			"endLine": 26
+		},
+		{
+			"type": "blank",
+			"lines": [
+				{
+					"kind": "blank"
+				}
+			],
+			"startLine": 27,
+			"endLine": 27
+		},
+		{
+			"type": "COMMENT",
+			"args": "# gpg --keyid-format LONG -k FAF6989E1BC16FEA",
+			"lines": [
+				{
+					"kind": "comment",
+					"text": "# gpg --keyid-format LONG -k FAF6989E1BC16FEA"
+				}
+			],
+			"startLine": 28,
+			"endLine": 28
+		},
+		{
+			"type": "COMMENT",
+			"args": "# pub   rsa4096/FAF6989E1BC16FEA 2019-11-07 [SC] [expires: 2021-11-06]",
+			"lines": [
+				{
+					"kind": "comment",
+					"text": "# pub   rsa4096/FAF6989E1BC16FEA 2019-11-07 [SC] [expires: 2021-11-06]"
+				}
+			],
+			"startLine": 29,
+			"endLine": 29
+		},
+		{
+			"type": "COMMENT",
+			"args": "#       8A7495662C3CD4AE18D95637FAF6989E1BC16FEA",
+			"lines": [
+				{
+					"kind": "comment",
+					"text": "#       8A7495662C3CD4AE18D95637FAF6989E1BC16FEA"
+				}
+			],
+			"startLine": 30,
+			"endLine": 30
+		},
+		{
+			"type": "COMMENT",
+			"args": "# uid                 [ unknown] Swift Automatic Signing Key #3 \u003cswift-infrastructure@swift.org\u003e",
+			"lines": [
+				{
+					"kind": "comment",
+					"text": "# uid                 [ unknown] Swift Automatic Signing Key #3 \u003cswift-infrastructure@swift.org\u003e"
+				}
+			],
+			"startLine": 31,
+			"endLine": 31
+		},
+		{
+			"type": "ARG",
+			"args": "SWIFT_SIGNING_KEY=8A7495662C3CD4AE18D95637FAF6989E1BC16FEA",
+			"lines": [
+				{
+					"kind": "instruction",
+					"text": "ARG SWIFT_SIGNING_KEY=8A7495662C3CD4AE18D95637FAF6989E1BC16FEA"
+				}
+			],
+			"startLine": 32,
+			"endLine": 32
+		},
+		{
+			"type": "ARG",
+			"args": "SWIFT_PLATFORM=ubuntu",
+			"lines": [
+				{
+					"kind": "instruction",
+					"text": "ARG SWIFT_PLATFORM=ubuntu"
+				}
+			],
+			"startLine": 33,
+			"endLine": 33
+		},
+		{
+			"type": "ARG",
+			"args": "OS_MAJOR_VER=24",
+			"lines": [
+				{
+					"kind": "instruction",
+					"text": "ARG OS_MAJOR_VER=24"
+				}
+			],
+			"startLine": 34,
+			"endLine": 34
+		},
+		{
+			"type": "ARG",
+			"args": "OS_MIN_VER=04",
+			"lines": [
+				{
+					"kind": "instruction",
+					"text": "ARG OS_MIN_VER=04"
+				}
+			],
+			"startLine": 35,
+			"endLine": 35
+		},
+		{
+			"type": "ARG",
+			"args": "SWIFT_WEBROOT=https://download.swift.org/development",
+			"lines": [
+				{
+					"kind": "instruction",
+					"text": "ARG SWIFT_WEBROOT=https://download.swift.org/development"
+				}
+			],
+			"startLine": 36,
+			"endLine": 36
+		},
+		{
+			"type": "blank",
+			"lines": [
+				{
+					"kind": "blank"
+				}
+			],
+			"startLine": 37,
+			"endLine": 37
+		},
+		{
+			"type": "COMMENT",
+			"args": "# This is a small trick to enable if/else for arm64 and amd64.",
+			"lines": [
+				{
+					"kind": "comment",
+					"text": "# This is a small trick to enable if/else for arm64 and amd64."
+				}
+			],
+			"startLine": 38,
+			"endLine": 38
+		},
+		{
+			"type": "COMMENT",
+			"args": "# Because of https://bugs.swift.org/browse/SR-14872 we need adjust tar options.",
+			"lines": [
+				{
+					"kind": "comment",
+					"text": "# Because of https://bugs.swift.org/browse/SR-14872 we need adjust tar options."
+				}
+			],
+			"startLine": 39,
+			"endLine": 39
+		},
+		{
+			"type": "FROM",
+			"ref": "base",
+			"alias": "base-amd64",
+			"lines": [
+				{
+					"kind": "instruction",
+					"text": "FROM base AS base-amd64"
+				}
+			],
+			"startLine": 40,
+			"endLine": 40
+		},
+		{
+			"type": "ARG",
+			"args": "OS_ARCH_SUFFIX=",
+			"lines": [
+				{
+					"kind": "instruction",
+					"text": "ARG OS_ARCH_SUFFIX="
+				}
+			],
+			"startLine": 41,
+			"endLine": 41
+		},
+		{
+			"type": "blank",
+			"lines": [
+				{
+					"kind": "blank"
+				}
+			],
+			"startLine": 42,
+			"endLine": 42
+		},
+		{
+			"type": "FROM",
+			"ref": "base",
+			"alias": "base-arm64",
+			"lines": [
+				{
+					"kind": "instruction",
+					"text": "FROM base AS base-arm64"
+				}
+			],
+			"startLine": 43,
+			"endLine": 43
+		},
+		{
+			"type": "ARG",
+			"args": "OS_ARCH_SUFFIX=-aarch64",
+			"lines": [
+				{
+					"kind": "instruction",
+					"text": "ARG OS_ARCH_SUFFIX=-aarch64"
+				}
+			],
+			"startLine": 44,
+			"endLine": 44
+		},
+		{
+			"type": "blank",
+			"lines": [
+				{
+					"kind": "blank"
+				}
+			],
+			"startLine": 45,
+			"endLine": 45
+		},
+		{
+			"type": "FROM",
+			"ref": "base-$TARGETARCH",
+			"alias": "final",
+			"lines": [
+				{
+					"kind": "instruction",
+					"text": "FROM base-$TARGETARCH AS final"
+				}
+			],
+			"startLine": 46,
+			"endLine": 46
+		},
+		{
+			"type": "blank",
+			"lines": [
+				{
+					"kind": "blank"
+				}
+			],
+			"startLine": 47,
+			"endLine": 47
+		},
+		{
+			"type": "ARG",
+			"args": "OS_VER=$SWIFT_PLATFORM$OS_MAJOR_VER.$OS_MIN_VER$OS_ARCH_SUFFIX",
+			"lines": [
+				{
+					"kind": "instruction",
+					"text": "ARG OS_VER=$SWIFT_PLATFORM$OS_MAJOR_VER.$OS_MIN_VER$OS_ARCH_SUFFIX"
+				}
+			],
+			"startLine": 48,
+			"endLine": 48
+		},
+		{
+			"type": "ARG",
+			"args": "PLATFORM_WEBROOT=\"$SWIFT_WEBROOT/$SWIFT_PLATFORM$OS_MAJOR_VER$OS_MIN_VER$OS_ARCH_SUFFIX\"",
+			"lines": [
+				{
+					"kind": "instruction",
+					"text": "ARG PLATFORM_WEBROOT=\"$SWIFT_WEBROOT/$SWIFT_PLATFORM$OS_MAJOR_VER$OS_MIN_VER$OS_ARCH_SUFFIX\""
+				}
+			],
+			"startLine": 49,
+			"endLine": 49
+		},
+		{
+			"type": "blank",
+			"lines": [
+				{
+					"kind": "blank"
+				}
+			],
+			"startLine": 50,
+			"endLine": 50
+		},
+		{
+			"type": "RUN",
+			"form": "shell",
+			"args": "echo \"${PLATFORM_WEBROOT}/latest-build.yml\"",
+			"lines": [
+				{
+					"kind": "instruction",
+					"text": "RUN echo \"${PLATFORM_WEBROOT}/latest-build.yml\""
+				}
+			],
+			"startLine": 51,
+			"endLine": 51
+		},
+		{
+			"type": "blank",
+			"lines": [
+				{
+					"kind": "blank"
+				}
+			],
+			"startLine": 52,
+			"endLine": 52
+		},
+		{
+			"type": "RUN",
+			"form": "shell",
+			"args": "set -e;     export $(curl -s ${PLATFORM_WEBROOT}/latest-build.yml | grep 'download:' | sed 's/:[^:\\/\\/]/=/g')     \u0026\u0026 export $(curl -s ${PLATFORM_WEBROOT}/latest-build.yml | grep 'download_signature:' | sed 's/:[^:\\/\\/]/=/g')     \u0026\u0026 export DOWNLOAD_DIR=$(echo $download | sed \"s/-${OS_VER}.tar.gz//g\")     \u0026\u0026 echo $DOWNLOAD_DIR \u003e .swift_tag     \u0026\u0026 export GNUPGHOME=\"$(mktemp -d)\"     \u0026\u0026 curl -fsSL ${PLATFORM_WEBROOT}/${DOWNLOAD_DIR}/${download} -o latest_toolchain.tar.gz         ${PLATFORM_WEBROOT}/${DOWNLOAD_DIR}/${download_signature} -o latest_toolchain.tar.gz.sig     \u0026\u0026 curl -fSsL --compressed https://swift.org/keys/all-keys.asc | gpg --import -     \u0026\u0026 gpg --batch --verify latest_toolchain.tar.gz.sig latest_toolchain.tar.gz     \u0026\u0026 tar -xzf latest_toolchain.tar.gz --directory / --strip-components=1     \u0026\u0026 chmod -R o+r /usr/lib/swift     \u0026\u0026 rm -rf \"$GNUPGHOME\" latest_toolchain.tar.gz.sig latest_toolchain.tar.gz     \u0026\u0026 apt-get purge --auto-remove -y curl",
+			"lines": [
+				{
+					"kind": "instruction",
+					"text": "RUN set -e; \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "    export $(curl -s ${PLATFORM_WEBROOT}/latest-build.yml | grep 'download:' | sed 's/:[^:\\/\\/]/=/g')  \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "    \u0026\u0026 export $(curl -s ${PLATFORM_WEBROOT}/latest-build.yml | grep 'download_signature:' | sed 's/:[^:\\/\\/]/=/g')  \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "    \u0026\u0026 export DOWNLOAD_DIR=$(echo $download | sed \"s/-${OS_VER}.tar.gz//g\") \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "    \u0026\u0026 echo $DOWNLOAD_DIR \u003e .swift_tag \\"
+				},
+				{
+					"kind": "comment",
+					"text": "    # - Download the GPG keys, Swift toolchain, and toolchain signature, and verify."
+				},
+				{
+					"kind": "continuation",
+					"text": "    \u0026\u0026 export GNUPGHOME=\"$(mktemp -d)\" \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "    \u0026\u0026 curl -fsSL ${PLATFORM_WEBROOT}/${DOWNLOAD_DIR}/${download} -o latest_toolchain.tar.gz \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "        ${PLATFORM_WEBROOT}/${DOWNLOAD_DIR}/${download_signature} -o latest_toolchain.tar.gz.sig \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "    \u0026\u0026 curl -fSsL --compressed https://swift.org/keys/all-keys.asc | gpg --import -  \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "    \u0026\u0026 gpg --batch --verify latest_toolchain.tar.gz.sig latest_toolchain.tar.gz \\"
+				},
+				{
+					"kind": "comment",
+					"text": "    # - Unpack the toolchain, set libs permissions, and clean up."
+				},
+				{
+					"kind": "continuation",
+					"text": "    \u0026\u0026 tar -xzf latest_toolchain.tar.gz --directory / --strip-components=1 \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "    \u0026\u0026 chmod -R o+r /usr/lib/swift \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "    \u0026\u0026 rm -rf \"$GNUPGHOME\" latest_toolchain.tar.gz.sig latest_toolchain.tar.gz \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "    \u0026\u0026 apt-get purge --auto-remove -y curl"
+				}
+			],
+			"startLine": 53,
+			"endLine": 68
+		},
+		{
+			"type": "blank",
+			"lines": [
+				{
+					"kind": "blank"
+				}
+			],
+			"startLine": 69,
+			"endLine": 69
+		},
+		{
+			"type": "COMMENT",
+			"args": "# Print Installed Swift Version",
+			"lines": [
+				{
+					"kind": "comment",
+					"text": "# Print Installed Swift Version"
+				}
+			],
+			"startLine": 70,
+			"endLine": 70
+		},
+		{
+			"type": "RUN",
+			"form": "shell",
+			"args": "swift --version",
+			"lines": [
+				{
+					"kind": "instruction",
+					"text": "RUN swift --version"
+				}
+			],
+			"startLine": 71,
+			"endLine": 71
+		},
+		{
+			"type": "blank",
+			"lines": [
+				{
+					"kind": "blank"
+				}
+			],
+			"startLine": 72,
+			"endLine": 72
+		},
+		{
+			"type": "RUN",
+			"form": "shell",
+			"args": "echo \"[ -n \\\"\\${TERM:-}\\\" -a -r /etc/motd ] \u0026\u0026 cat /etc/motd\" \u003e\u003e /etc/bash.bashrc;     (       printf \"################################################################\\n\";       printf \"# %-60s #\\n\" \"\";       printf \"# %-60s #\\n\" \"Swift Nightly Docker Image\";       printf \"# %-60s #\\n\" \"Tag: $(cat .swift_tag)\";       printf \"# %-60s #\\n\" \"\";       printf \"################################################################\\n\"     ) \u003e /etc/motd",
+			"lines": [
+				{
+					"kind": "instruction",
+					"text": "RUN echo \"[ -n \\\"\\${TERM:-}\\\" -a -r /etc/motd ] \u0026\u0026 cat /etc/motd\" \u003e\u003e /etc/bash.bashrc; \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "    ( \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "      printf \"################################################################\\n\"; \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "      printf \"# %-60s #\\n\" \"\"; \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "      printf \"# %-60s #\\n\" \"Swift Nightly Docker Image\"; \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "      printf \"# %-60s #\\n\" \"Tag: $(cat .swift_tag)\"; \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "      printf \"# %-60s #\\n\" \"\"; \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "      printf \"################################################################\\n\" \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "    ) \u003e /etc/motd"
+				}
+			],
+			"startLine": 73,
+			"endLine": 81
+		}
+	]
+}

@@ -1,0 +1,295 @@
+{
+	"type": "dockerfile",
+	"file": "input.dockerfile",
+	"directives": [
+		{
+			"name": "syntax",
+			"value": "docker/dockerfile:1"
+		}
+	],
+	"instructions": [
+		{
+			"type": "FROM",
+			"ref": "golang:1.21",
+			"alias": "builder",
+			"lines": [
+				{
+					"kind": "instruction",
+					"text": "FROM golang:1.21 AS builder"
+				}
+			],
+			"startLine": 2,
+			"endLine": 2
+		},
+		{
+			"type": "ARG",
+			"args": "VERSION=dev",
+			"lines": [
+				{
+					"kind": "instruction",
+					"text": "ARG VERSION=dev"
+				}
+			],
+			"startLine": 3,
+			"endLine": 3
+		},
+		{
+			"type": "LABEL",
+			"args": "maintainer=\"test@example.com\" version=\"1.0\"",
+			"lines": [
+				{
+					"kind": "instruction",
+					"text": "LABEL maintainer=\"test@example.com\" version=\"1.0\""
+				}
+			],
+			"startLine": 4,
+			"endLine": 4
+		},
+		{
+			"type": "ENV",
+			"args": "GOPATH /go",
+			"lines": [
+				{
+					"kind": "instruction",
+					"text": "ENV GOPATH /go"
+				}
+			],
+			"startLine": 5,
+			"endLine": 5
+		},
+		{
+			"type": "WORKDIR",
+			"args": "/src",
+			"lines": [
+				{
+					"kind": "instruction",
+					"text": "WORKDIR /src"
+				}
+			],
+			"startLine": 6,
+			"endLine": 6
+		},
+		{
+			"type": "COPY",
+			"from": "builder",
+			"form": "plain",
+			"paths": "/src /dst",
+			"lines": [
+				{
+					"kind": "instruction",
+					"text": "COPY --from=builder --chown=user:group /src /dst"
+				}
+			],
+			"startLine": 7,
+			"endLine": 7
+		},
+		{
+			"type": "COPY",
+			"form": "json",
+			"paths": [
+				"src1",
+				"src2",
+				"/dst/"
+			],
+			"lines": [
+				{
+					"kind": "instruction",
+					"text": "COPY [\"src1\", \"src2\", \"/dst/\"]"
+				}
+			],
+			"startLine": 8,
+			"endLine": 8
+		},
+		{
+			"type": "ADD",
+			"form": "plain",
+			"paths": "https://example.com/file.tar.gz /tmp/",
+			"lines": [
+				{
+					"kind": "instruction",
+					"text": "ADD https://example.com/file.tar.gz /tmp/"
+				}
+			],
+			"startLine": 9,
+			"endLine": 9
+		},
+		{
+			"type": "RUN",
+			"form": "shell",
+			"args": "set -eux; \tapt-get update; \tapt-get install -y --no-install-recommends curl; \trm -rf /var/lib/apt/lists/*",
+			"lines": [
+				{
+					"kind": "instruction",
+					"text": "RUN set -eux; \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "\tapt-get update; \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "\tapt-get install -y --no-install-recommends curl; \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "\trm -rf /var/lib/apt/lists/*"
+				}
+			],
+			"startLine": 10,
+			"endLine": 13
+		},
+		{
+			"type": "EXPOSE",
+			"args": "8080 8443",
+			"lines": [
+				{
+					"kind": "instruction",
+					"text": "EXPOSE 8080 8443"
+				}
+			],
+			"startLine": 14,
+			"endLine": 14
+		},
+		{
+			"type": "USER",
+			"args": "nobody:nogroup",
+			"lines": [
+				{
+					"kind": "instruction",
+					"text": "USER nobody:nogroup"
+				}
+			],
+			"startLine": 15,
+			"endLine": 15
+		},
+		{
+			"type": "VOLUME",
+			"form": "plain",
+			"args": "/var/log",
+			"lines": [
+				{
+					"kind": "instruction",
+					"text": "VOLUME /var/log"
+				}
+			],
+			"startLine": 16,
+			"endLine": 16
+		},
+		{
+			"type": "VOLUME",
+			"form": "json",
+			"args": [
+				"/var/data",
+				"/var/cache"
+			],
+			"lines": [
+				{
+					"kind": "instruction",
+					"text": "VOLUME [\"/var/data\", \"/var/cache\"]"
+				}
+			],
+			"startLine": 17,
+			"endLine": 17
+		},
+		{
+			"type": "STOPSIGNAL",
+			"args": "SIGTERM",
+			"lines": [
+				{
+					"kind": "instruction",
+					"text": "STOPSIGNAL SIGTERM"
+				}
+			],
+			"startLine": 18,
+			"endLine": 18
+		},
+		{
+			"check": "CMD",
+			"cmd": "curl -f http://localhost/",
+			"endLine": 19,
+			"form": "shell",
+			"interval": "30s",
+			"lines": [
+				{
+					"kind": "instruction",
+					"text": "HEALTHCHECK --interval=30s --timeout=5s CMD curl -f http://localhost/"
+				}
+			],
+			"startLine": 19,
+			"timeout": "5s",
+			"type": "HEALTHCHECK"
+		},
+		{
+			"check": "none",
+			"endLine": 20,
+			"lines": [
+				{
+					"kind": "instruction",
+					"text": "HEALTHCHECK NONE"
+				}
+			],
+			"startLine": 20,
+			"type": "HEALTHCHECK"
+		},
+		{
+			"type": "SHELL",
+			"form": "exec",
+			"args": [
+				"/bin/sh",
+				"-c"
+			],
+			"lines": [
+				{
+					"kind": "instruction",
+					"text": "SHELL [\"/bin/sh\", \"-c\"]"
+				}
+			],
+			"startLine": 21,
+			"endLine": 21
+		},
+		{
+			"type": "ONBUILD",
+			"args": "RUN echo \"triggered\"",
+			"lines": [
+				{
+					"kind": "instruction",
+					"text": "ONBUILD RUN echo \"triggered\""
+				}
+			],
+			"startLine": 22,
+			"endLine": 22
+		},
+		{
+			"type": "CMD",
+			"form": "exec",
+			"args": [
+				"server",
+				"--port",
+				"8080"
+			],
+			"lines": [
+				{
+					"kind": "instruction",
+					"text": "CMD [\"server\", \"--port\", \"8080\"]"
+				}
+			],
+			"startLine": 23,
+			"endLine": 23
+		},
+		{
+			"type": "ENTRYPOINT",
+			"form": "exec",
+			"args": [
+				"/usr/local/bin/entrypoint"
+			],
+			"lines": [
+				{
+					"kind": "instruction",
+					"text": "ENTRYPOINT [\"/usr/local/bin/entrypoint\"]"
+				}
+			],
+			"startLine": 24,
+			"endLine": 24
+		}
+	]
+}

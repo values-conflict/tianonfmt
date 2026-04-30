@@ -1,0 +1,642 @@
+{
+	"type": "jq",
+	"funcDefs": [
+		{
+			"type": "funcDef",
+			"name": "_semver_obj2obj",
+			"params": [
+				"$req"
+			],
+			"body": {
+				"type": "if",
+				"cond": {
+					"type": "binOp",
+					"op": "==",
+					"left": {
+						"type": "identity"
+					},
+					"right": {
+						"type": "var",
+						"name": "$req"
+					}
+				},
+				"then": {
+					"type": "bool",
+					"value": true
+				},
+				"elseIfs": [
+					{
+						"cond": {
+							"type": "binOp",
+							"op": "!=",
+							"left": {
+								"type": "field",
+								"name": ".major"
+							},
+							"right": {
+								"type": "binOp",
+								"op": "",
+								"left": {
+									"type": "var",
+									"name": "$req"
+								},
+								"right": {
+									"type": "field",
+									"name": ".major"
+								}
+							}
+						},
+						"then": {
+							"type": "bool",
+							"value": false
+						}
+					},
+					{
+						"cond": {
+							"type": "binOp",
+							"op": "and",
+							"left": {
+								"type": "binOp",
+								"op": "and",
+								"left": {
+									"type": "binOp",
+									"op": "!=",
+									"left": {
+										"type": "field",
+										"name": ".minor"
+									},
+									"right": {
+										"type": "binOp",
+										"op": "",
+										"left": {
+											"type": "var",
+											"name": "$req"
+										},
+										"right": {
+											"type": "field",
+											"name": ".minor"
+										}
+									}
+								},
+								"right": {
+									"type": "binOp",
+									"op": "!=",
+									"left": {
+										"type": "field",
+										"name": ".minor"
+									},
+									"right": {
+										"type": "string",
+										"raw": "\"x\""
+									}
+								}
+							},
+							"right": {
+								"type": "binOp",
+								"op": "!=",
+								"left": {
+									"type": "field",
+									"name": ".minor"
+								},
+								"right": {
+									"type": "string",
+									"raw": "\"*\""
+								}
+							}
+						},
+						"then": {
+							"type": "bool",
+							"value": false
+						}
+					},
+					{
+						"cond": {
+							"type": "binOp",
+							"op": "and",
+							"left": {
+								"type": "binOp",
+								"op": "and",
+								"left": {
+									"type": "binOp",
+									"op": "!=",
+									"left": {
+										"type": "field",
+										"name": ".patch"
+									},
+									"right": {
+										"type": "binOp",
+										"op": "",
+										"left": {
+											"type": "var",
+											"name": "$req"
+										},
+										"right": {
+											"type": "field",
+											"name": ".patch"
+										}
+									}
+								},
+								"right": {
+									"type": "binOp",
+									"op": "!=",
+									"left": {
+										"type": "field",
+										"name": ".patch"
+									},
+									"right": {
+										"type": "string",
+										"raw": "\"x\""
+									}
+								}
+							},
+							"right": {
+								"type": "binOp",
+								"op": "!=",
+								"left": {
+									"type": "field",
+									"name": ".patch"
+								},
+								"right": {
+									"type": "string",
+									"raw": "\"*\""
+								}
+							}
+						},
+						"then": {
+							"type": "bool",
+							"value": false
+						}
+					},
+					{
+						"cond": {
+							"type": "binOp",
+							"op": "and",
+							"left": {
+								"type": "binOp",
+								"op": "==",
+								"left": {
+									"type": "binOp",
+									"op": "",
+									"left": {
+										"type": "var",
+										"name": "$req"
+									},
+									"right": {
+										"type": "field",
+										"name": ".minor"
+									}
+								},
+								"right": {
+									"type": "null"
+								}
+							},
+							"right": {
+								"type": "paren",
+								"expr": {
+									"type": "binOp",
+									"op": "or",
+									"left": {
+										"type": "binOp",
+										"op": "==",
+										"left": {
+											"type": "field",
+											"name": ".minor"
+										},
+										"right": {
+											"type": "string",
+											"raw": "\"x\""
+										}
+									},
+									"right": {
+										"type": "binOp",
+										"op": "==",
+										"left": {
+											"type": "field",
+											"name": ".minor"
+										},
+										"right": {
+											"type": "string",
+											"raw": "\"*\""
+										}
+									}
+								}
+							}
+						},
+						"then": {
+							"type": "bool",
+							"value": false
+						}
+					},
+					{
+						"cond": {
+							"type": "binOp",
+							"op": "and",
+							"left": {
+								"type": "binOp",
+								"op": "==",
+								"left": {
+									"type": "binOp",
+									"op": "",
+									"left": {
+										"type": "var",
+										"name": "$req"
+									},
+									"right": {
+										"type": "field",
+										"name": ".patch"
+									}
+								},
+								"right": {
+									"type": "null"
+								}
+							},
+							"right": {
+								"type": "paren",
+								"expr": {
+									"type": "binOp",
+									"op": "or",
+									"left": {
+										"type": "binOp",
+										"op": "==",
+										"left": {
+											"type": "field",
+											"name": ".patch"
+										},
+										"right": {
+											"type": "string",
+											"raw": "\"x\""
+										}
+									},
+									"right": {
+										"type": "binOp",
+										"op": "==",
+										"left": {
+											"type": "field",
+											"name": ".patch"
+										},
+										"right": {
+											"type": "string",
+											"raw": "\"*\""
+										}
+									}
+								}
+							}
+						},
+						"then": {
+							"type": "bool",
+							"value": false
+						}
+					},
+					{
+						"cond": {
+							"type": "binOp",
+							"op": "and",
+							"left": {
+								"type": "binOp",
+								"op": "and",
+								"left": {
+									"type": "binOp",
+									"op": "==",
+									"left": {
+										"type": "binOp",
+										"op": "",
+										"left": {
+											"type": "var",
+											"name": "$req"
+										},
+										"right": {
+											"type": "field",
+											"name": ".major"
+										}
+									},
+									"right": {
+										"type": "null"
+									}
+								},
+								"right": {
+									"type": "binOp",
+									"op": "==",
+									"left": {
+										"type": "binOp",
+										"op": "",
+										"left": {
+											"type": "var",
+											"name": "$req"
+										},
+										"right": {
+											"type": "field",
+											"name": ".minor"
+										}
+									},
+									"right": {
+										"type": "null"
+									}
+								}
+							},
+							"right": {
+								"type": "binOp",
+								"op": "==",
+								"left": {
+									"type": "binOp",
+									"op": "",
+									"left": {
+										"type": "var",
+										"name": "$req"
+									},
+									"right": {
+										"type": "field",
+										"name": ".patch"
+									}
+								},
+								"right": {
+									"type": "null"
+								}
+							}
+						},
+						"then": {
+							"type": "bool",
+							"value": false
+						}
+					}
+				],
+				"else": {
+					"type": "bool",
+					"value": true
+				}
+			}
+		},
+		{
+			"type": "funcDef",
+			"name": "_ver2obj",
+			"body": {
+				"type": "if",
+				"cond": {
+					"type": "binOp",
+					"op": "==",
+					"left": {
+						"type": "call",
+						"name": "type"
+					},
+					"right": {
+						"type": "string",
+						"raw": "\"object\""
+					}
+				},
+				"then": {
+					"type": "identity"
+				},
+				"elseIfs": [
+					{
+						"cond": {
+							"type": "binOp",
+							"op": "and",
+							"left": {
+								"type": "binOp",
+								"op": "==",
+								"left": {
+									"type": "call",
+									"name": "type"
+								},
+								"right": {
+									"type": "string",
+									"raw": "\"string\""
+								}
+							},
+							"right": {
+								"type": "call",
+								"name": "test",
+								"args": [
+									{
+										"type": "string",
+										"raw": "\"(?\u003cmajor\u003e[0-9]+)(\\\\.(?\u003cminor\u003e[0-9x*]+))?(\\\\.?(?\u003cpatch\u003e[0-9x*]+))?\""
+									}
+								]
+							}
+						},
+						"then": {
+							"type": "call",
+							"name": "capture",
+							"args": [
+								{
+									"type": "string",
+									"raw": "\"(?\u003cmajor\u003e[0-9]+)(\\\\.(?\u003cminor\u003e[0-9x*]+))?(\\\\.?(?\u003cpatch\u003e[0-9x*]+))?\""
+								}
+							]
+						}
+					},
+					{
+						"cond": {
+							"type": "binOp",
+							"op": "and",
+							"left": {
+								"type": "binOp",
+								"op": "==",
+								"left": {
+									"type": "call",
+									"name": "type"
+								},
+								"right": {
+									"type": "string",
+									"raw": "\"string\""
+								}
+							},
+							"right": {
+								"type": "binOp",
+								"op": "==",
+								"left": {
+									"type": "identity"
+								},
+								"right": {
+									"type": "string",
+									"raw": "\"\""
+								}
+							}
+						},
+						"then": {
+							"type": "object",
+							"fields": [
+								{
+									"key": {
+										"type": "ident",
+										"name": "major"
+									},
+									"value": {
+										"type": "null"
+									}
+								},
+								{
+									"key": {
+										"type": "ident",
+										"name": "minor"
+									},
+									"value": {
+										"type": "null"
+									}
+								},
+								{
+									"key": {
+										"type": "ident",
+										"name": "patch"
+									},
+									"value": {
+										"type": "null"
+									}
+								}
+							]
+						}
+					},
+					{
+						"cond": {
+							"type": "binOp",
+							"op": "==",
+							"left": {
+								"type": "call",
+								"name": "type"
+							},
+							"right": {
+								"type": "string",
+								"raw": "\"number\""
+							}
+						},
+						"then": {
+							"type": "object",
+							"fields": [
+								{
+									"key": {
+										"type": "ident",
+										"name": "minor"
+									},
+									"value": {
+										"type": "call",
+										"name": "floor"
+									}
+								},
+								{
+									"key": {
+										"type": "ident",
+										"name": "patch"
+									},
+									"value": {
+										"type": "paren",
+										"expr": {
+											"type": "binOp",
+											"op": "-",
+											"left": {
+												"type": "identity"
+											},
+											"right": {
+												"type": "call",
+												"name": "floor"
+											}
+										}
+									}
+								}
+							]
+						}
+					}
+				],
+				"else": {
+					"type": "object",
+					"fields": [
+						{
+							"key": {
+								"type": "ident",
+								"name": "major"
+							},
+							"value": {
+								"type": "identity"
+							}
+						}
+					]
+				}
+			}
+		},
+		{
+			"type": "funcDef",
+			"name": "semver",
+			"params": [
+				"$req"
+			],
+			"leadingComments": [
+				"# Returns true if input version spec semantically matches the requested version"
+			],
+			"body": {
+				"type": "if",
+				"cond": {
+					"type": "binOp",
+					"op": "or",
+					"left": {
+						"type": "binOp",
+						"op": "==",
+						"left": {
+							"type": "var",
+							"name": "$req"
+						},
+						"right": {
+							"type": "null"
+						}
+					},
+					"right": {
+						"type": "binOp",
+						"op": "==",
+						"left": {
+							"type": "var",
+							"name": "$req"
+						},
+						"right": {
+							"type": "string",
+							"raw": "\"\""
+						}
+					}
+				},
+				"then": {
+					"type": "bool",
+					"value": false
+				},
+				"elseIfs": [
+					{
+						"cond": {
+							"type": "binOp",
+							"op": "==",
+							"left": {
+								"type": "identity"
+							},
+							"right": {
+								"type": "var",
+								"name": "$req"
+							}
+						},
+						"then": {
+							"type": "bool",
+							"value": true
+						}
+					}
+				],
+				"else": {
+					"type": "pipe",
+					"left": {
+						"type": "call",
+						"name": "_ver2obj"
+					},
+					"right": {
+						"type": "call",
+						"name": "_semver_obj2obj",
+						"args": [
+							{
+								"type": "pipe",
+								"left": {
+									"type": "var",
+									"name": "$req"
+								},
+								"right": {
+									"type": "call",
+									"name": "_ver2obj"
+								}
+							}
+						]
+					}
+				}
+			}
+		}
+	]
+}

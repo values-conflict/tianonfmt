@@ -1,0 +1,191 @@
+{
+	"type": "shell",
+	"file": "input.sh",
+	"stmts": [
+		{
+			"expr": "",
+			"type": "arithmCmd"
+		},
+		{
+			"type": "testClause",
+			"x": ""
+		},
+		{
+			"exprs": [
+				"",
+				""
+			],
+			"type": "let"
+		},
+		{
+			"stmt": {
+				"type": "call",
+				"args": [
+					"sleep",
+					"0"
+				]
+			},
+			"type": "time"
+		},
+		{
+			"type": "stmt",
+			"cmd": {
+				"type": "call",
+				"args": [
+					"false"
+				]
+			},
+			"negated": true,
+			"background": true
+		},
+		{
+			"type": "for",
+			"loop": {
+				"type": "wordIter",
+				"name": "x",
+				"items": [
+					"a",
+					"b",
+					"c"
+				]
+			},
+			"do": [
+				{
+					"type": "call",
+					"args": [
+						"echo",
+						"\"$x\""
+					]
+				}
+			]
+		},
+		{
+			"type": "while",
+			"cond": [
+				{
+					"type": "call",
+					"args": [
+						"read",
+						"-r",
+						"line"
+					]
+				}
+			],
+			"do": [
+				{
+					"type": "call",
+					"args": [
+						"echo",
+						"\"$line\""
+					]
+				}
+			]
+		},
+		{
+			"type": "case",
+			"word": "\"$x\"",
+			"items": [
+				{
+					"patterns": [
+						"a"
+					],
+					"stmts": [
+						{
+							"type": "call",
+							"args": [
+								"echo",
+								"a"
+							]
+						}
+					]
+				},
+				{
+					"patterns": [
+						"b"
+					],
+					"stmts": [
+						{
+							"type": "call",
+							"args": [
+								"echo",
+								"b"
+							]
+						}
+					]
+				},
+				{
+					"patterns": [
+						"*"
+					],
+					"stmts": [
+						{
+							"type": "call",
+							"args": [
+								"echo",
+								"other"
+							]
+						}
+					]
+				}
+			]
+		},
+		{
+			"type": "subshell",
+			"stmts": [
+				{
+					"type": "binary",
+					"op": "\u0026\u0026",
+					"x": {
+						"type": "call",
+						"args": [
+							"cd",
+							"/tmp"
+						]
+					},
+					"y": {
+						"type": "call",
+						"args": [
+							"echo",
+							"hi"
+						]
+					}
+				}
+			]
+		},
+		{
+			"type": "block",
+			"stmts": [
+				{
+					"type": "call",
+					"args": [
+						"echo",
+						"a"
+					]
+				},
+				{
+					"type": "call",
+					"args": [
+						"echo",
+						"b"
+					]
+				}
+			]
+		},
+		{
+			"type": "stmt",
+			"cmd": {
+				"type": "call",
+				"args": [
+					"echo",
+					"hi"
+				]
+			},
+			"redirs": [
+				{
+					"op": "\u003e",
+					"word": "/dev/null"
+				}
+			]
+		}
+	]
+}

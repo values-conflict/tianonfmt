@@ -1,0 +1,133 @@
+{
+	"type": "jq",
+	"funcDefs": [
+		{
+			"type": "funcDef",
+			"name": "parse_stream",
+			"params": [
+				"lines"
+			],
+			"leadingComments": [
+				"# parse a stream of lines into records"
+			],
+			"body": {
+				"type": "foreach",
+				"expr": {
+					"type": "paren",
+					"expr": {
+						"type": "comma",
+						"left": {
+							"type": "call",
+							"name": "lines"
+						},
+						"right": {
+							"type": "commented",
+							"expr": {
+								"type": "string",
+								"raw": "\"\""
+							},
+							"trailingComment": "# inject a synthetic blank line at the end"
+						}
+					}
+				},
+				"pattern": {
+					"type": "var",
+					"name": "$line"
+				},
+				"init": {
+					"type": "object",
+					"fields": [
+						{
+							"key": {
+								"type": "ident",
+								"name": "accum"
+							},
+							"value": {
+								"type": "object",
+								"fields": []
+							}
+						}
+					]
+				},
+				"update": {
+					"type": "if",
+					"cond": {
+						"type": "binOp",
+						"op": "==",
+						"left": {
+							"type": "var",
+							"name": "$line"
+						},
+						"right": {
+							"type": "string",
+							"raw": "\"\""
+						}
+					},
+					"then": {
+						"type": "object",
+						"fields": [
+							{
+								"key": {
+									"type": "ident",
+									"name": "out"
+								},
+								"value": {
+									"type": "field",
+									"name": ".accum"
+								}
+							},
+							{
+								"key": {
+									"type": "ident",
+									"name": "accum"
+								},
+								"value": {
+									"type": "object",
+									"fields": []
+								}
+							}
+						]
+					},
+					"else": {
+						"type": "binOp",
+						"op": "=",
+						"left": {
+							"type": "index",
+							"expr": {
+								"type": "field",
+								"name": ".accum"
+							},
+							"key": {
+								"type": "field",
+								"name": ".cur"
+							}
+						},
+						"right": {
+							"type": "var",
+							"name": "$line"
+						}
+					}
+				},
+				"extract": {
+					"type": "commented",
+					"expr": {
+						"type": "if",
+						"cond": {
+							"type": "field",
+							"name": ".out"
+						},
+						"then": {
+							"type": "field",
+							"name": ".out"
+						},
+						"else": {
+							"type": "call",
+							"name": "empty"
+						}
+					},
+					"trailingComment": "# trailing comma trick"
+				}
+			}
+		}
+	]
+}

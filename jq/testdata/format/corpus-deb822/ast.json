@@ -1,0 +1,493 @@
+{
+	"type": "jq",
+	"funcDefs": [
+		{
+			"type": "funcDef",
+			"name": "deb822_stream",
+			"params": [
+				"lines"
+			],
+			"leadingComments": [
+				"# https://manpages.debian.org/testing/dpkg-dev/deb822.5.en.html",
+				"# given a stream of deb822-formatted input lines, this outputs a stream of parsed objects (like \"deb822_parse\" below, but in streaming form)",
+				"#",
+				"#   jq --raw-input --null-input 'include \"deb822\"; deb822_stream(inputs) | ...'",
+				"#"
+			],
+			"body": {
+				"type": "foreach",
+				"expr": {
+					"type": "paren",
+					"expr": {
+						"type": "pipe",
+						"left": {
+							"type": "comma",
+							"left": {
+								"type": "call",
+								"name": "lines"
+							},
+							"right": {
+								"type": "commented",
+								"expr": {
+									"type": "string",
+									"raw": "\"\""
+								},
+								"trailingComment": "# inject a synthetic blank line at the end of the input stream to make sure we output everything (because we only output on empty lines, when we know an \"entry\" is done)"
+							}
+						},
+						"right": {
+							"type": "call",
+							"name": "select",
+							"args": [
+								{
+									"type": "pipe",
+									"left": {
+										"type": "commented",
+										"leadingComments": [
+											"# ignore comment lines (optional in the spec, but for documents that should not have them they are invalid syntax anyhow so should be fairly harmless to strip unilaterally)"
+										],
+										"expr": {
+											"type": "call",
+											"name": "startswith",
+											"args": [
+												{
+													"type": "string",
+													"raw": "\"#\""
+												}
+											]
+										}
+									},
+									"right": {
+										"type": "commented",
+										"leadingComments": [
+											"# TODO consider splitting this into a separate function, like \"filter_inline_pgp_noise\" ?"
+										],
+										"expr": {
+											"type": "call",
+											"name": "not"
+										}
+									}
+								}
+							]
+						}
+					}
+				},
+				"pattern": {
+					"type": "var",
+					"name": "$line"
+				},
+				"init": {
+					"type": "object",
+					"fields": [
+						{
+							"key": {
+								"type": "ident",
+								"name": "accum"
+							},
+							"value": {
+								"type": "object",
+								"fields": []
+							}
+						}
+					]
+				},
+				"update": {
+					"type": "if",
+					"cond": {
+						"type": "binOp",
+						"op": "==",
+						"left": {
+							"type": "var",
+							"name": "$line"
+						},
+						"right": {
+							"type": "string",
+							"raw": "\"\""
+						}
+					},
+					"then": {
+						"type": "object",
+						"fields": [
+							{
+								"key": {
+									"type": "ident",
+									"name": "out"
+								},
+								"value": {
+									"type": "field",
+									"name": ".accum"
+								}
+							},
+							{
+								"key": {
+									"type": "ident",
+									"name": "accum"
+								},
+								"value": {
+									"type": "object",
+									"fields": []
+								}
+							}
+						]
+					},
+					"else": {
+						"type": "localFuncDef",
+						"name": "_trimstart",
+						"body": {
+							"type": "call",
+							"name": "until",
+							"args": [
+								{
+									"type": "pipe",
+									"left": {
+										"type": "binOp",
+										"op": "or",
+										"left": {
+											"type": "call",
+											"name": "startswith",
+											"args": [
+												{
+													"type": "commented",
+													"expr": {
+														"type": "string",
+														"raw": "\" \""
+													},
+													"trailingComment": "# TODO should we throw an error if a line contains a newline? (that's bad input)"
+												}
+											]
+										},
+										"right": {
+											"type": "call",
+											"name": "startswith",
+											"args": [
+												{
+													"type": "string",
+													"raw": "\"\\t\""
+												}
+											]
+										}
+									},
+									"right": {
+										"type": "call",
+										"name": "not"
+									}
+								},
+								{
+									"type": "slice",
+									"expr": {
+										"type": "identity"
+									},
+									"start": {
+										"type": "number",
+										"raw": "1"
+									}
+								}
+							]
+						},
+						"rest": {
+							"type": "localFuncDef",
+							"name": "_trimend",
+							"body": {
+								"type": "call",
+								"name": "until",
+								"args": [
+									{
+										"type": "pipe",
+										"left": {
+											"type": "binOp",
+											"op": "or",
+											"left": {
+												"type": "call",
+												"name": "endswith",
+												"args": [
+													{
+														"type": "string",
+														"raw": "\" \""
+													}
+												]
+											},
+											"right": {
+												"type": "call",
+												"name": "endswith",
+												"args": [
+													{
+														"type": "string",
+														"raw": "\"\\t\""
+													}
+												]
+											}
+										},
+										"right": {
+											"type": "call",
+											"name": "not"
+										}
+									},
+									{
+										"type": "slice",
+										"expr": {
+											"type": "identity"
+										},
+										"end": {
+											"type": "binOp",
+											"op": "neg",
+											"left": {
+												"type": "number",
+												"raw": "1"
+											},
+											"right": null
+										}
+									}
+								]
+							},
+							"rest": {
+								"type": "as",
+								"expr": {
+									"type": "pipe",
+									"left": {
+										"type": "call",
+										"name": "del",
+										"args": [
+											{
+												"type": "field",
+												"name": ".out"
+											}
+										]
+									},
+									"right": {
+										"type": "paren",
+										"expr": {
+											"type": "pipe",
+											"left": {
+												"type": "var",
+												"name": "$line"
+											},
+											"right": {
+												"type": "call",
+												"name": "_trimstart"
+											}
+										}
+									}
+								},
+								"pattern": {
+									"type": "var",
+									"name": "$ltrim"
+								},
+								"body": {
+									"type": "as",
+									"expr": {
+										"type": "paren",
+										"expr": {
+											"type": "pipe",
+											"left": {
+												"type": "var",
+												"name": "$ltrim"
+											},
+											"right": {
+												"type": "call",
+												"name": "_trimend"
+											}
+										}
+									},
+									"pattern": {
+										"type": "var",
+										"name": "$trim"
+									},
+									"body": {
+										"type": "if",
+										"cond": {
+											"type": "binOp",
+											"op": "!=",
+											"left": {
+												"type": "var",
+												"name": "$ltrim"
+											},
+											"right": {
+												"type": "var",
+												"name": "$line"
+											}
+										},
+										"then": {
+											"type": "binOp",
+											"op": "+=",
+											"left": {
+												"type": "index",
+												"expr": {
+													"type": "field",
+													"name": ".accum"
+												},
+												"key": {
+													"type": "field",
+													"name": ".cur"
+												}
+											},
+											"right": {
+												"type": "binOp",
+												"op": "+",
+												"left": {
+													"type": "string",
+													"raw": "\"\\n\""
+												},
+												"right": {
+													"type": "var",
+													"name": "$trim"
+												}
+											}
+										},
+										"else": {
+											"type": "as",
+											"expr": {
+												"type": "paren",
+												"expr": {
+													"type": "pipe",
+													"left": {
+														"type": "var",
+														"name": "$trim"
+													},
+													"right": {
+														"type": "call",
+														"name": "index",
+														"args": [
+															{
+																"type": "string",
+																"raw": "\":\""
+															}
+														]
+													}
+												}
+											},
+											"pattern": {
+												"type": "var",
+												"name": "$colon"
+											},
+											"body": {
+												"type": "commented",
+												"expr": {
+													"type": "if",
+													"cond": {
+														"type": "var",
+														"name": "$colon"
+													},
+													"then": {
+														"type": "pipe",
+														"left": {
+															"type": "binOp",
+															"op": "=",
+															"left": {
+																"type": "field",
+																"name": ".cur"
+															},
+															"right": {
+																"type": "slice",
+																"expr": {
+																	"type": "var",
+																	"name": "$trim"
+																},
+																"end": {
+																	"type": "var",
+																	"name": "$colon"
+																}
+															}
+														},
+														"right": {
+															"type": "binOp",
+															"op": "=",
+															"left": {
+																"type": "index",
+																"expr": {
+																	"type": "field",
+																	"name": ".accum"
+																},
+																"key": {
+																	"type": "field",
+																	"name": ".cur"
+																}
+															},
+															"right": {
+																"type": "paren",
+																"expr": {
+																	"type": "pipe",
+																	"left": {
+																		"type": "slice",
+																		"expr": {
+																			"type": "var",
+																			"name": "$trim"
+																		},
+																		"start": {
+																			"type": "binOp",
+																			"op": "+",
+																			"left": {
+																				"type": "var",
+																				"name": "$colon"
+																			},
+																			"right": {
+																				"type": "number",
+																				"raw": "1"
+																			}
+																		}
+																	},
+																	"right": {
+																		"type": "call",
+																		"name": "_trimstart"
+																	}
+																}
+															}
+														}
+													},
+													"else": {
+														"type": "identity"
+													}
+												},
+												"trailingComment": "# ignore malformed lines that miss a colon"
+											}
+										}
+									}
+								}
+							}
+						}
+					}
+				},
+				"extract": {
+					"type": "if",
+					"cond": {
+						"type": "binOp",
+						"op": "and",
+						"left": {
+							"type": "field",
+							"name": ".out"
+						},
+						"right": {
+							"type": "binOp",
+							"op": "\u003e",
+							"left": {
+								"type": "paren",
+								"expr": {
+									"type": "pipe",
+									"left": {
+										"type": "field",
+										"name": ".out"
+									},
+									"right": {
+										"type": "call",
+										"name": "length"
+									}
+								}
+							},
+							"right": {
+								"type": "number",
+								"raw": "0"
+							}
+						}
+					},
+					"then": {
+						"type": "field",
+						"name": ".out"
+					},
+					"else": {
+						"type": "call",
+						"name": "empty"
+					}
+				}
+			}
+		}
+	]
+}
