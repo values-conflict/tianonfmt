@@ -1,6 +1,6 @@
+# "build_should_sbom", etc.
 include "doi";
 
-# "build_should_sbom", etc.
 # input: "build" object (with "buildId" top level key)
 # output: boolean
 def needs_build:

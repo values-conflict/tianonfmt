@@ -195,6 +195,7 @@ func (p *printer) moduleStmt(m *ModuleStmt) {
 }
 
 func (p *printer) importStmt(i *ImportStmt) {
+	p.comments(i.LeadingComments)
 	if i.Include {
 		p.write("include ")
 	} else {
@@ -1096,7 +1097,9 @@ func anyNodeHasTrailingComment(n Node) bool {
 	}
 	switch v := n.(type) {
 	case *CommentedExpr:
-		return v.TrailingComment != nil || anyNodeHasTrailingComment(v.Expr)
+		// Leading comments are line comments: they must appear on their own line,
+		// so any CommentedExpr with leading comments cannot be safely inlined.
+		return v.TrailingComment != nil || len(v.LeadingComments) > 0 || anyNodeHasTrailingComment(v.Expr)
 	case *Pipe:
 		return anyNodeHasTrailingComment(v.Left) || anyNodeHasTrailingComment(v.Right)
 	case *Comma:
@@ -1168,12 +1171,11 @@ func (p *printer) nodeInline(n Node) {
 	}
 	switch v := n.(type) {
 	case *CommentedExpr:
-		// In inline mode, emit leading comments as inline prefix and trailing
-		// comment as inline suffix (best effort — the caller should not inline
-		// nodes with trailing comments).
-		for _, c := range v.LeadingComments {
-			p.write(c.Text)
-			p.write(" ")
+		// Leading comments are line-terminated: inlining them would make subsequent
+		// tokens unreachable.  Fall back to the multi-line printer.
+		if len(v.LeadingComments) > 0 {
+			p.node(n)
+			return
 		}
 		p.nodeInline(v.Expr)
 		if v.TrailingComment != nil {
