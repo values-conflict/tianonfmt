@@ -248,6 +248,7 @@
 														"left": {
 															"type": "binOp",
 															"op": "//",
+															"multiLine": true,
 															"left": {
 																"type": "index",
 																"expr": {
@@ -285,6 +286,7 @@
 															"right": {
 																"type": "binOp",
 																"op": "//",
+																"multiLine": true,
 																"left": {
 																	"type": "index",
 																	"expr": {
@@ -580,6 +582,7 @@
 				"left": {
 					"type": "binOp",
 					"op": "+",
+					"multiLine": true,
 					"left": {
 						"type": "object",
 						"fields": [
@@ -778,20 +781,16 @@
 																	}
 																},
 																"key": {
-																	"type": "commented",
-																	"expr": {
-																		"type": "binOp",
-																		"op": "",
-																		"left": {
-																			"type": "field",
-																			"name": ".build"
-																		},
-																		"right": {
-																			"type": "field",
-																			"name": ".arch"
-																		}
+																	"type": "binOp",
+																	"op": "",
+																	"left": {
+																		"type": "field",
+																		"name": ".build"
 																	},
-																	"trailingComment": "# value of the first image tag"
+																	"right": {
+																		"type": "field",
+																		"name": ".arch"
+																	}
 																}
 															},
 															"right": {
@@ -874,20 +873,16 @@
 																	}
 																},
 																"key": {
-																	"type": "commented",
-																	"expr": {
-																		"type": "binOp",
-																		"op": "",
-																		"left": {
-																			"type": "field",
-																			"name": ".build"
-																		},
-																		"right": {
-																			"type": "field",
-																			"name": ".arch"
-																		}
+																	"type": "binOp",
+																	"op": "",
+																	"left": {
+																		"type": "field",
+																		"name": ".build"
 																	},
-																	"trailingComment": "# URL to Docker Hub"
+																	"right": {
+																		"type": "field",
+																		"name": ".arch"
+																	}
 																}
 															},
 															"right": {
@@ -1084,6 +1079,7 @@
 									"body": {
 										"type": "binOp",
 										"op": "+",
+										"multiLine": true,
 										"left": {
 											"type": "object",
 											"fields": [
@@ -1590,6 +1586,7 @@
 																																"left": {
 																																	"type": "binOp",
 																																	"op": "//",
+																																	"multiLine": true,
 																																	"left": {
 																																		"type": "index",
 																																		"expr": {
@@ -1627,6 +1624,7 @@
 																																	"right": {
 																																		"type": "binOp",
 																																		"op": "//",
+																																		"multiLine": true,
 																																		"left": {
 																																			"type": "index",
 																																			"expr": {

@@ -14,8 +14,7 @@ def tagged_manifests(builds_selector; tags_extractor):
 			# as an extra protection against cross-architecture "bleeding" ("riscv64" infra pushing "amd64" images, for example), filter the list of manifests to those whose architecture matches the architecture it is supposed to be for
 			# to be explicitly clear, this filtering is *also* done as part of our "builds.json" generation, so this is an added layer of best-effort protection that will be especially important to preserve and/or replicate if/when we solve the "not built yet so include the previous contents of the tag" portion of the problem at this layer instead of in the currently-separate put-shared process
 			$i.build.resolved.manifests[]
-			| select(.annotations."com.docker.official-images.bashbrew.arch"
-			// "" == $i.build.arch) # this assumes "registry.SynthesizeIndex" created this list of manifests (because it sets this annotation), but it would be reasonable for us to reimplement that conversion of "OCI platform object" to "bashbrew architecture" in pure jq if it was prudent or necessary to do so
+			| select(.annotations."com.docker.official-images.bashbrew.arch" // "" == $i.build.arch) # this assumes "registry.SynthesizeIndex" created this list of manifests (because it sets this annotation), but it would be reasonable for us to reimplement that conversion of "OCI platform object" to "bashbrew architecture" in pure jq if it was prudent or necessary to do so
 		]
 	)
 ;
@@ -36,14 +35,14 @@ def deploy_objects:
 			| sort_manifests
 		) as $manifests
 		| ([$manifests[].digest] | join("\n")) as $key
-		| .[$key]
-		|= (
+		| .[$key] |= (
 			if . then
 				.refs += [$ref]
 			else
 				{
 					type: "manifest",
 					refs: [$ref],
+
 					# add appropriate "lookup" values for copying child objects properly
 					lookup: (
 						$manifests
@@ -57,6 +56,7 @@ def deploy_objects:
 						})
 						| from_entries
 					),
+
 					# convert the list of "manifests" into a full (canonical!) index/manifest list for deploying
 					data: {
 						schemaVersion: 2,
@@ -76,4 +76,3 @@ def deploy_objects:
 	)
 	| [.[]] # strip off our synthetic map keys to avoid leaking our implementation detail
 ;
-

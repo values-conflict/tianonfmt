@@ -27,6 +27,10 @@ foreach .[] as $item (
 | .g[0:2]
 | .h[.i]
 | @base64
-| [.j, .k, empty]
+| [
+	.j,
+	.k,
+	empty
+]
 | { l: .m, "n.o": .p, (.q): .r }
 | (.s) | .t? | $__loc__ | break $lbl

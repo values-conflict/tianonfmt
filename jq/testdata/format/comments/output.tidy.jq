@@ -11,4 +11,3 @@ def parse_stream(lines):
 		if .out then .out else empty end # trailing comma trick
 	)
 ;
-

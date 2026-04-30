@@ -177,51 +177,102 @@
 									"handler": {
 										"type": "paren",
 										"expr": {
-											"type": "call",
-											"name": "error",
-											"args": [
-												{
-													"type": "binOp",
-													"op": "+",
-													"left": {
+											"type": "commented",
+											"leadingComments": [
+												"# invalid .[\"foo\"][\"bar\"]: ERROR MESSAGE HERE",
+												"# value: {\"baz\":\"buzz\"}"
+											],
+											"expr": {
+												"type": "call",
+												"name": "error",
+												"args": [
+													{
 														"type": "binOp",
 														"op": "+",
+														"multiLine": true,
 														"left": {
 															"type": "binOp",
 															"op": "+",
+															"multiLine": true,
 															"left": {
 																"type": "binOp",
 																"op": "+",
+																"multiLine": true,
 																"left": {
-																	"type": "commented",
-																	"leadingComments": [
-																		"# invalid .[\"foo\"][\"bar\"]: ERROR MESSAGE HERE",
-																		"# value: {\"baz\":\"buzz\"}"
-																	],
-																	"expr": {
+																	"type": "binOp",
+																	"op": "+",
+																	"multiLine": true,
+																	"left": {
 																		"type": "string",
 																		"raw": "\"\\ninvalid \""
+																	},
+																	"right": {
+																		"type": "if",
+																		"cond": {
+																			"type": "var",
+																			"name": "$bork"
+																		},
+																		"then": {
+																			"type": "string",
+																			"raw": "\"value\""
+																		},
+																		"else": {
+																			"type": "string",
+																			"raw": "\".\\($maybepath | map(\"[\\(tojson)]\") | add // \"\")\""
+																		}
 																	}
 																},
 																"right": {
-																	"type": "if",
-																	"cond": {
-																		"type": "var",
-																		"name": "$bork"
-																	},
-																	"then": {
-																		"type": "string",
-																		"raw": "\"value\""
-																	},
-																	"else": {
-																		"type": "string",
-																		"raw": "\".\\($maybepath | map(\"[\\(tojson)]\") | add // \"\")\""
-																	}
+																	"type": "string",
+																	"raw": "\":\\n\\t\\($val | tojson)\""
 																}
 															},
 															"right": {
-																"type": "string",
-																"raw": "\":\\n\\t\\($val | tojson)\""
+																"type": "paren",
+																"expr": {
+																	"type": "pipe",
+																	"left": {
+																		"type": "var",
+																		"name": "$val"
+																	},
+																	"right": {
+																		"type": "pipe",
+																		"left": {
+																			"type": "call",
+																			"name": "err"
+																		},
+																		"right": {
+																			"type": "if",
+																			"cond": {
+																				"type": "binOp",
+																				"op": "and",
+																				"left": {
+																					"type": "identity"
+																				},
+																				"right": {
+																					"type": "binOp",
+																					"op": "\u003e",
+																					"left": {
+																						"type": "call",
+																						"name": "length"
+																					},
+																					"right": {
+																						"type": "number",
+																						"raw": "0"
+																					}
+																				}
+																			},
+																			"then": {
+																				"type": "string",
+																				"raw": "\"\\n\\(.)\""
+																			},
+																			"else": {
+																				"type": "string",
+																				"raw": "\"\""
+																			}
+																		}
+																	}
+																}
 															}
 														},
 														"right": {
@@ -229,97 +280,50 @@
 															"expr": {
 																"type": "pipe",
 																"left": {
-																	"type": "var",
-																	"name": "$val"
+																	"type": "call",
+																	"name": "ltrimstr",
+																	"args": [
+																		{
+																			"type": "string",
+																			"raw": "\"\\n\""
+																		}
+																	]
 																},
 																"right": {
-																	"type": "pipe",
-																	"left": {
-																		"type": "call",
-																		"name": "err"
-																	},
-																	"right": {
-																		"type": "if",
-																		"cond": {
-																			"type": "binOp",
-																			"op": "and",
-																			"left": {
-																				"type": "identity"
-																			},
-																			"right": {
-																				"type": "binOp",
-																				"op": "\u003e",
-																				"left": {
-																					"type": "call",
-																					"name": "length"
-																				},
-																				"right": {
-																					"type": "number",
-																					"raw": "0"
-																				}
-																			}
-																		},
-																		"then": {
-																			"type": "string",
-																			"raw": "\"\\n\\(.)\""
-																		},
-																		"else": {
-																			"type": "string",
-																			"raw": "\"\""
-																		}
-																	}
-																}
-															}
-														}
-													},
-													"right": {
-														"type": "paren",
-														"expr": {
-															"type": "pipe",
-															"left": {
-																"type": "call",
-																"name": "ltrimstr",
-																"args": [
-																	{
-																		"type": "string",
-																		"raw": "\"\\n\""
-																	}
-																]
-															},
-															"right": {
-																"type": "if",
-																"cond": {
-																	"type": "binOp",
-																	"op": "and",
-																	"left": {
-																		"type": "identity"
-																	},
-																	"right": {
+																	"type": "if",
+																	"cond": {
 																		"type": "binOp",
-																		"op": "\u003e",
+																		"op": "and",
 																		"left": {
-																			"type": "call",
-																			"name": "length"
+																			"type": "identity"
 																		},
 																		"right": {
-																			"type": "number",
-																			"raw": "0"
+																			"type": "binOp",
+																			"op": "\u003e",
+																			"left": {
+																				"type": "call",
+																				"name": "length"
+																			},
+																			"right": {
+																				"type": "number",
+																				"raw": "0"
+																			}
 																		}
+																	},
+																	"then": {
+																		"type": "string",
+																		"raw": "\"\\n\\(.)\""
+																	},
+																	"else": {
+																		"type": "string",
+																		"raw": "\"\""
 																	}
-																},
-																"then": {
-																	"type": "string",
-																	"raw": "\"\\n\\(.)\""
-																},
-																"else": {
-																	"type": "string",
-																	"raw": "\"\""
 																}
 															}
 														}
 													}
-												}
-											]
+												]
+											}
 										}
 									}
 								}
