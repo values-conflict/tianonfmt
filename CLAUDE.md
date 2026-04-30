@@ -78,6 +78,38 @@ If you find a valid input where `format(parse(x)) != format(parse(format(parse(x
 
 If the formatter changes something on a second pass, `TestFormatIdempotent` catches it; if it produces wrong output, `TestFormat` catches it.
 
+### Token-level semantic preservation test
+
+The golden-file and idempotency tests share a blind spot: if a formatter bug is *consistent* — it makes the same wrong change on every pass — `TestFormatIdempotent` passes and `TestFormat` passes (once the golden file is regenerated to match the bug).  The golden file is only as trustworthy as the formatter that produced it.
+
+To close this gap, every language package should have a **`TestFormatPreservesTokens`** (or equivalent name) that verifies `normalize(format(input)) == normalize(input)` using a **pure text normalizer** — no AST, no parser, no golden file for the expected value.  The expected result is derived directly from the raw input source.
+
+**How it works:**
+
+1. **Tokenize** the source text into a flat sequence of non-whitespace, non-comment tokens.  All layout (indentation, line breaks, spacing between tokens) is discarded.  The tokenizer must correctly handle the language's string quoting, including any string-interpolation syntax that embeds nested expressions — a naïve scanner that stops at the first closing delimiter will produce different wrong tokens for input vs. formatted output (since the formatter may reflow code near the incorrectly-identified boundary).
+
+2. **Normalize** the token sequence by applying only the known mechanical rewrites the formatter makes beyond pure whitespace:
+   - For jq: unquote `"identifier":` → `identifier:` in object-key position; remove `,` before `}` (trailing-comma insertion).
+   - For each language, enumerate these at the time the test is written; they typically number two or three.
+
+3. **Compare** the two normalized sequences.  If they differ, the formatter changed a token — dropped something, reordered, or rewrote content — without authorization.
+
+**What it catches that the other tests do not:**
+
+- A comment silently dropped by the formatter (the golden file was regenerated without noticing)
+- An expression reordered or a token deleted because of a parser/formatter bug that is self-consistent
+- Any regression where `format(format(x)) == format(x)` holds but `format(x) != x` in a semantically meaningful way
+
+**How to identify the normalizations for a new language:**
+
+Run `diff <(tokenize(input)) <(tokenize(format(input)))` across all fixtures; anything that differs after discarding whitespace is a candidate normalization.  For jq this produced exactly two (key unquoting, trailing comma).  If the list is long, the formatter is making unauthorized content changes and those should be fixed, not normalized away.
+
+**Implementing the tokenizer:**
+
+The tokenizer must be a standalone function — no imports from the language package — so the test does not transitively trust the parser.  For languages with string interpolation (jq `\(...)`, shell `$(...)`, etc.) the scanner must correctly track nesting depth using mutual recursion: `scanString` delegates to `scanInterp` when it encounters the interpolation opener, and `scanInterp` recurses back into `scanString` when it encounters a nested string.  Without this, the scanner produces different wrong token boundaries for input vs. formatted output because the formatter reflowed surrounding code that lands inside the incorrectly-identified string region.
+
+See `jq/jq_test.go` (`scanJQStr`, `scanJQInterp`, `tokenizeJQ`, `normalizeJQ`, `TestFormatPreservesTokens`) for the reference implementation.
+
 ### Golden error fixtures
 
 If a fixture directory contains `error.txt` instead of `output<outExt>`, `testutil.Golden` expects the function to return a non-nil error and compares `err.Error()` to the file content.  Use this to pin exact parse-error messages.  Run `go test -update` to generate or regenerate `error.txt` files.
