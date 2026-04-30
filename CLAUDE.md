@@ -36,6 +36,21 @@ testutil.Golden(t, "testdata/format", ".sh", ".sh", func(src string) (string, er
 - Always add both an idempotency test (apply twice, compare) alongside the primary golden test
 - Organize testdata by suite (`format/`, `tidy/`, `pedantic/`, `errors/`, `lint/`) so purpose is obvious from the path
 
+### Fixture attribution (`meta.txt`)
+
+Every fixture directory whose input file was copied verbatim from an external source must contain a `meta.txt`:
+
+```
+Source: https://github.com/foo/bar/blob/<full-40-char-SHA>/path/to/file
+License: <Debian well-known short name>  (Expat, Apache-2.0, GPL-2, GPL-3, AGPL-3, …)
+```
+
+Use the full 40-character commit SHA — never a branch ref.  Add a `Note:` line for anything needing clarification (e.g. the file is a snapshot of an older version, or it is shared verbatim between multiple upstream projects).
+
+For fixtures sourced from `corpus/` or `anticorpus/` (Tianon's own code or Docker official image repos), still include `Source:`.  If the source repo has no license file, write `License: **WARNING:** UNKNOWN` instead of omitting the line.
+
+This convention is enforced by review, not tooling — always add `meta.txt` when copying fixture content from any repo.
+
 ### Golden error fixtures
 
 If a fixture directory contains `error.txt` instead of `output<outExt>`, `testutil.Golden` expects the function to return a non-nil error and compares `err.Error()` to the file content.  Use this to pin exact parse-error messages.  Run `go test -update` to generate or regenerate `error.txt` files.

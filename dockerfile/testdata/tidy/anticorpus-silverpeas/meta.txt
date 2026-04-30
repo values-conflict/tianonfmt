@@ -1,0 +1,2 @@
+Source: https://github.com/Silverpeas/docker-silverpeas-prod/blob/1da47c20888edf6fa7c08516fb3dc930c8e79e92/Dockerfile
+License: GPL-3

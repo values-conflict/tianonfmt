@@ -1,0 +1,2 @@
+Source: https://github.com/groovy/docker-groovy/blob/0a4a3925ea1901b37931adc62a0b6661e5908458/generate-stackbrew-library.sh
+License: Apache-2.0
