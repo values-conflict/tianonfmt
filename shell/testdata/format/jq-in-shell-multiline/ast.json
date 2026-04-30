@@ -1,0 +1,32 @@
+{
+	"type": "shell",
+	"file": "input.sh",
+	"stmts": [
+		{
+			"type": "call",
+			"args": [
+				"set",
+				"-Eeuo",
+				"pipefail"
+			]
+		},
+		{
+			"type": "call",
+			"assigns": [
+				"result=$(jq '\n\t.foo\n\t| .bar\n' input.json)"
+			],
+			"args": []
+		},
+		{
+			"type": "call",
+			"args": [
+				"jq",
+				"--arg",
+				"name",
+				"\"world\"",
+				"'\n\t{\n\t\t\"greeting\": (\"Hello, \" + $name),\n\t\t\"value\": .data\n\t}\n'",
+				"input.json"
+			]
+		}
+	]
+}

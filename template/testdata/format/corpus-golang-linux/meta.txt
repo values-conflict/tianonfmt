@@ -1,0 +1,2 @@
+Source: https://github.com/docker-library/golang/blob/0cfc1989f95a18fe3506bcdd32502819b0e3502b/Dockerfile-linux.template
+License: BSD-3-Clause

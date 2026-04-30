@@ -1,0 +1,13 @@
+--- a/testdata/ast-diff-changed/input.jq.ast
++++ b/testdata/ast-diff-changed/input.jq.ast
+@@ -6,8 +6,8 @@
+ 		"fields": [
+ 			{
+ 				"key": {
+-					"type": "string",
+-					"raw": "\"foo\""
++					"type": "ident",
++					"name": "foo"
+ 				},
+ 				"value": {
+ 					"type": "field",

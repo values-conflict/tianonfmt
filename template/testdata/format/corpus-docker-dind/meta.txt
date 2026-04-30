@@ -1,0 +1,2 @@
+Source: https://github.com/docker-library/docker/blob/5b5016b9257f0dfc3baf38b575f7505d16970b7e/Dockerfile-dind.template
+License: Apache-2.0

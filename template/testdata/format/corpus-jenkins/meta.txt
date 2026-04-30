@@ -1,0 +1,1 @@
+Source: https://github.com/tianon/dockerfiles/blob/2118a1979eff7545e06570d1eefc6434d691e68d/jenkins/Dockerfile.template
