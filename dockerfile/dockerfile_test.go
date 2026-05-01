@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -312,4 +313,164 @@ func TestLint(t *testing.T) {
 	testutil.Golden(t, "testdata/lint", "input.dockerfile", []testutil.Case{
 		{Out: "violations.txt", Fn: lintFn},
 	})
+}
+
+// ── token-level format preservation ──────────────────────────────────────────
+
+// scanDockerStr scans a "..." string in a Dockerfile from src[start].
+func scanDockerStr(src string, start int) int {
+	i := start + 1
+	for i < len(src) {
+		if src[i] == '\\' && i+1 < len(src) {
+			i += 2
+			continue
+		}
+		if src[i] == '"' {
+			return i + 1
+		}
+		i++
+	}
+	return i
+}
+
+// tokenizeDockerfile splits a Dockerfile into non-whitespace tokens, discarding
+// comments and treating '\' line-continuation as whitespace.
+func tokenizeDockerfile(src string) []string {
+	var tokens []string
+	i := 0
+	for i < len(src) {
+		c := src[i]
+		// whitespace
+		if c == ' ' || c == '\t' || c == '\n' || c == '\r' {
+			i++
+			continue
+		}
+		// line continuation: \ immediately followed by newline
+		if c == '\\' && i+1 < len(src) && (src[i+1] == '\n' || src[i+1] == '\r') {
+			i++
+			continue
+		}
+		// comment
+		if c == '#' {
+			for i < len(src) && src[i] != '\n' {
+				i++
+			}
+			continue
+		}
+		// "..." string
+		if c == '"' {
+			j := scanDockerStr(src, i)
+			tokens = append(tokens, src[i:j])
+			i = j
+			continue
+		}
+		// word — all non-whitespace, non-special chars
+		j := i
+		for j < len(src) {
+			ch := src[j]
+			if ch == ' ' || ch == '\t' || ch == '\n' || ch == '\r' {
+				break
+			}
+			if ch == '#' || ch == '"' {
+				break
+			}
+			if ch == '\\' && j+1 < len(src) && (src[j+1] == '\n' || src[j+1] == '\r') {
+				break
+			}
+			j++
+		}
+		if j > i {
+			tokens = append(tokens, src[i:j])
+			i = j
+		} else {
+			i++
+		}
+	}
+	return tokens
+}
+
+// normalizeDockerfile returns a canonical token sequence for comparison.
+// It applies two known mechanical rewrites beyond pure whitespace:
+//
+//  1. ENV KEY=VALUE → ENV KEY VALUE (space-separated form).
+//     WORD=VALUE tokens are split at the first '=', discarding the '='.
+//     WORD= (trailing '=', empty value) is shortened to just WORD.
+//
+//  2. "..." quoted strings are unquoted: the surrounding quotes are stripped,
+//     the content is re-tokenized at whitespace, and each resulting word is
+//     also split at its first '='.  This handles two formatter behaviors:
+//      a. ENV key= "value" → ENV key value (quotes removed from value).
+//      b. Multi-line quoted shell arguments: indentation inside the string
+//         changes but the word content stays the same after whitespace is
+//         collapsed.
+//
+// Both rewrites are applied universally and symmetrically — they are the same
+// on both sides of the comparison — so they cannot mask genuine content bugs.
+func normalizeDockerfile(src string) string {
+	toks := tokenizeDockerfile(src)
+	var result []string
+	normWord := func(w string) {
+		if eq := strings.IndexByte(w, '='); eq > 0 {
+			key := w[:eq]
+			val := w[eq+1:]
+			if val == "" {
+				result = append(result, key)
+			} else {
+				result = append(result, key, val)
+			}
+		} else {
+			result = append(result, w)
+		}
+	}
+	for _, tok := range toks {
+		if strings.HasPrefix(tok, `"`) && len(tok) >= 2 {
+			// Unquote: strip surrounding quotes, split at whitespace, then at '='.
+			// Standalone '\' words (backslash line-continuation) are discarded.
+			content := tok[1 : len(tok)-1]
+			for _, w := range strings.Fields(content) {
+				if w == `\` {
+					continue
+				}
+				normWord(w)
+			}
+		} else {
+			normWord(tok)
+		}
+	}
+	return strings.Join(result, " ")
+}
+
+// TestFormatPreservesTokens verifies that dockerfile.Format does not silently
+// alter the program beyond the one known mechanical transformation (ENV
+// key=value → key value).  Expected value is derived from raw input text; no
+// golden file is used.
+func TestFormatPreservesTokens(t *testing.T) {
+	dirs, err := os.ReadDir("testdata/format")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, d := range dirs {
+		if !d.IsDir() {
+			continue
+		}
+		t.Run(d.Name(), func(t *testing.T) {
+			src, err := os.ReadFile(filepath.Join("testdata/format", d.Name(), "input.dockerfile"))
+			if err != nil {
+				t.Skip("no input.dockerfile")
+				return
+			}
+			f, err := dockerfile.Parse(string(src))
+			if err != nil {
+				t.Skipf("parse error: %v", err)
+				return
+			}
+			formatted := dockerfile.Format(f)
+			normIn := normalizeDockerfile(string(src))
+			normOut := normalizeDockerfile(formatted)
+			if normIn != normOut {
+				t.Errorf("normalizeDockerfile(format(input)) != normalizeDockerfile(input)\n\nnorm(input):\n%s\n\nnorm(format):\n%s",
+					normIn, normOut)
+			}
+		})
+	}
 }

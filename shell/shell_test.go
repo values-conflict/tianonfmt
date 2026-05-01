@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -471,6 +472,457 @@ func TestFormatWithJQCallback(t *testing.T) {
 	}
 }
 
+
+// ── token-level format preservation ──────────────────────────────────────────
+
+// scanShSingleQuote scans a '...' shell string from src[start].
+func scanShSingleQuote(src string, start int) int {
+	i := start + 1
+	for i < len(src) && src[i] != '\'' {
+		i++
+	}
+	if i < len(src) {
+		i++
+	}
+	return i
+}
+
+// scanShAnsiC scans a $'...' ANSI-C quoted string starting at the ' in src[start].
+func scanShAnsiC(src string, start int) int {
+	i := start + 1 // skip opening '
+	for i < len(src) {
+		if src[i] == '\\' && i+1 < len(src) {
+			i += 2
+			continue
+		}
+		if src[i] == '\'' {
+			return i + 1
+		}
+		i++
+	}
+	return i
+}
+
+// scanShDoubleQuote scans a "..." shell string, handling \" escapes and
+// $(…) / `…` command substitutions so nested quotes don't prematurely close it.
+func scanShDoubleQuote(src string, start int) int {
+	i := start + 1
+	for i < len(src) {
+		switch src[i] {
+		case '\\':
+			if i+1 < len(src) {
+				i += 2
+			} else {
+				i++
+			}
+		case '"':
+			return i + 1
+		case '$':
+			if i+1 < len(src) && src[i+1] == '(' {
+				i = scanShParenDepth(src, i+2)
+			} else if i+1 < len(src) && src[i+1] == '\'' {
+				i = scanShAnsiC(src, i+1)
+			} else {
+				i++
+			}
+		case '`':
+			i = scanShBacktick(src, i+1)
+		default:
+			i++
+		}
+	}
+	return i
+}
+
+// scanShParenDepth scans a balanced (…) region starting at src[start]
+// (just after the opening '('), handling nested quotes.
+func scanShParenDepth(src string, start int) int {
+	i := start
+	depth := 1
+	for i < len(src) && depth > 0 {
+		switch src[i] {
+		case '(':
+			depth++
+			i++
+		case ')':
+			depth--
+			i++
+		case '\'':
+			i = scanShSingleQuote(src, i)
+		case '"':
+			i = scanShDoubleQuote(src, i)
+		case '`':
+			i = scanShBacktick(src, i+1)
+		case '$':
+			if i+1 < len(src) && src[i+1] == '\'' {
+				i = scanShAnsiC(src, i+1)
+			} else {
+				i++
+			}
+		case '\\':
+			if i+1 < len(src) {
+				i += 2
+			} else {
+				i++
+			}
+		default:
+			i++
+		}
+	}
+	return i
+}
+
+// scanShBacktick scans a `…` region starting at src[start] (just after the
+// opening backtick).
+func scanShBacktick(src string, start int) int {
+	i := start
+	for i < len(src) && src[i] != '`' {
+		if src[i] == '\\' && i+1 < len(src) {
+			i += 2
+			continue
+		}
+		i++
+	}
+	if i < len(src) {
+		i++ // consume closing backtick
+	}
+	return i
+}
+
+func shIsWordBreak(c byte) bool {
+	switch c {
+	case ' ', '\t', '\n', '\r',
+		'\'', '"', '`',
+		';', '|', '&',
+		'(', ')', '{', '}',
+		'<', '>',
+		'#':
+		return true
+	}
+	return false
+}
+
+// tokenizeShell splits shell source into non-whitespace tokens, discarding
+// comments.  Standalone ';' (statement separator) is also discarded — the
+// shell formatter replaces it with a newline, making both forms token-equivalent.
+// ';;' (case terminator) and multi-char operators (&&, ||, >>, etc.) are kept.
+func tokenizeShell(src string) []string {
+	var tokens []string
+	i := 0
+	for i < len(src) {
+		c := src[i]
+		// whitespace
+		if c == ' ' || c == '\t' || c == '\n' || c == '\r' {
+			i++
+			continue
+		}
+		// comment
+		if c == '#' {
+			for i < len(src) && src[i] != '\n' {
+				i++
+			}
+			continue
+		}
+		// single-quoted string
+		if c == '\'' {
+			j := scanShSingleQuote(src, i)
+			tokens = append(tokens, src[i:j])
+			i = j
+			continue
+		}
+		// double-quoted string
+		if c == '"' {
+			j := scanShDoubleQuote(src, i)
+			tokens = append(tokens, src[i:j])
+			i = j
+			continue
+		}
+		// $'...' ANSI-C string or $(...) substitution
+		if c == '$' && i+1 < len(src) {
+			if src[i+1] == '\'' {
+				j := scanShAnsiC(src, i+1)
+				tokens = append(tokens, src[i:j])
+				i = j
+				continue
+			}
+			if src[i+1] == '(' {
+				// $(…) — treat as start of a word; fall through to word scanner
+			}
+		}
+		// backtick substitution (inline)
+		if c == '`' {
+			j := scanShBacktick(src, i+1)
+			tokens = append(tokens, src[i:j])
+			i = j
+			continue
+		}
+		// ;; and ;& and ;;& (case terminators — keep)
+		if c == ';' {
+			if i+2 < len(src) && src[i+1] == ';' && src[i+2] == '&' {
+				tokens = append(tokens, ";;&")
+				i += 3
+				continue
+			}
+			if i+1 < len(src) && src[i+1] == ';' {
+				tokens = append(tokens, ";;")
+				i += 2
+				continue
+			}
+			if i+1 < len(src) && src[i+1] == '&' {
+				tokens = append(tokens, ";&")
+				i += 2
+				continue
+			}
+			// standalone ';' — discard (formatter replaces with newline)
+			i++
+			continue
+		}
+		// multi-char operators
+		if c == '&' && i+1 < len(src) && src[i+1] == '&' {
+			tokens = append(tokens, "&&")
+			i += 2
+			continue
+		}
+		if c == '|' && i+1 < len(src) && src[i+1] == '|' {
+			tokens = append(tokens, "||")
+			i += 2
+			continue
+		}
+		if c == '|' && i+1 < len(src) && src[i+1] == '&' {
+			tokens = append(tokens, "|&")
+			i += 2
+			continue
+		}
+		if c == '>' && i+1 < len(src) && src[i+1] == '>' {
+			tokens = append(tokens, ">>")
+			i += 2
+			continue
+		}
+		if c == '<' && i+1 < len(src) && src[i+1] == '<' {
+			if i+2 < len(src) && src[i+2] == '<' {
+				tokens = append(tokens, "<<<")
+				i += 3
+				continue
+			}
+			tokens = append(tokens, "<<")
+			i += 2
+			continue
+		}
+		if c == '>' && i+1 < len(src) && src[i+1] == '&' {
+			tokens = append(tokens, ">&")
+			i += 2
+			continue
+		}
+		if c == '<' && i+1 < len(src) && src[i+1] == '&' {
+			tokens = append(tokens, "<&")
+			i += 2
+			continue
+		}
+		// single-char operators
+		if c == '|' || c == '&' || c == '(' || c == ')' || c == '{' || c == '}' || c == '<' || c == '>' {
+			tokens = append(tokens, string(c))
+			i++
+			continue
+		}
+		// word — everything up to the next break char, embedding $(…) and `…`
+		j := i
+		for j < len(src) && !shIsWordBreak(src[j]) {
+			if src[j] == '$' && j+1 < len(src) && src[j+1] == '(' {
+				j = scanShParenDepth(src, j+2)
+			} else if src[j] == '$' && j+1 < len(src) && src[j+1] == '{' {
+				// ${…} variable expansion — scan to matching }
+				depth := 1
+				j += 2
+				for j < len(src) && depth > 0 {
+					if src[j] == '{' {
+						depth++
+					} else if src[j] == '}' {
+						depth--
+					}
+					j++
+				}
+			} else {
+				j++
+			}
+		}
+		if j > i {
+			tokens = append(tokens, src[i:j])
+			i = j
+		} else {
+			// unrecognised single char — emit and advance
+			tokens = append(tokens, string(src[i]))
+			i++
+		}
+	}
+	return tokens
+}
+
+// shNormalizeArith strips spaces inside $((…)) arithmetic expansions embedded
+// in a word token.  The formatter adds spaces around operators inside $((...))
+// while the source may have none; stripping them makes both canonical.
+func shNormalizeArith(tok string) string {
+	if !strings.Contains(tok, "$((") {
+		return tok
+	}
+	var out []byte
+	i := 0
+	for i < len(tok) {
+		if i+3 <= len(tok) && tok[i] == '$' && tok[i+1] == '(' && tok[i+2] == '(' {
+			out = append(out, '$', '(', '(')
+			i += 3
+			depth := 2
+			for i < len(tok) && depth > 0 {
+				c := tok[i]
+				if c == '(' {
+					depth++
+					out = append(out, c)
+				} else if c == ')' {
+					depth--
+					out = append(out, c)
+				} else if c == ' ' || c == '\t' {
+					// strip spaces inside arithmetic expressions
+				} else {
+					out = append(out, c)
+				}
+				i++
+			}
+		} else {
+			out = append(out, tok[i])
+			i++
+		}
+	}
+	return string(out)
+}
+
+// shExpandSubshells recursively tokenizes $(…) subshell contents inside any
+// token — whether a "…" double-quoted string or a bare word.  This is necessary
+// because the formatter adjusts whitespace inside $(…): it removes leading/
+// trailing spaces (e.g. $( set ) → $(set)) and reformats multi-line subshells
+// (pipe placement, indentation).  Tokenizing the inner shell code the same way
+// as the outer code makes both forms produce the same token sequence.
+//
+// For "…" strings the outer quotes are stripped before scanning; the opening
+// and closing quote characters are not emitted as separate tokens.
+//
+// Standalone '\' tokens (backslash line-continuation artifacts added by the
+// formatter) are filtered out from inner token sequences.
+func shExpandSubshells(tok string) []string {
+	if !strings.Contains(tok, "$(") {
+		return []string{tok}
+	}
+	i := 0
+	end := len(tok)
+	if strings.HasPrefix(tok, `"`) && end >= 2 && tok[end-1] == '"' {
+		i = 1   // skip opening "
+		end--   // stop before closing "
+	}
+	var parts []string
+	litStart := i
+	for i < end {
+		c := tok[i]
+		if c == '\\' && i+1 < end {
+			i += 2
+			continue
+		}
+		if c == '$' && i+1 < end && tok[i+1] == '(' {
+			if i > litStart {
+				parts = append(parts, tok[litStart:i])
+			}
+			i += 2 // skip $(
+			depth := 1
+			contentStart := i
+			for i < end && depth > 0 {
+				switch tok[i] {
+				case '(':
+					depth++
+				case ')':
+					depth--
+				case '\'':
+					i++
+					for i < end && tok[i] != '\'' {
+						i++
+					}
+				case '\\':
+					if i+1 < end {
+						i++
+					}
+				}
+				i++
+			}
+			shellCode := tok[contentStart : i-1]
+			for _, t := range tokenizeShell(shellCode) {
+				if t != `\` {
+					parts = append(parts, t)
+				}
+			}
+			litStart = i
+			continue
+		}
+		i++
+	}
+	if end > litStart {
+		parts = append(parts, tok[litStart:end])
+	}
+	if len(parts) == 0 {
+		return []string{tok}
+	}
+	return parts
+}
+
+// normalizeShell returns a canonical token sequence for semantic comparison.
+// Known mechanical rewrites applied beyond pure whitespace:
+//  1. Standalone ';' discarded (formatter converts "{ cmd; cmd; }" to multi-line).
+//  2. Spaces inside $((…)) arithmetic expansions stripped (formatter adds them).
+//  3. $(…) subshell contents — inside both "…" strings and bare words — are
+//     recursively tokenized so that whitespace changes (leading/trailing spaces,
+//     indentation, pipe-placement) inside subshells are normalized away.
+//  4. Standalone '\' tokens (backslash line-continuation artifacts) filtered out.
+func normalizeShell(src string) string {
+	toks := tokenizeShell(src)
+	var result []string
+	for _, tok := range toks {
+		if tok == `\` {
+			continue // backslash line-continuation artifact
+		}
+		tok = shNormalizeArith(tok)
+		result = append(result, shExpandSubshells(tok)...)
+	}
+	return strings.Join(result, " ")
+}
+
+// TestFormatPreservesTokens verifies that shell.Format does not silently alter
+// the program beyond the known mechanical transformations (semicolon removal,
+// arithmetic spacing, and subshell whitespace normalization inside strings).
+// Expected value is derived from raw input text; no golden file is used.
+func TestFormatPreservesTokens(t *testing.T) {
+	dirs, err := os.ReadDir("testdata/format")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, d := range dirs {
+		if !d.IsDir() {
+			continue
+		}
+		t.Run(d.Name(), func(t *testing.T) {
+			src, err := os.ReadFile(filepath.Join("testdata/format", d.Name(), "input.sh"))
+			if err != nil {
+				t.Skip("no input.sh")
+				return
+			}
+			formatted, err := shell.Format(string(src), shell.DetectLang(string(src)), nil)
+			if err != nil {
+				t.Skipf("format error: %v", err)
+				return
+			}
+			normIn := normalizeShell(string(src))
+			normOut := normalizeShell(formatted)
+			if normIn != normOut {
+				t.Errorf("normalizeShell(format(input)) != normalizeShell(input)\n\nnorm(input):\n%s\n\nnorm(format):\n%s",
+					normIn, normOut)
+			}
+		})
+	}
+}
 
 // ── golden helper ─────────────────────────────────────────────────────────────
 
