@@ -52,7 +52,6 @@ type writer struct {
 	fmtr *Formatter
 }
 
-func (w *writer) write(s string)   { w.out.WriteString(s) }
 func (w *writer) writeln(s string) { w.out.WriteString(s); w.out.WriteByte('\n') }
 func (w *writer) newline()         { w.out.WriteByte('\n') }
 

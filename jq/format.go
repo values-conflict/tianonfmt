@@ -70,13 +70,6 @@ type printer struct {
 	tidy            bool // apply tidy-level normalisations (index notation, etc.)
 }
 
-// clearTrailing resets lastWasTrailing and returns its old value.
-func (p *printer) clearTrailing() bool {
-	v := p.lastWasTrailing
-	p.lastWasTrailing = false
-	return v
-}
-
 // closeDelimiter writes a closing bracket/paren.
 //
 // In "trailing comment" state (set by commentedExpr or writeAfterPunct), adds
@@ -133,26 +126,10 @@ func (p *printer) atLineStart() bool {
 
 // ── helpers for comment-forced multi-line ────────────────────────────────────
 
-// hasTrailingComment reports whether n is a CommentedExpr with a trailing comment.
-func hasTrailingComment(n Node) bool {
-	ce, ok := n.(*CommentedExpr)
-	return ok && ce.TrailingComment != nil
-}
-
 // hasAnyComment reports whether n is a CommentedExpr (has any kind of comment).
 func hasAnyComment(n Node) bool {
 	_, ok := n.(*CommentedExpr)
 	return ok
-}
-
-// anyPartHasTrailingComment reports whether any element has a trailing comment.
-func anyPartHasTrailingComment(parts []Node) bool {
-	for _, part := range parts {
-		if hasTrailingComment(part) {
-			return true
-		}
-	}
-	return false
 }
 
 // anyPartHasComment reports whether any element has any kind of comment.
