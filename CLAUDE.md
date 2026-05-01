@@ -82,33 +82,43 @@ If the formatter changes something on a second pass, `TestFormatIdempotent` catc
 
 The golden-file and idempotency tests share a blind spot: if a formatter bug is *consistent* — it makes the same wrong change on every pass — `TestFormatIdempotent` passes and `TestFormat` passes (once the golden file is regenerated to match the bug).  The golden file is only as trustworthy as the formatter that produced it.
 
-To close this gap, every language package should have a **`TestFormatPreservesTokens`** (or equivalent name) that verifies `normalize(format(input)) == normalize(input)` using a **pure text normalizer** — no AST, no parser, no golden file for the expected value.  The expected result is derived directly from the raw input source.
+To close this gap, every language package has a **`TestFormatPreservesTokens`** that verifies `normalize(format(input)) == normalize(input)` using a **pure text normalizer** — no AST, no parser, no golden file for the expected value.  The expected result is derived directly from the raw input source.
 
 **How it works:**
 
-1. **Tokenize** the source text into a flat sequence of non-whitespace, non-comment tokens.  All layout (indentation, line breaks, spacing between tokens) is discarded.  The tokenizer must correctly handle the language's string quoting, including any string-interpolation syntax that embeds nested expressions — a naïve scanner that stops at the first closing delimiter will produce different wrong tokens for input vs. formatted output (since the formatter may reflow code near the incorrectly-identified boundary).
+1. **Tokenize** the source into a flat sequence of non-whitespace, non-comment tokens, discarding all layout.  The tokenizer must correctly handle the language's string quoting and any string-interpolation syntax — a naïve scanner that stops at the first closing delimiter will produce different wrong token boundaries for input vs. formatted output when the formatter reflows code near the incorrectly-identified boundary.
 
-2. **Normalize** the token sequence by applying only the known mechanical rewrites the formatter makes beyond pure whitespace:
-   - For jq: unquote `"identifier":` → `identifier:` in object-key position; remove `,` before `}` (trailing-comma insertion).
-   - For each language, enumerate these at the time the test is written; they typically number two or three.
+2. **Normalize** the token sequence by applying only the known mechanical rewrites the formatter makes beyond pure whitespace.  Known normalizations per language:
+
+   | Language | Normalizations |
+   |---|---|
+   | **jq** | Unquote `"identifier":` → `identifier:` (object key); remove `,` before `}` (trailing comma) |
+   | **shell** | Discard standalone `;` (→ newline); strip spaces inside `$((…))`; recursively tokenize `$(…)` subshell contents inside all tokens (words and `"…"` strings) — the formatter reflows indentation and pipe placement inside subshells; discard standalone `\` (line-continuation artifact) |
+   | **dockerfile** | Split `WORD=VALUE` at first `=`; unquote `"…"` strings by stripping quotes, splitting at whitespace, and splitting each word at `=` — handles ENV quote removal and indentation changes inside multi-line shell args |
+   | **markdown** | Normalize bullets `*`/`+` → `-`; convert setext headings to ATX; strip trailing whitespace (preserving exactly 2-space soft break); collapse 2+ blank lines to one |
+   | **template** | Apply jq normalization (`testutil.NormalizeJQ`) to each `{{ … }}` block's content; leave literal text verbatim |
 
 3. **Compare** the two normalized sequences.  If they differ, the formatter changed a token — dropped something, reordered, or rewrote content — without authorization.
 
 **What it catches that the other tests do not:**
 
 - A comment silently dropped by the formatter (the golden file was regenerated without noticing)
-- An expression reordered or a token deleted because of a parser/formatter bug that is self-consistent
-- Any regression where `format(format(x)) == format(x)` holds but `format(x) != x` in a semantically meaningful way
+- An expression reordered or a token deleted because of a self-consistent parser/formatter bug
+- Any regression where `format∘format = format` holds but `format(x) ≠ x` in a semantically meaningful way
 
 **How to identify the normalizations for a new language:**
 
-Run `diff <(tokenize(input)) <(tokenize(format(input)))` across all fixtures; anything that differs after discarding whitespace is a candidate normalization.  For jq this produced exactly two (key unquoting, trailing comma).  If the list is long, the formatter is making unauthorized content changes and those should be fixed, not normalized away.
+Compare token sequences of input and formatted output across all fixtures: anything that differs after discarding whitespace is a candidate normalization.  If the list is long, the formatter is making unauthorized content changes and those should be fixed rather than normalized away.
 
 **Implementing the tokenizer:**
 
-The tokenizer must be a standalone function — no imports from the language package — so the test does not transitively trust the parser.  For languages with string interpolation (jq `\(...)`, shell `$(...)`, etc.) the scanner must correctly track nesting depth using mutual recursion: `scanString` delegates to `scanInterp` when it encounters the interpolation opener, and `scanInterp` recurses back into `scanString` when it encounters a nested string.  Without this, the scanner produces different wrong token boundaries for input vs. formatted output because the formatter reflowed surrounding code that lands inside the incorrectly-identified string region.
+The tokenizer must use no imports from the language package so the test does not transitively trust the parser.  For languages where the formatter reformats code inside string-embedded sub-languages (shell `$(…)`, jq `\(…)`, etc.) the scanner must **recursively tokenize those embedded regions** — not just correctly identify their boundaries.  This is a stronger requirement than just getting string boundaries right: even with a perfect boundary scanner, the formatter may reflow code inside the subshell, producing different whitespace in the same opaque string token.  Recursive tokenization of the embedded code discards that whitespace and makes both sides compare equal.
 
-See `jq/jq_test.go` (`scanJQStr`, `scanJQInterp`, `tokenizeJQ`, `normalizeJQ`, `TestFormatPreservesTokens`) for the reference implementation.
+For `$(…)` / `\(…)` nesting, use mutual recursion: `scanString` delegates to `scanInterp` on the opener, `scanInterp` recurses back into `scanString` when it encounters a nested string.
+
+**Shared jq tokenizer:**
+
+`testutil.TokenizeJQ` and `testutil.NormalizeJQ` in `internal/testutil/jqnorm.go` are the canonical jq tokenizer/normalizer, shared by both `jq/jq_test.go` and `template/template_test.go`.
 
 ### Golden error fixtures
 
