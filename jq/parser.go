@@ -1176,20 +1176,5 @@ func (p *parser) parseObjectPattern() (*ObjectPattern, error) {
 	return op, nil
 }
 
-// isIdent is used by the formatter to check if a name needs quoting.
-func isIdent(s string) bool {
-	if len(s) == 0 {
-		return false
-	}
-	if !isIdentStart(s[0]) {
-		return false
-	}
-	for i := 1; i < len(s); i++ {
-		if !isIdentContinue(s[i]) {
-			return false
-		}
-	}
-	return true
-}
 
 var _ = strings.TrimPrefix // used indirectly
