@@ -66,14 +66,6 @@ Formatters are great — `gofmt` is the obvious example — but they only exist 
 
 Style documentation lives in [`docs/`](docs/).  None of it is exhaustive, and some of it is probably wrong — but it's interesting.
 
-## Install
-
-```console
-$ go install github.com/tianon/fmt/tianonfmt/cmd/tianonfmt@latest
-```
-
-Requires Go 1.25+.
-
 ## Attribution
 
 The research, corpus analysis, style documentation, and initial implementation were produced by "claude my eyes right out".  Tianon was harmed in the creation of this tool.
