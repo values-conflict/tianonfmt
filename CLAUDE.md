@@ -151,7 +151,8 @@ Any regression in field names, nesting, or ordering produces a readable diff.  P
 
 - **One package per language**: `jq/`, `shell/`, `dockerfile/`, `markdown/`, `template/`
 - **Shared utilities in `internal/`** — never copy helpers across packages; extract to `internal/` instead
-- **Testable entry point**: the `cmd/` binary exposes `run(args []string, stdin, stdout, stderr) int` so the CLI can be integration-tested without subprocess overhead
+- **Testable entry point**: the `cmd/` binary exposes `run(args []string, stdin, stdout, stderr) int` so the CLI can be integration-tested without subprocess overhead; `stdout`/`stderr` are `io.Writer` parameters so tests can capture output without subprocesses
+- **`string` in, `string` out for formatters**: all language formatters accept source text as `string` and return `string`.  Formatters require the full source in memory (you cannot stream-format a jq expression one token at a time), and source files are small — `io.Reader` would add complexity with no benefit
 - **Single dispatch enum** (`fileKind`) — when the same set of file types is switched on in multiple places, consolidate into one enum and one set of helper functions; parallel switches are a maintenance hazard
 
 ## Code quality
@@ -191,3 +192,18 @@ Style documentation lives in `docs/`.  Rules:
 - Document what differs from enforced ecosystem norms; do not document what `gofmt` already enforces automatically
 - Document intentional omissions explicitly under a "Notable omissions" section
 - `TODO` is always ALL-CAPS followed by a concrete, specific description — no vague TODOs
+
+## LLM guidance
+
+- **No logging in library code.** Library packages (`jq/`, `shell/`, `dockerfile/`, `markdown/`, `template/`) must never write to stderr or stdout directly.  Return errors; let the caller (`cmd/`) decide how to surface them.  If a library function genuinely needs to produce output, accept an `io.Writer` parameter — never write to `os.Stdout` or `os.Stderr` directly.
+- **No `context.Background()` inside library code.** If a function signature takes a `context.Context`, require it from the caller.  Do not paper over a missing context with `context.Background()` or `context.TODO()` inside library functions.
+- **No out-of-scope TODOs.** Do not add `TODO` comments for things the current task does not require.  The existing rule still applies: any `TODO` that does exist must be ALL-CAPS with a concrete, specific description.
+- **Do not change `go.mod` or `go.sum`** unless the task explicitly requires a new dependency.  Prefer stdlib alternatives; check whether the standard library already covers the use case before reaching for an import.
+- **Match the existing error style in the file you are editing.** If the file uses `errors.New`, do not introduce `fmt.Errorf`, and vice versa.
+- **Return the concrete type, not an interface**, unless the function is part of an existing API that already returns an interface.
+- **Do not strip error information.** Use `%w` not `%v` when wrapping errors; `%v` loses the original error type and breaks `errors.Is`/`errors.As` for callers.
+- **Prefer `t.Fatal` over `t.Error` + `return`** in tests when continuing after a failure would cause a nil dereference or meaningless subsequent failures.
+
+## Build system
+
+Use the standard Go toolchain directly — `go build`, `go test`, `go vet`, `go mod tidy`.  Do not introduce a Makefile: it is a parallel, inferior build system on top of one that already works, and it hides what is actually running.  For multi-step release or maintenance tasks, write a small Go program under `cmd/` instead.

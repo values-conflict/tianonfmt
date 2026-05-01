@@ -15,6 +15,7 @@ type Lexer struct {
 	peeked *Token
 }
 
+// NewLexer returns a new Lexer positioned at the start of src.
 func NewLexer(src string) *Lexer {
 	return &Lexer{src: src, line: 1}
 }

@@ -22,7 +22,7 @@ func (t Token) String() string {
 type Kind int
 
 const (
-	EOF Kind = iota
+	EOF Kind = iota // marks end of token stream; Text is always empty
 
 	// INVALID is returned by the lexer when it encounters a character that is
 	// not part of the jq grammar.  The Text field holds the offending character.
