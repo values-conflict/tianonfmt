@@ -423,7 +423,8 @@ type ObjectPattern struct {
 func (o *ObjectPattern) jqNode()      {}
 func (o *ObjectPattern) nodePos() Pos { return o.At }
 
-// ObjPatField: key: $binding or shorthand key (which implies $key)
+// ObjPatField is one key:$binding pair in an object destructuring pattern.
+// A missing Binding implies the shorthand form, where the binding defaults to $key.
 type ObjPatField struct {
 	Key     string
 	Binding string // "$name"; empty means shorthand (binding == "$"+key)

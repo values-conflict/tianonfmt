@@ -1,10 +1,3 @@
-// Package dockerfile parses Dockerfiles into an AST suitable for formatting.
-//
-// Reference: The classic Dockerfile grammar as documented at
-// https://docs.docker.com/reference/dockerfile/ and as observed in the moby
-// project's daemon/builder/dockerfile package.  The jq-based reference parser
-// at fmt/dockerfile-parser/dockerfile.jq was also used as a specification for
-// edge-case behaviour.
 package dockerfile
 
 import (
