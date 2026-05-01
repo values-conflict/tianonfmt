@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"regexp"
 	"strings"
 	"testing"
 
@@ -628,173 +627,14 @@ func TestFormatInlineVsMultiline(t *testing.T) {
 
 // ── token-level format preservation ──────────────────────────────────────────
 
-// scanJQStr scans a jq string literal beginning at src[start] (a '"') and
-// returns the index just past the closing '"'.
-// It correctly handles \(…) interpolation by delegating to scanJQInterp so
-// that a '"' inside \(…) is treated as a nested string, not as the end of the
-// outer string.  This matters for tokens like @sh "…\("inner"\)…" where a
-// naïve scanner would stop at the inner '"'.
-func scanJQStr(src string, start int) int {
-	i := start + 1
-	for i < len(src) {
-		switch {
-		case src[i] == '\\' && i+1 < len(src) && src[i+1] == '(':
-			// String interpolation: scan the full \(…) expression.
-			i = scanJQInterp(src, i+2)
-		case src[i] == '\\' && i+1 < len(src):
-			i += 2 // other escape sequences: skip two bytes
-		case src[i] == '"':
-			return i + 1 // closing quote of the outer string
-		default:
-			i++
-		}
-	}
-	return i
-}
+// The jq tokenizer and normalizer used by TestFormatPreservesTokens live in
+// internal/testutil (tokenizeJQ → testutil.TokenizeJQ, normalizeJQ →
+// testutil.NormalizeJQ) so that template_test.go can share the same
+// implementation without duplicating code.  Local shims keep the call sites
+// in this file unchanged.
 
-// scanJQInterp scans the expression inside a \(…) interpolation, starting at
-// src[start] (the byte immediately after the opening '\(').  Returns the index
-// just past the matching ')'.  Tracks balanced parentheses and recurses into
-// nested string literals via scanJQStr.
-func scanJQInterp(src string, start int) int {
-	i := start
-	depth := 1 // one open paren from the '\(' that brought us here
-	for i < len(src) && depth > 0 {
-		switch {
-		case src[i] == '(':
-			depth++
-			i++
-		case src[i] == ')':
-			depth--
-			i++
-		case src[i] == '"':
-			i = scanJQStr(src, i) // nested string; handles its own \(…)
-		case src[i] == '\\' && i+1 < len(src):
-			i += 2
-		default:
-			i++
-		}
-	}
-	return i
-}
-
-func jqIsAlpha(c byte) bool { return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') }
-func jqIsDigit(c byte) bool { return c >= '0' && c <= '9' }
-func jqIsIdent(c byte) bool { return jqIsAlpha(c) || jqIsDigit(c) || c == '_' }
-
-// tokenizeJQ splits src into a flat slice of non-whitespace, non-comment jq
-// tokens.  Whitespace between tokens (including newlines and indentation) is
-// discarded, so the result is layout-agnostic.
-func tokenizeJQ(src string) []string {
-	var tokens []string
-	i := 0
-	for i < len(src) {
-		c := src[i]
-		switch {
-		case c == ' ' || c == '\t' || c == '\n' || c == '\r':
-			i++
-		case c == '#': // comment — skip to end of line
-			for i < len(src) && src[i] != '\n' {
-				i++
-			}
-		case c == '"':
-			j := scanJQStr(src, i)
-			tokens = append(tokens, src[i:j])
-			i = j
-		case c == '@': // @format token
-			j := i + 1
-			for j < len(src) && jqIsIdent(src[j]) {
-				j++
-			}
-			tokens = append(tokens, src[i:j])
-			i = j
-		case c == '$': // $variable
-			j := i + 1
-			for j < len(src) && jqIsIdent(src[j]) {
-				j++
-			}
-			tokens = append(tokens, src[i:j])
-			i = j
-		case jqIsAlpha(c) || c == '_': // identifier or keyword
-			j := i
-			for j < len(src) && jqIsIdent(src[j]) {
-				j++
-			}
-			tokens = append(tokens, src[i:j])
-			i = j
-		case jqIsDigit(c): // numeric literal
-			j := i
-			for j < len(src) && (jqIsDigit(src[j]) || src[j] == '.' || src[j] == 'e' || src[j] == 'E' || src[j] == '+' || src[j] == '-') {
-				j++
-			}
-			tokens = append(tokens, src[i:j])
-			i = j
-		case c == '.' && i+1 < len(src) && src[i+1] == '.': // .. recurse
-			tokens = append(tokens, "..")
-			i += 2
-		case c == '.' && i+1 < len(src) && jqIsDigit(src[i+1]): // leading-dot float (.5)
-			j := i
-			for j < len(src) && (jqIsDigit(src[j]) || src[j] == '.') {
-				j++
-			}
-			tokens = append(tokens, src[i:j])
-			i = j
-		default: // single-character token (., :, ,, |, (, ), [, ], {, }, ?, +, -, *, /, %, =, ;, <, >, !)
-			tokens = append(tokens, string(c))
-			i++
-		}
-	}
-	return tokens
-}
-
-var jqBareKeyRE = regexp.MustCompile(`^[a-zA-Z_][a-zA-Z0-9_]*$`)
-
-// normalizeJQ produces a canonical token sequence for semantic comparison.
-// It applies two rewrites that the formatter makes beyond pure whitespace:
-//  1. Unquote object keys that are valid bare identifiers: "foo" → foo
-//     Safe because "string": (string immediately before :) only appears as an
-//     object key in jq — no other syntactic position uses this pattern.
-//  2. Remove trailing commas before }: , } → }
-//     The formatter adds a trailing comma after the last field of a multi-line
-//     object; stripping it makes both sides token-equivalent.
-//
-// After these rewrites all tokens are joined with a single space, making the
-// result independent of indentation, line breaks, and inter-token spacing.
-func normalizeJQ(src string) string {
-	toks := tokenizeJQ(src)
-
-	// Unquote "identifier" keys immediately before ":".
-	for i := 0; i+1 < len(toks); i++ {
-		if !strings.HasPrefix(toks[i], `"`) || toks[i+1] != ":" {
-			continue
-		}
-		raw := toks[i]
-		content := raw[1 : len(raw)-1] // strip surrounding quotes
-		// Reject strings with any escape sequence or non-ASCII — they can't be
-		// bare identifiers and the loop below would be confused by backslashes.
-		ok := true
-		for _, b := range []byte(content) {
-			if b == '\\' || b > 127 {
-				ok = false
-				break
-			}
-		}
-		if ok && jqBareKeyRE.MatchString(content) {
-			toks[i] = content
-		}
-	}
-
-	// Remove trailing commas before '}'.
-	result := toks[:0]
-	for i, tok := range toks {
-		if tok == "," && i+1 < len(toks) && toks[i+1] == "}" {
-			continue
-		}
-		result = append(result, tok)
-	}
-
-	return strings.Join(result, " ")
-}
+func tokenizeJQ(src string) []string  { return testutil.TokenizeJQ(src) }
+func normalizeJQ(src string) string   { return testutil.NormalizeJQ(src) }
 
 // TestFormatPreservesTokens verifies that the formatter does not silently
 // alter the program beyond the two known mechanical transformations (object-key

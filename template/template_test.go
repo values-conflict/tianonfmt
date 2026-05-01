@@ -4,7 +4,6 @@ import (
 	"flag"
 	"os"
 	"path/filepath"
-	"regexp"
 	"strings"
 	"testing"
 
@@ -153,157 +152,15 @@ func TestFormat_EatEOLPreserved(t *testing.T) {
 }
 
 // ── token-level format preservation ──────────────────────────────────────────
-//
-// The jq tokenizer and normalizer below are a local copy of the equivalent
-// helpers in jq/jq_test.go.  They live here rather than in internal/ because
-// they are test-only code, and the CLAUDE.md preference is to share via
-// internal/ only for production helpers.  If the two diverge, reconcile by
-// reviewing the jq package's version.
-
-func tmplScanJQStr(src string, start int) int {
-	i := start + 1
-	for i < len(src) {
-		switch {
-		case src[i] == '\\' && i+1 < len(src) && src[i+1] == '(':
-			i = tmplScanJQInterp(src, i+2)
-		case src[i] == '\\' && i+1 < len(src):
-			i += 2
-		case src[i] == '"':
-			return i + 1
-		default:
-			i++
-		}
-	}
-	return i
-}
-
-func tmplScanJQInterp(src string, start int) int {
-	i := start
-	depth := 1
-	for i < len(src) && depth > 0 {
-		switch {
-		case src[i] == '(':
-			depth++
-			i++
-		case src[i] == ')':
-			depth--
-			i++
-		case src[i] == '"':
-			i = tmplScanJQStr(src, i)
-		case src[i] == '\\' && i+1 < len(src):
-			i += 2
-		default:
-			i++
-		}
-	}
-	return i
-}
-
-func tmplIsAlpha(c byte) bool { return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') }
-func tmplIsDigit(c byte) bool { return c >= '0' && c <= '9' }
-func tmplIsIdent(c byte) bool { return tmplIsAlpha(c) || tmplIsDigit(c) || c == '_' }
-
-func tmplTokenizeJQ(src string) []string {
-	var tokens []string
-	i := 0
-	for i < len(src) {
-		c := src[i]
-		switch {
-		case c == ' ' || c == '\t' || c == '\n' || c == '\r':
-			i++
-		case c == '#':
-			for i < len(src) && src[i] != '\n' {
-				i++
-			}
-		case c == '"':
-			j := tmplScanJQStr(src, i)
-			tokens = append(tokens, src[i:j])
-			i = j
-		case c == '@':
-			j := i + 1
-			for j < len(src) && tmplIsIdent(src[j]) {
-				j++
-			}
-			tokens = append(tokens, src[i:j])
-			i = j
-		case c == '$':
-			j := i + 1
-			for j < len(src) && tmplIsIdent(src[j]) {
-				j++
-			}
-			tokens = append(tokens, src[i:j])
-			i = j
-		case tmplIsAlpha(c) || c == '_':
-			j := i
-			for j < len(src) && tmplIsIdent(src[j]) {
-				j++
-			}
-			tokens = append(tokens, src[i:j])
-			i = j
-		case tmplIsDigit(c):
-			j := i
-			for j < len(src) && (tmplIsDigit(src[j]) || src[j] == '.' || src[j] == 'e' || src[j] == 'E') {
-				j++
-			}
-			tokens = append(tokens, src[i:j])
-			i = j
-		case c == '.' && i+1 < len(src) && src[i+1] == '.':
-			tokens = append(tokens, "..")
-			i += 2
-		case c == '.' && i+1 < len(src) && tmplIsDigit(src[i+1]):
-			j := i
-			for j < len(src) && (tmplIsDigit(src[j]) || src[j] == '.') {
-				j++
-			}
-			tokens = append(tokens, src[i:j])
-			i = j
-		default:
-			tokens = append(tokens, string(c))
-			i++
-		}
-	}
-	return tokens
-}
-
-var tmplBareKeyRE = regexp.MustCompile(`^[a-zA-Z_][a-zA-Z0-9_]*$`)
-
-func tmplNormalizeJQ(src string) string {
-	toks := tmplTokenizeJQ(src)
-	for i := 0; i+1 < len(toks); i++ {
-		if !strings.HasPrefix(toks[i], `"`) || toks[i+1] != ":" {
-			continue
-		}
-		raw := toks[i]
-		content := raw[1 : len(raw)-1]
-		ok := true
-		for _, b := range []byte(content) {
-			if b == '\\' || b > 127 {
-				ok = false
-				break
-			}
-		}
-		if ok && tmplBareKeyRE.MatchString(content) {
-			toks[i] = content
-		}
-	}
-	result := toks[:0]
-	for i, tok := range toks {
-		if tok == "," && i+1 < len(toks) && toks[i+1] == "}" {
-			continue
-		}
-		result = append(result, tok)
-	}
-	return strings.Join(result, " ")
-}
 
 // normalizeTemplate normalizes a Dockerfile template for semantic comparison.
-// It splits the source on {{ … }} block boundaries and applies tmplNormalizeJQ
-// to each jq block's content, leaving literal text verbatim (the formatter
-// preserves it unchanged).  Trim markers (-{{ and -}}) are preserved.
+// It splits the source on {{ … }} block boundaries and applies
+// testutil.NormalizeJQ to each jq block's content, leaving literal text
+// verbatim (the formatter preserves it unchanged).  Trim markers are kept.
 //
 // The formatter may reflow a multi-line jq block to a single line or vice
-// versa; after normalizing the jq content with tmplNormalizeJQ (which strips
-// whitespace), both layouts map to the same token sequence.
+// versa; after normalizing the jq content (which strips whitespace), both
+// layouts map to the same token sequence.
 func normalizeTemplate(src string) string {
 	var sb strings.Builder
 	i := 0
@@ -349,7 +206,7 @@ func normalizeTemplate(src string) string {
 			closeLen = len(rest)
 		}
 
-		sb.WriteString(tmplNormalizeJQ(blockContent))
+		sb.WriteString(testutil.NormalizeJQ(blockContent))
 		if trimClose {
 			sb.WriteString("-}}")
 		} else {
