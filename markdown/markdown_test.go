@@ -10,9 +10,11 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/tianon/fmt/tianonfmt/dockerfile"
 	"github.com/tianon/fmt/tianonfmt/internal/testutil"
-
+	"github.com/tianon/fmt/tianonfmt/jq"
 	"github.com/tianon/fmt/tianonfmt/markdown"
+	"github.com/tianon/fmt/tianonfmt/shell"
 )
 
 func TestMain(m *testing.M) {
@@ -22,10 +24,40 @@ func TestMain(m *testing.M) {
 
 // ── format / AST ─────────────────────────────────────────────────────────────
 
+// testFenceFmt is a best-effort fenceFmt callback using real sub-formatters.
+// It mirrors the logic in formatter.makeFenceFmt from cmd/tianonfmt/main.go.
+func testFenceFmt(lang string, _ int, content string) string {
+	switch lang {
+	case "dockerfile":
+		f, err := dockerfile.Parse(content)
+		if err != nil {
+			return ""
+		}
+		return dockerfile.Format(f)
+	case "jq":
+		f, err := jq.ParseFile(content)
+		if err != nil {
+			return ""
+		}
+		return jq.FormatFile(f)
+	case "bash", "sh", "shell":
+		out, err := shell.FormatWithTidy(content, shell.DetectLang(content), nil)
+		if err != nil {
+			return ""
+		}
+		return out
+	default:
+		return ""
+	}
+}
+
 func TestFormat(t *testing.T) {
 	testutil.Golden(t, "testdata/format", "input.md", []testutil.Case{
 		{Out: "output.md", Fn: func(src string) (string, error) {
 			return markdown.Format(src), nil
+		}, Idem: true},
+		{Out: "output.tidy.md", Fn: func(src string) (string, error) {
+			return markdown.FormatTidy(src, testFenceFmt), nil
 		}, Idem: true},
 		{Out: "ast.json", Fn: func(src string) (string, error) {
 			b, err := json.MarshalIndent(markdown.MarshalFile(src, "input.md"), "", "\t")
@@ -147,6 +179,77 @@ func TestFormatPreservesTokens(t *testing.T) {
 					normIn, normOut)
 			}
 		})
+	}
+}
+
+// ── FormatTidy ────────────────────────────────────────────────────────────────
+
+func TestFormatTidy_NilMatchesFormat(t *testing.T) {
+	src := "# Title\n\n* bullet\n\n```jq\n.foo\n```\n"
+	if markdown.FormatTidy(src, nil) != markdown.Format(src) {
+		t.Error("FormatTidy(src, nil) should equal Format(src)")
+	}
+}
+
+func TestFormatTidy_FenceReplacement(t *testing.T) {
+	src := "# Doc\n\n```dockerfile\nFROM foo\n```\n"
+	var gotLang string
+	var gotLine int
+	var gotContent string
+	result := markdown.FormatTidy(src, func(lang string, openLine int, content string) string {
+		gotLang = lang
+		gotLine = openLine
+		gotContent = content
+		return "REPLACED\n"
+	})
+	if gotLang != "dockerfile" {
+		t.Errorf("lang: got %q, want %q", gotLang, "dockerfile")
+	}
+	if gotLine != 3 {
+		t.Errorf("openLine: got %d, want 3", gotLine)
+	}
+	if gotContent != "FROM foo" {
+		t.Errorf("content: got %q, want %q", gotContent, "FROM foo")
+	}
+	if !strings.Contains(result, "REPLACED") {
+		t.Errorf("replaced content missing: %q", result)
+	}
+	if strings.Contains(result, "FROM foo") {
+		t.Errorf("original content should be replaced: %q", result)
+	}
+}
+
+func TestFormatTidy_EmptyFenceSkipped(t *testing.T) {
+	src := "```dockerfile\n```\n"
+	called := false
+	markdown.FormatTidy(src, func(lang string, openLine int, content string) string {
+		called = true
+		return "REPLACED\n"
+	})
+	if called {
+		t.Error("fenceFmt should not be called for empty fence")
+	}
+}
+
+func TestFormatTidy_CallbackEmptyPreservesOriginal(t *testing.T) {
+	src := "```dockerfile\nFROM foo\n```\n"
+	result := markdown.FormatTidy(src, func(lang string, openLine int, content string) string {
+		return "" // signal: keep original
+	})
+	if !strings.Contains(result, "FROM foo") {
+		t.Errorf("original content should be preserved when callback returns empty: %q", result)
+	}
+}
+
+func TestFormatTidy_OuterNormalizationsApply(t *testing.T) {
+	// non-fence content still gets Format normalizations
+	src := "Title\n=====\n\n* item\n\n```jq\n.x\n```\n"
+	result := markdown.FormatTidy(src, nil)
+	if !strings.Contains(result, "# Title") {
+		t.Errorf("setext heading should be converted: %q", result)
+	}
+	if !strings.Contains(result, "- item") {
+		t.Errorf("bullet should be normalized: %q", result)
 	}
 }
 

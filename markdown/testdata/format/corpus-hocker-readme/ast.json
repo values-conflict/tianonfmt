@@ -1,0 +1,21 @@
+{
+	"blocks": [
+		{
+			"text": "Hocker allows for easily converting something like:",
+			"type": "paragraph"
+		},
+		{
+			"type": "blank"
+		},
+		{
+			"content": "#!/bin/bash\nset -e\n\nexec docker run -d \\\n\t--name apt-cacher-ng \\\n\t--restart always \\\n\t--dns 8.8.8.8 --dns 8.8.4.4 \\\n\t--tmpfs /var/cache/apt-cacher-ng \\\n\ttianon/apt-cacher-ng \"$@\"",
+			"lang": "bash",
+			"type": "codeBlock"
+		},
+		{
+			"type": "blank"
+		}
+	],
+	"file": "input.md",
+	"type": "markdown"
+}

@@ -1,1 +1,1 @@
-input.dockerfile
+output.dockerfile

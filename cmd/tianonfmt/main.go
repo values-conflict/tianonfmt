@@ -98,7 +98,8 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) (exitCode int
 	}
 
 	fmtr := &formatter{
-		tidy: *tidyFlag,
+		tidy:   *tidyFlag,
+		stderr: stderr,
 	}
 
 	if len(fileArgs) == 0 {
@@ -210,23 +211,24 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) (exitCode int
 
 // formatter holds formatting options and dispatches to per-language formatters.
 type formatter struct {
-	tidy bool
+	tidy   bool
+	stderr io.Writer // for warnings from tidy operations; nil discards
 }
 
 func (f *formatter) byPath(path, src string) (string, error) {
-	return f.byKind(kindByPath(path, src), src)
+	return f.byKind(kindByPath(path, src), path, src)
 }
 
 func (f *formatter) byContent(name, src string) (string, error) {
-	return f.byKind(kindByContent(src), src)
+	return f.byKind(kindByContent(src), name, src)
 }
 
-func (f *formatter) byKind(k fileKind, src string) (string, error) {
+func (f *formatter) byKind(k fileKind, name, src string) (string, error) {
 	switch k {
 	case kindJQ:
 		return f.jq(src)
 	case kindMarkdown:
-		return f.md(src)
+		return f.md(name, src)
 	case kindTemplate:
 		return f.template(src)
 	case kindDockerfile:
@@ -264,8 +266,54 @@ func (f *formatter) dockerfile(src string) (string, error) {
 	return dockerfile.FormatWith(parsed, dfFmt), nil
 }
 
-func (f *formatter) md(src string) (string, error) {
+func (f *formatter) md(name, src string) (string, error) {
+	if f.tidy {
+		return markdown.FormatTidy(src, f.makeFenceFmt(name)), nil
+	}
 	return markdown.Format(src), nil
+}
+
+// makeFenceFmt returns a fenceFmt callback for use with markdown.FormatTidy.
+// It attempts to reformat fenced code block contents using the appropriate
+// sub-formatter based on the language tag or content-based detection.
+//
+// TODO: tidy rewrites are always applied to fence content when f.tidy is true;
+// there is no way to format-only without tidy inside a tidy markdown pass.
+func (f *formatter) makeFenceFmt(name string) func(lang string, openLine int, content string) string {
+	return func(lang string, openLine int, content string) string {
+		var (
+			k      fileKind
+			warnOn bool // true for explicit (non-auto-detected) tags
+		)
+
+		switch lang {
+		case "dockerfile":
+			k, warnOn = kindDockerfile, true
+		case "jq":
+			k, warnOn = kindJQ, true
+		case "bash", "sh", "shell":
+			k, warnOn = kindShell, true
+		case "":
+			// Auto-detect: only proceed for confident detections.
+			switch detected := kindByContent(content); detected {
+			case kindDockerfile, kindShell:
+				k = detected
+			default:
+				return "" // not confident enough, pass through
+			}
+		default:
+			return "" // unsupported language tag, pass through silently
+		}
+
+		formatted, err := f.byKind(k, name, content)
+		if err != nil {
+			if warnOn && f.stderr != nil {
+				fmt.Fprintf(f.stderr, "tianonfmt: %s:%d: %v\n", name, openLine, err)
+			}
+			return ""
+		}
+		return formatted
+	}
 }
 
 func (f *formatter) template(src string) (string, error) {

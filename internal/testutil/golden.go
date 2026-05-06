@@ -60,6 +60,11 @@ func Golden(t *testing.T, dir, in string, cases []Case) {
 			if err != nil {
 				t.Fatalf("read input: %v", err)
 			}
+			// prevOutputs maps output content to the filename of the first case
+			// that produced it.  On -update, this lets subsequent identical outputs
+			// symlink to the nearest prior output rather than back to the input,
+			// producing a readable chain: output.tidy.jq → output.jq → input.jq.
+			prevOutputs := make(map[string]string)
 			for _, c := range cases {
 				name := c.Out
 				if name == "" {
@@ -67,14 +72,14 @@ func Golden(t *testing.T, dir, in string, cases []Case) {
 				}
 				t.Run(name, func(t *testing.T) {
 					t.Helper()
-					runCase(t, filepath.Join(dir, e.Name()), in, string(src), c)
+					runCase(t, filepath.Join(dir, e.Name()), in, string(src), c, prevOutputs)
 				})
 			}
 		})
 	}
 }
 
-func runCase(t *testing.T, fixtureDir, inFile, src string, c Case) {
+func runCase(t *testing.T, fixtureDir, inFile, src string, c Case, prevOutputs map[string]string) {
 	t.Helper()
 	errPath := filepath.Join(fixtureDir, "error.txt")
 
@@ -125,15 +130,27 @@ func runCase(t *testing.T, fixtureDir, inFile, src string, c Case) {
 
 	if *Update {
 		os.Remove(outPath)
-		if got == src {
-			// Output is identical to input: use a symlink so it's obvious
-			// that this formatter makes no changes to this input.
+		switch {
+		case prevOutputs[got] != "":
+			// A prior case produced identical output: symlink to it so the
+			// chain is readable (e.g. output.tidy.jq → output.jq → input.jq).
+			if err := os.Symlink(prevOutputs[got], outPath); err != nil {
+				t.Fatalf("symlink golden: %v", err)
+			}
+		case got == src:
+			// Output identical to input: symlink back to the input file.
 			if err := os.Symlink(inFile, outPath); err != nil {
 				t.Fatalf("symlink golden: %v", err)
 			}
-		} else {
+		default:
 			if err := os.WriteFile(outPath, []byte(got), 0o644); err != nil {
 				t.Fatalf("write golden: %v", err)
+			}
+		}
+		// Record this case's output so later cases can symlink to it.
+		if c.Out != "" {
+			if _, exists := prevOutputs[got]; !exists {
+				prevOutputs[got] = c.Out
 			}
 		}
 		return

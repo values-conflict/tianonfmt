@@ -1,1 +1,1 @@
-input.sh
+output.sh

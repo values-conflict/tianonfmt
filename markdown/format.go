@@ -7,7 +7,8 @@
 //   - At most one blank line between blocks
 //   - Code fences always have a language identifier; "sh"/"shell" are Wrong
 //
-// Lines inside fenced code blocks are passed through unchanged.
+// [Format] passes fenced code block contents through unchanged.
+// [FormatTidy] additionally reformats fenced block contents via a caller-supplied callback.
 package markdown
 
 import (
@@ -15,12 +16,31 @@ import (
 )
 
 // Format formats a Markdown source string.
+// Fenced code block contents are passed through unchanged.
 func Format(src string) string {
-	lines := strings.Split(src, "\n")
+	return formatImpl(strings.Split(src, "\n"), nil)
+}
+
+// FormatTidy applies the same normalizations as Format and additionally
+// reformats fenced code block contents via fenceFmt.
+//
+// fenceFmt receives the language tag (lowercased, trimmed; empty if the fence
+// has no tag), the 1-based line number of the opening fence, and the block
+// content (lines joined with "\n", no trailing newline).  Returning "" keeps
+// the original content.  Fences with no content lines are skipped.
+// If fenceFmt is nil, FormatTidy behaves identically to Format.
+func FormatTidy(src string, fenceFmt func(lang string, openLine int, content string) string) string {
+	return formatImpl(strings.Split(src, "\n"), fenceFmt)
+}
+
+func formatImpl(lines []string, fenceFmt func(lang string, openLine int, content string) string) string {
 	out := make([]string, 0, len(lines))
 
 	inFence := false
 	var fenceMarker string // the opening fence (e.g. "```", "````")
+	var fenceLangTag string
+	var fenceOpenLine int
+	var fenceBuf []string
 	consecutiveBlanks := 0
 
 	for i := 0; i < len(lines); i++ {
@@ -31,16 +51,35 @@ func Format(src string) string {
 			if marker := fenceStart(line); marker != "" {
 				inFence = true
 				fenceMarker = marker
+				fenceLangTag = strings.ToLower(strings.TrimSpace(line[len(marker):]))
+				fenceOpenLine = i + 1 // 1-based
+				fenceBuf = nil
 				out = append(out, line)
 				consecutiveBlanks = 0
 				continue
 			}
 		} else {
 			if fenceEnd(line, fenceMarker) {
+				// Emit fence content, optionally reformatted.
+				if fenceFmt != nil && len(fenceBuf) > 0 {
+					content := strings.Join(fenceBuf, "\n")
+					if formatted := fenceFmt(fenceLangTag, fenceOpenLine, content); formatted != "" {
+						formatted = strings.TrimRight(formatted, "\n")
+						out = append(out, strings.Split(formatted, "\n")...)
+					} else {
+						out = append(out, fenceBuf...)
+					}
+				} else {
+					out = append(out, fenceBuf...)
+				}
+				out = append(out, line)
 				inFence = false
 				fenceMarker = ""
+				fenceLangTag = ""
+				fenceBuf = nil
+			} else {
+				fenceBuf = append(fenceBuf, line)
 			}
-			out = append(out, line)
 			consecutiveBlanks = 0
 			continue
 		}
@@ -49,7 +88,7 @@ func Format(src string) string {
 
 		// Convert setext-style headers to ATX.
 		// A setext underline is a line of === or --- immediately after a non-blank line.
-		if i+1 < len(lines) && !inFence {
+		if i+1 < len(lines) {
 			next := lines[i+1]
 			if isSetextUnderline(next, '=') {
 				out = append(out, "# "+strings.TrimSpace(line))

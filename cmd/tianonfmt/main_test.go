@@ -1086,6 +1086,124 @@ func TestRun_TidyMarkdownFile(t *testing.T) {
 	}
 }
 
+func TestRun_TidyMarkdownFences(t *testing.T) {
+	// --tidy on a .md file reformats embedded code fences.
+	// The dockerfile fence contains an && chain; tidy converts it to set -eux; form.
+	f, err := os.CreateTemp(t.TempDir(), "*.md")
+	if err != nil {
+		t.Fatal(err)
+	}
+	f.WriteString("# Doc\n\n```dockerfile\nFROM debian:bookworm-slim\nRUN apt-get update && apt-get install -y --no-install-recommends curl && rm -rf /var/lib/apt/lists/*\n```\n")
+	f.Close()
+	stdout, _, code := runCLI(t, "", "--tidy "+f.Name())
+	if code != 0 {
+		t.Fatalf("exit %d\nstdout: %s", code, stdout)
+	}
+	if !strings.Contains(stdout, "set -eux") {
+		t.Errorf("dockerfile fence should be tidy-formatted (set -eux expected), got:\n%s", stdout)
+	}
+}
+
+func writeTempMD(t *testing.T, content string) string {
+	t.Helper()
+	f, err := os.CreateTemp(t.TempDir(), "*.md")
+	if err != nil {
+		t.Fatal(err)
+	}
+	f.WriteString(content)
+	f.Close()
+	return f.Name()
+}
+
+func TestRun_TidyMarkdownJQFence(t *testing.T) {
+	// jq fence: trailing comma removed by tidy.
+	path := writeTempMD(t, "# Doc\n\n```jq\n{\n  foo: .foo,\n}\n```\n")
+	stdout, _, code := runCLI(t, "", "--tidy "+path)
+	if code != 0 {
+		t.Fatalf("exit %d\nstdout: %s", code, stdout)
+	}
+	if strings.Contains(stdout, "foo: .foo,") {
+		t.Errorf("jq tidy should remove trailing comma, got:\n%s", stdout)
+	}
+}
+
+func TestRun_TidyMarkdownBashFence(t *testing.T) {
+	// bash fence: set flag normalization applied.
+	path := writeTempMD(t, "# Doc\n\n```bash\n#!/usr/bin/env bash\nset -e\necho hi\n```\n")
+	stdout, _, code := runCLI(t, "", "--tidy "+path)
+	if code != 0 {
+		t.Fatalf("exit %d\nstdout: %s", code, stdout)
+	}
+	if !strings.Contains(stdout, "set -Eeuo pipefail") {
+		t.Errorf("bash fence should be tidy-formatted (set -Eeuo pipefail expected), got:\n%s", stdout)
+	}
+}
+
+func TestRun_TidyMarkdownUnrecognizedFence(t *testing.T) {
+	// Unrecognized tag (go): content passed through unchanged.
+	const gofunc = "func main() {\n\tfmt.Println(\"hi\")\n}"
+	path := writeTempMD(t, "# Doc\n\n```go\n"+gofunc+"\n```\n")
+	stdout, _, code := runCLI(t, "", "--tidy "+path)
+	if code != 0 {
+		t.Fatalf("exit %d\nstdout: %s", code, stdout)
+	}
+	if !strings.Contains(stdout, "fmt.Println") {
+		t.Errorf("unrecognized fence should be unchanged, got:\n%s", stdout)
+	}
+}
+
+func TestRun_TidyMarkdownAutoDetectDockerfile(t *testing.T) {
+	// Untagged fence opening with FROM: auto-detected as dockerfile.
+	path := writeTempMD(t, "# Doc\n\n```\nFROM debian:bookworm-slim\nRUN apt-get update && apt-get install -y --no-install-recommends curl\n```\n")
+	stdout, _, code := runCLI(t, "", "--tidy "+path)
+	if code != 0 {
+		t.Fatalf("exit %d\nstdout: %s", code, stdout)
+	}
+	if !strings.Contains(stdout, "set -eux") {
+		t.Errorf("auto-detected dockerfile fence should be tidy-formatted, got:\n%s", stdout)
+	}
+}
+
+func TestRun_TidyMarkdownAutoDetectShell(t *testing.T) {
+	// Untagged fence with shebang: auto-detected as shell.
+	path := writeTempMD(t, "# Doc\n\n```\n#!/usr/bin/env bash\nset -e\necho hi\n```\n")
+	stdout, _, code := runCLI(t, "", "--tidy "+path)
+	if code != 0 {
+		t.Fatalf("exit %d\nstdout: %s", code, stdout)
+	}
+	if !strings.Contains(stdout, "set -Eeuo pipefail") {
+		t.Errorf("auto-detected shell fence should be tidy-formatted, got:\n%s", stdout)
+	}
+}
+
+func TestRun_TidyMarkdownAutoDetectNotConfident(t *testing.T) {
+	// Untagged fence with plain text: not a dockerfile or shell shebang,
+	// so auto-detection is not confident and content passes through unchanged.
+	path := writeTempMD(t, "# Doc\n\n```\nsome plain text here\nnot code\n```\n")
+	stdout, _, code := runCLI(t, "", "--tidy "+path)
+	if code != 0 {
+		t.Fatalf("exit %d\nstdout: %s", code, stdout)
+	}
+	if !strings.Contains(stdout, "some plain text here") {
+		t.Errorf("non-confident auto-detect should leave content unchanged, got:\n%s", stdout)
+	}
+}
+
+func TestRun_TidyMarkdownFenceParseError(t *testing.T) {
+	// Explicit jq tag with invalid content: warning to stderr, content preserved.
+	path := writeTempMD(t, "# Doc\n\n```jq\n{{not valid jq}}\n```\n")
+	stdout, stderr, code := runCLI(t, "", "--tidy "+path)
+	if code != 0 {
+		t.Fatalf("exit %d\nstdout: %s\nstderr: %s", code, stdout, stderr)
+	}
+	if !strings.Contains(stdout, "{{not valid jq}}") {
+		t.Errorf("invalid fence content should be preserved, got:\n%s", stdout)
+	}
+	if !strings.Contains(stderr, ".md:3:") {
+		t.Errorf("expected warning with line number in stderr, got: %q", stderr)
+	}
+}
+
 func TestRun_DiffFileChanged(t *testing.T) {
 	// --diff on a file that needs formatting: stable golden output since
 	// go test always runs from the package source directory.

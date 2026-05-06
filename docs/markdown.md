@@ -50,6 +50,8 @@ Corpus refs: [`rawdns/README.md#L39-L52`](https://github.com/tianon/rawdns/blob/
 
 **Fenced with triple backticks**, never indented.  A language identifier is always provided.  When a code block itself contains fenced code blocks (e.g. a markdown example showing a fenced block), the outer fence uses four or more backticks — a fence closes at the next fence of equal or greater length, so triple-backtick inner fences would incorrectly close the outer block.
 
+**`--tidy` reformats fenced block contents** using the appropriate sub-formatter for the language tag.  Tags supported: `dockerfile`, `jq`, `bash`, `sh`, `shell`.  Untagged fences are auto-detected (a block opening with `FROM` or a `#!` shebang is reformatted; otherwise the block is left unchanged).  If the contents cannot be parsed, they are left unchanged and a warning is emitted.  Because `--tidy` is applied to the whole file, fenced block contents are also tidied — there is no way to format-only without tidy inside a tidy markdown pass.  `console` and other unrecognised tags are always left unchanged.
+
 The critical distinction between language identifiers:
 
 - **`console`** — interactive terminal session, showing the `$` prompt and command output.  Used for showing what the user would actually type and see.
