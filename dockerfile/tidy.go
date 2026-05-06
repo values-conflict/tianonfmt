@@ -81,8 +81,8 @@ func normRUNFirstLine(instr *Instruction, normSetFlags func(string) string) {
 }
 
 // shellSpecialChars is the set of characters that indicate shell features.
-// Any command containing one of these cannot be safely converted to exec form
-// by simple whitespace splitting — leave it for pedantic's explicit wrapping.
+// Commands containing these cannot be safely converted by whitespace splitting
+// and require an explicit /bin/sh -c wrapper instead.
 const shellSpecialChars = "$&|;<>(){}[]`*?'\"\\"
 
 // hasShellFeatures reports whether cmd uses shell features that prevent safe
@@ -98,9 +98,15 @@ func buildExecLine(kw string, args []string) (text, jsonArgs string) {
 	return kw + " " + jsonArgs, jsonArgs
 }
 
-// TidyCmdEntrypoint converts shell-form CMD/ENTRYPOINT to exec form when the
-// command contains no shell features (no $, |, ;, &, etc.).  Safe to auto-fix
-// because simple whitespace-split produces a semantically equivalent exec form.
+// TidyCmdEntrypoint converts shell-form CMD/ENTRYPOINT to exec form.
+// Commands with no shell features are split on whitespace.
+// Commands with shell features are wrapped in an explicit /bin/sh -c invocation:
+//
+//	CMD:        CMD ["/bin/sh", "-c", "shell command"]
+//	ENTRYPOINT: ENTRYPOINT ["/bin/sh", "-c", "shell command", "--"]
+//
+// The trailing "--" on ENTRYPOINT lets CMD arguments pass through as positional
+// parameters to the shell command rather than as flags to /bin/sh.
 func TidyCmdEntrypoint(f *File) {
 	for _, instr := range f.Instructions {
 		if instr.Keyword != "CMD" && instr.Keyword != "ENTRYPOINT" {
@@ -110,47 +116,21 @@ func TidyCmdEntrypoint(f *File) {
 		if strings.HasPrefix(args, "[") {
 			continue // already exec form
 		}
+		var tokens []string
 		if hasShellFeatures(args) {
-			continue // has shell features — leave for pedantic
-		}
-		tokens := strings.Fields(args)
-		if len(tokens) == 0 {
-			continue
+			if instr.Keyword == "ENTRYPOINT" {
+				tokens = []string{"/bin/sh", "-c", args, "--"}
+			} else {
+				tokens = []string{"/bin/sh", "-c", args}
+			}
+		} else {
+			tokens = strings.Fields(args)
+			if len(tokens) == 0 {
+				continue
+			}
 		}
 		text, _ := buildExecLine(instr.Keyword, tokens)
 		instr.Args = string(mustMarshal(tokens))
-		if len(instr.Lines) > 0 {
-			instr.Lines[0].Text = text
-		}
-	}
-}
-
-// PedanticCmdEntrypoint wraps any remaining shell-form CMD/ENTRYPOINT in an
-// explicit /bin/sh -c invocation — the --pedantic fallback for commands with
-// shell features that cannot be safely split.
-//
-// CMD:        CMD ["/bin/sh", "-c", "shell command"]
-// ENTRYPOINT: ENTRYPOINT ["/bin/sh", "-c", "shell command", "--"]
-//
-// The trailing "--" on ENTRYPOINT lets CMD arguments pass through as positional
-// parameters to the shell command rather than as flags to /bin/sh.
-func PedanticCmdEntrypoint(f *File) {
-	for _, instr := range f.Instructions {
-		if instr.Keyword != "CMD" && instr.Keyword != "ENTRYPOINT" {
-			continue
-		}
-		args := strings.TrimSpace(instr.Args)
-		if strings.HasPrefix(args, "[") {
-			continue // already exec form
-		}
-		var wrapped []string
-		if instr.Keyword == "ENTRYPOINT" {
-			wrapped = []string{"/bin/sh", "-c", args, "--"}
-		} else {
-			wrapped = []string{"/bin/sh", "-c", args}
-		}
-		text, _ := buildExecLine(instr.Keyword, wrapped)
-		instr.Args = string(mustMarshal(wrapped))
 		if len(instr.Lines) > 0 {
 			instr.Lines[0].Text = text
 		}

@@ -1,14 +1,14 @@
 package jq
 
-// Violation describes a pedantic style issue that cannot be auto-fixed.
+// Violation describes a style issue that --tidy cannot auto-fix.
 type Violation struct {
 	Line int
 	Msg  string
 }
 
-// LintFile checks the parsed File for pedantic style violations that --tidy
-// cannot automatically rewrite.  src is the original source text, used to
-// compute 1-based line numbers from byte offsets.
+// LintFile checks the parsed File for style violations that --tidy cannot
+// automatically rewrite.  src is the original source text, used to compute
+// 1-based line numbers from byte offsets.
 func LintFile(f *File, src string) []Violation {
 	var out []Violation
 	lintNullInElse(f, src, &out)

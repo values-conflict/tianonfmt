@@ -34,26 +34,14 @@ func Format(src string, lang syntax.LangVariant, jqFmt func(expr string, inline 
 }
 
 // FormatWithTidy formats a shell script with idiomatic rewrites applied first.
-// Currently rewrites: shebang normalisation; "|| true" → "|| :"; "which" → "command -v".
+// Rewrites: shebang normalisation; set flag normalisation (set -e → set -eu / set -Eeuo pipefail);
+// "|| true" → "|| :"; "which" → "command -v".
 func FormatWithTidy(src string, lang syntax.LangVariant, jqFmt func(expr string, inline bool) string) (string, error) {
 	src = TidyShebang(src)
-	f, err := parseShell(src, lang)
-	if err != nil {
-		return "", err
-	}
-	ApplyTidy(f)
-	if jqFmt != nil {
-		formatJQInAST(f, jqFmt)
-	}
-	return printShell(f)
-}
-
-// FormatWithPedantic applies pedantic-level rewrites on top of tidy.
-// Adds set flag normalisation (set -e → set -eu for sh; → set -Eeuo pipefail for bash).
-// NormalizeSetFlags runs on source text before parsing (same pattern as TidyShebang)
-// to preserve correct position info in the parsed AST.
-func FormatWithPedantic(src string, lang syntax.LangVariant, jqFmt func(expr string, inline bool) string) (string, error) {
-	src = TidyShebang(src)
+	// Re-detect language after shebang normalisation: TidyShebang may have
+	// changed #!/bin/sh → #!/usr/bin/env bash, so NormalizeSetFlags must use
+	// the post-tidy language to remain idempotent.
+	lang = DetectLang(src)
 	src = NormalizeSetFlags(src, lang)
 	f, err := parseShell(src, lang)
 	if err != nil {

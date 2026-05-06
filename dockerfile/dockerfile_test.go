@@ -193,11 +193,11 @@ func TestTidyCmdEntrypoint_EmptyArgs(t *testing.T) {
 	}
 }
 
-func TestPedanticCmdEntrypoint_AlreadyExec(t *testing.T) {
-	// already exec form: no change
+func TestTidyCmdEntrypoint_AlreadyExec(t *testing.T) {
+	// Already exec form: no change.
 	src := "FROM scratch\nCMD [\"/bin/sh\"]\n"
 	f, _ := dockerfile.Parse(src)
-	dockerfile.PedanticCmdEntrypoint(f)
+	dockerfile.TidyCmdEntrypoint(f)
 	for _, instr := range f.Instructions {
 		if instr.Keyword == "CMD" {
 			want := `["/bin/sh"]`
@@ -242,24 +242,11 @@ func TestTidyCmdEntrypoint_SimpleToExec(t *testing.T) {
 	}
 }
 
-func TestTidyCmdEntrypoint_ShellFeaturesUnchanged(t *testing.T) {
+func TestTidyCmdEntrypoint_ShellFeaturesWrapped(t *testing.T) {
+	// Shell-feature commands get /bin/sh -c wrapping rather than simple split.
 	src := "FROM scratch\nCMD echo $HOME\nENTRYPOINT exec \"$@\"\n"
 	f, _ := dockerfile.Parse(src)
 	dockerfile.TidyCmdEntrypoint(f)
-	for _, instr := range f.Instructions {
-		if instr.Keyword == "CMD" || instr.Keyword == "ENTRYPOINT" {
-			if strings.HasPrefix(strings.TrimSpace(instr.Args), "[") {
-				t.Errorf("%s with shell features should not be converted: %q", instr.Keyword, instr.Args)
-			}
-		}
-	}
-}
-
-func TestPedanticCmdEntrypoint_WrapsShellFeatures(t *testing.T) {
-	src := "FROM scratch\nCMD echo $HOME\nENTRYPOINT exec \"$@\"\n"
-	f, _ := dockerfile.Parse(src)
-	dockerfile.TidyCmdEntrypoint(f)  // no-op on these
-	dockerfile.PedanticCmdEntrypoint(f)
 	for _, instr := range f.Instructions {
 		switch instr.Keyword {
 		case "CMD":

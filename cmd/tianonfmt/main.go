@@ -14,14 +14,13 @@
 //	                Mutually exclusive with --diff.  Errors if used with stdin.
 //	-d, --diff      Print a unified diff for each file that would change; exit non-zero if
 //	                any file differs.  Mutually exclusive with --write.
-//	-t, --tidy      Apply idiomatic rewrites beyond formatting:
-//	                  shell: #!/bin/bash → #!/usr/bin/env bash; || true → || :
+//	-t, --tidy      Apply idiomatic rewrites beyond formatting, then fail (exit 1) if any
+//	                constructs remain that Tianon considers Wrong (combine with --diff to see
+//	                what needs changing).  Rewrites include:
+//	                  shell: #!/bin/bash → #!/usr/bin/env bash; || true → || :;
+//	                         set -e → set -eu (sh) or set -Eeuo pipefail (bash)
 //	                  Dockerfile RUN: && chains → set -eux; semicolons;
-//	                                 set -Eeuo pipefail → set -eux
-//	-p, --pedantic  Implies --tidy, plus stricter normalisations not applied by --tidy alone:
-//	                  shell: set -e → set -eu (sh) or set -Eeuo pipefail (bash)
-//	                Additionally fails (exit 1) if any constructs remain Wrong.
-//	                Combine with --diff to see what needs changing.
+//	                                 CMD/ENTRYPOINT shell-form → exec form
 //	    --ast[=mode]  Dump parsed AST as JSON to stdout.
 //	                  --ast or --ast=input: pre-format AST
 //	                  --ast=format: post-format AST
@@ -84,8 +83,7 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) (exitCode int
 	writeFlag := fs.Bool("write", 'w', "write result to source file (print filenames of changed files)")
 	diffFlag := fs.Bool("diff", 'd', "display diffs; exit non-zero if any file differs")
 	astFlag := fs.OptString("ast", 0, "input", "dump parsed AST as JSON to stdout; --ast=format dumps post-format AST; combine with --diff to show AST diff")
-	tidyFlag := fs.Bool("tidy", 't', "apply idiomatic rewrites: Dockerfile RUN && chains → set -eux; semicolons, shell || true → || :")
-	pedanticFlag := fs.Bool("pedantic", 'p', "fail if any constructs remain that Tianon considers Wrong; lists offending files (use with --diff to show what needs changing)")
+	tidyFlag := fs.Bool("tidy", 't', "apply idiomatic rewrites and fail if any Wrong constructs remain (use with --diff to see what needs changing)")
 
 	fileArgs, err := fs.Parse(args)
 	if err != nil {
@@ -100,8 +98,7 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) (exitCode int
 	}
 
 	fmtr := &formatter{
-		tidy:     *tidyFlag || *pedanticFlag,
-		pedantic: *pedanticFlag,
+		tidy: *tidyFlag,
 	}
 
 	if len(fileArgs) == 0 {
@@ -125,10 +122,9 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) (exitCode int
 		if err != nil {
 			die("%v", err)
 		}
-		if *pedanticFlag {
-			if code := pedanticCheck("-", out, false, *diffFlag, stdout, stderr); code != 0 {
-				return code
-			}
+		lintCode := 0
+		if *tidyFlag {
+			lintCode = tidyCheck("-", out, false, stderr)
 		}
 		if *diffFlag {
 			diff, err := computeDiff("<stdin>", string(src), out)
@@ -139,10 +135,10 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) (exitCode int
 				stdout.Write(diff)
 				return 1
 			}
-			return 0
+			return lintCode
 		}
 		fmt.Fprint(stdout, out)
-		return 0
+		return lintCode
 	}
 
 	for _, path := range fileArgs {
@@ -173,10 +169,9 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) (exitCode int
 			continue
 		}
 
-		if *pedanticFlag {
-			if code := pedanticCheck(path, out, true, *diffFlag, stdout, stderr); code != 0 {
+		if *tidyFlag {
+			if code := tidyCheck(path, out, true, stderr); code != 0 {
 				exitCode = code
-				continue
 			}
 		}
 
@@ -215,8 +210,7 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) (exitCode int
 
 // formatter holds formatting options and dispatches to per-language formatters.
 type formatter struct {
-	tidy     bool
-	pedantic bool // pedantic implies tidy and adds stricter normalisations
+	tidy bool
 }
 
 func (f *formatter) byPath(path, src string) (string, error) {
@@ -263,9 +257,6 @@ func (f *formatter) dockerfile(src string) (string, error) {
 		dockerfile.TidyFile(parsed, tidyRUN, normalizeSetFlags)
 		dockerfile.TidyCmdEntrypoint(parsed)
 	}
-	if f.pedantic {
-		dockerfile.PedanticCmdEntrypoint(parsed)
-	}
 	dfFmt := &dockerfile.Formatter{
 		JQFmt:       jqFmtFunc,
 		RUNShellFmt: shell.FormatRUN,
@@ -285,12 +276,9 @@ func (f *formatter) shell(src string) (string, error) {
 	lang := shell.DetectLang(src)
 	var out string
 	var err error
-	switch {
-	case f.pedantic:
-		out, err = shell.FormatWithPedantic(src, lang, jqFmtFunc)
-	case f.tidy:
+	if f.tidy {
 		out, err = shell.FormatWithTidy(src, lang, jqFmtFunc)
-	default:
+	} else {
 		out, err = shell.Format(src, lang, jqFmtFunc)
 	}
 	if err != nil {
@@ -438,44 +426,21 @@ func normalizeSetFlags(s string) string {
 	return s
 }
 
-// ── pedantic check ───────────────────────────────────────────────────────────
+// ── tidy lint check ──────────────────────────────────────────────────────────
 
-// pedanticCheck checks whether out (already tidy-applied) has any Wrong
-// constructs that --tidy could not auto-fix.  byPath controls dispatch;
-// showDiff controls whether second-tidy diffs are printed to stdout.
-//
-// Returns 0 (clean) or 1 (Wrong constructs remain).
-func pedanticCheck(name, out string, byPath, showDiff bool, stdout, stderr io.Writer) int {
+// tidyCheck reports any Wrong constructs in out that --tidy could not auto-fix.
+// byPath controls dispatch.  Returns 0 (clean) or 1 (violations found).
+func tidyCheck(name, out string, byPath bool, stderr io.Writer) int {
 	code := 0
-
-	tidyFmtr := &formatter{tidy: true}
-	var further string
-	var err error
-	if byPath {
-		further, err = tidyFmtr.byPath(name, out)
-	} else {
-		further, err = tidyFmtr.byContent(name, out)
-	}
-	if err == nil && further != out {
-		code = 1
-		if showDiff {
-			diff, _ := computeDiff(name, out, further)
-			stdout.Write(diff)
-		} else {
-			fmt.Fprintf(stderr, "tianonfmt: %s: Wrong constructs remain after --tidy\n", name)
-		}
-	}
-
 	for _, v := range lintViolations(name, out, byPath) {
 		fmt.Fprintf(stderr, "tianonfmt: %s:%d: %s\n", name, v.Line, v.Msg)
 		code = 1
 	}
-
 	return code
 }
 
-// lintViolations returns pedantic lint violations for src, dispatching by
-// file type using the same detection logic as the formatter.
+// lintViolations returns lint violations for src that --tidy cannot auto-fix,
+// dispatching by file type using the same detection logic as the formatter.
 func lintViolations(name, src string, byPathMode bool) []jq.Violation {
 	var k fileKind
 	if byPathMode {
@@ -495,7 +460,7 @@ func lintViolations(name, src string, byPathMode bool) []jq.Violation {
 	}
 }
 
-// lintMarkdown checks markdown src for pedantic violations.
+// lintMarkdown checks markdown src for violations that --tidy cannot auto-fix.
 func lintMarkdown(src string) []jq.Violation {
 	vs := markdown.Lint(src)
 	out := make([]jq.Violation, len(vs))
@@ -505,7 +470,7 @@ func lintMarkdown(src string) []jq.Violation {
 	return out
 }
 
-// lintJQ parses src as jq and returns any pedantic violations.
+// lintJQ parses src as jq and returns any violations that --tidy cannot auto-fix.
 func lintJQ(src string) []jq.Violation {
 	f, err := jq.ParseFile(src)
 	if err != nil {
@@ -514,7 +479,7 @@ func lintJQ(src string) []jq.Violation {
 	return jq.LintFile(f, src)
 }
 
-// lintShell checks shell src for pedantic violations:
+// lintShell checks shell src for violations that --tidy cannot auto-fix:
 //   - echo -e / echo -n: use printf instead
 //   - shebang: #!/bin/bash or #!/bin/sh should be #!/usr/bin/env bash
 func lintShell(src string) []jq.Violation {
@@ -614,7 +579,7 @@ func echoFlagViolation(line string) string {
 	return ""
 }
 
-// lintDockerfile checks Dockerfile src for pedantic violations.
+// lintDockerfile checks Dockerfile src for violations that --tidy cannot auto-fix.
 func lintDockerfile(src string) []jq.Violation {
 	f, err := dockerfile.Parse(src)
 	if err != nil {

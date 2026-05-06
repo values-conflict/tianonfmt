@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-set -eu
+set -Eeuo pipefail
 
 # version_greater A B returns whether A > B
 version_greater() {
@@ -268,7 +268,7 @@ if expr "$1" : "apache" 1>/dev/null || [ "$1" = "php-fpm" ] || [ "${NEXTCLOUD_UP
 						fi
 						if [ -n "${NEXTCLOUD_TRUSTED_DOMAINS+x}" ]; then
 							echo "Setting trusted domains…"
-							set -f # turn off glob
+							set -Eeuo pipefail
 							NC_TRUSTED_DOMAIN_IDX=1
 							for DOMAIN in ${NEXTCLOUD_TRUSTED_DOMAINS}; do
 								DOMAIN=$(echo "${DOMAIN}" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')

@@ -41,14 +41,14 @@ testutil.Golden(t, "testdata/format", ".sh", ".sh", func(src string) (string, er
 - Input files: `testdata/<suite>/<name>/input<inExt>`
 - Golden output files: `testdata/<suite>/<name>/output<outExt>` (regenerate with `-update`)
 - Always add both an idempotency test (apply twice, compare) alongside the primary golden test
-- Organize testdata by suite (`format/`, `tidy/`, `pedantic/`, `errors/`, `lint/`) so purpose is obvious from the path
+- Organize testdata by suite (`format/`, `errors/`, `lint/`) so purpose is obvious from the path
 
 ### Minimise the number of distinct input files
 
-**If we can parse it, we can format it, tidy it, and pedantic it.**  Every input that exists should be tested against every applicable transformer.
+**If we can parse it, we can format it and tidy it.**  Every input that exists should be tested against every applicable transformer.
 
 - **Do not create separate input files per suite.**  `testdata/format/` is the primary home for inputs.  `TestFormat`, `TestTidy`, `TestFormatRoundTrip`, and `TestMarshalAST` all read from `testdata/format/` and write differently-named outputs into the same fixture directory (`output.sh`, `output.tidy.sh`, `ast.json`).
-- **`testdata/tidy/` (and other suite subdirectories) exist only for inputs whose edge case is impossible to express in the format suite.**  If an input could live in `testdata/format/`, it must — a duplicate in `testdata/tidy/` is dead weight.
+- **`testdata/errors/`, `testdata/lint/`, and any other suite subdirectory exist only for inputs whose edge case is impossible to express in the format suite.**  If an input could live in `testdata/format/`, it must — a duplicate elsewhere is dead weight.
 - Before adding any new fixture, verify no existing fixture already exercises the same AST paths.  If one does, extend it rather than creating a parallel one.
 
 ### Fixture attribution (`meta.txt`)
@@ -166,8 +166,7 @@ Any regression in field names, nesting, or ordering produces a readable diff.  P
 
 ## CLI flags
 
-- `--tidy` applies idiomatic rewrites (shebang, `|| true → || :`, `which → command -v`, simple shell-form → JSON form)
-- `--pedantic` implies `--tidy` and applies stricter rewrites (set-flag normalization, all shell forms → JSON form with explicit shell injection)
+- `--tidy` applies idiomatic rewrites (shebang, `|| true → || :`, `which → command -v`, set-flag normalization, all CMD/ENTRYPOINT shell-forms → JSON form) and fails (exit 1) if any Wrong constructs remain that cannot be auto-fixed
 - `-w` (write): prints names of changed files, silent for unchanged; errors on stdin; mutually exclusive with `-d`
 - `-d` (diff): prints unified diffs; mutually exclusive with `-w`
 

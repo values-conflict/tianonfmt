@@ -213,14 +213,14 @@ CMD ["echo","hello"]
 ENTRYPOINT ["/usr/local/bin/server","--port","8080"]
 ```
 
-**`--pedantic` normalisation**: any remaining shell-form (commands that *do* use shell features) is wrapped in an explicit `/bin/sh -c` invocation.  `ENTRYPOINT` gets a trailing `"--"` so that `CMD` arguments are forwarded as positional parameters rather than flags to `/bin/sh`:
+Commands that *do* use shell features are wrapped in an explicit `/bin/sh -c` invocation.  `ENTRYPOINT` gets a trailing `"--"` so that `CMD` arguments are forwarded as positional parameters rather than flags to `/bin/sh`:
 
 ```dockerfile
-# Before --pedantic (after --tidy has run):
+# Before --tidy:
 CMD echo $HOME
 ENTRYPOINT exec "$@"
 
-# After --pedantic:
+# After --tidy:
 CMD ["/bin/sh","-c","echo $HOME"]
 ENTRYPOINT ["/bin/sh","-c","exec \"$@\"","--"]
 ```
@@ -253,11 +253,11 @@ Generated Dockerfiles (produced from `Dockerfile.template` sources) carry the ge
 ## Notable omissions
 
 - `set -Eeuo pipefail` inside `RUN` — the simpler `set -eux` is used (POSIX sh, no `-E` or pipefail); `--tidy` normalises any `set` variant to `set -eux` automatically
-- `apt-get install` without `-y` and `--no-install-recommends` — both flags are mandatory in every corpus `apt-get install` call; `--pedantic` flags missing flags
-- `MAINTAINER` — deprecated instruction; `--pedantic` flags it
-- `HEALTHCHECK CMD ...` — never used; `HEALTHCHECK NONE` (disabling an inherited check) is acceptable; `--pedantic` flags CMD form
-- `ONBUILD` — never used; `--pedantic` flags it
-- `LABEL` — never used in normal Dockerfiles; `--pedantic` flags it.  Exception: `moby.buildkit.frontend.*` labels required by the BuildKit frontend protocol are whitelisted — Tianon uses these in his BuildKit-specific Dockerfiles because BuildKit itself requires them.
+- `apt-get install` without `-y` and `--no-install-recommends` — both flags are mandatory in every corpus `apt-get install` call; `--tidy` flags missing flags
+- `MAINTAINER` — deprecated instruction; `--tidy` flags it
+- `HEALTHCHECK CMD ...` — never used; `HEALTHCHECK NONE` (disabling an inherited check) is acceptable; `--tidy` flags CMD form
+- `ONBUILD` — never used; `--tidy` flags it
+- `LABEL` — never used in normal Dockerfiles; `--tidy` flags it.  Exception: `moby.buildkit.frontend.*` labels required by the BuildKit frontend protocol are whitelisted — Tianon uses these in his BuildKit-specific Dockerfiles because BuildKit itself requires them.
 - Heredoc syntax inside `RUN` — not used (only `\` continuation style)
 - `ARG` before `FROM` for multi-stage builds — not seen in corpus
 - `LABEL` instructions — not common in corpus Dockerfiles

@@ -383,27 +383,15 @@ func TestLintShell_SetEAlone(t *testing.T) {
 	}
 }
 
-func TestFormatter_PedanticSetNormalization(t *testing.T) {
-	// --pedantic should normalize set -e to set -Eeuo pipefail for bash
-	f := &formatter{tidy: true, pedantic: true}
+func TestFormatter_TidySetNormalization(t *testing.T) {
+	// --tidy should normalize set -e to set -Eeuo pipefail for bash
+	f := &formatter{tidy: true}
 	out, err := f.byContent("-", "#!/usr/bin/env bash\nset -e\necho hi\n")
 	if err != nil {
 		t.Fatal(err)
 	}
 	if !strings.Contains(out, "set -Eeuo pipefail") {
-		t.Errorf("pedantic should normalize set -e → set -Eeuo pipefail, got: %q", out)
-	}
-}
-
-func TestFormatter_TidyNoSetChange(t *testing.T) {
-	// --tidy alone should NOT change set -e
-	f := &formatter{tidy: true, pedantic: false}
-	out, err := f.byContent("-", "#!/usr/bin/env bash\nset -e\necho hi\n")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if strings.Contains(out, "Eeuo") {
-		t.Errorf("tidy should NOT change set flags, got: %q", out)
+		t.Errorf("tidy should normalize set -e → set -Eeuo pipefail, got: %q", out)
 	}
 }
 
@@ -793,24 +781,23 @@ func TestPrintAST_Format(t *testing.T) {
 	}
 }
 
-func TestPedanticCheck_Clean(t *testing.T) {
-	// Already-tidy output: second pass should find nothing Wrong
+func TestTidyCheck_Clean(t *testing.T) {
 	out, err := (&formatter{tidy: true}).byContent("-", ".foo | not")
 	if err != nil {
 		t.Fatal(err)
 	}
-	code := pedanticCheck("-", out, false, false, os.Stdout, os.Stderr)
+	code := tidyCheck("-", out, false, os.Stderr)
 	if code != 0 {
 		t.Errorf("expected exit 0 for clean jq, got %d", code)
 	}
 }
 
-func TestPedanticCheck_EqFalse(t *testing.T) {
-	// lintJQ fires for == false — pedantic check should return 1.
+func TestTidyCheck_EqFalse(t *testing.T) {
+	// lintJQ fires for == false — tidy check should return 1.
 	// Redirect stderr so violation messages don't pollute test output.
 	old := os.Stderr
 	os.Stderr, _ = os.Open(os.DevNull)
-	code := pedanticCheck("-", ".x == false", false, false, os.Stdout, os.Stderr)
+	code := tidyCheck("-", ".x == false", false, os.Stderr)
 	os.Stderr = old
 	if code != 1 {
 		t.Errorf("expected exit 1 for == false, got %d", code)
@@ -927,7 +914,7 @@ func TestRun_WriteFlagOnStdin(t *testing.T) {
 }
 
 func TestRun_TidyStdin(t *testing.T) {
-	stdout, _, code := runCLI(t, "FROM debian:bookworm-slim\nRUN apt-get update && apt-get install -y curl\n", "--tidy")
+	stdout, _, code := runCLI(t, "FROM debian:bookworm-slim\nRUN apt-get update && apt-get install -y --no-install-recommends curl\n", "--tidy")
 	if code != 0 {
 		t.Fatalf("exit %d", code)
 	}
@@ -936,17 +923,17 @@ func TestRun_TidyStdin(t *testing.T) {
 	}
 }
 
-func TestRun_PedanticPass(t *testing.T) {
-	_, _, code := runCLI(t, ".foo | not", "--pedantic")
+func TestRun_TidyLintPass(t *testing.T) {
+	_, _, code := runCLI(t, ".foo | not", "--tidy")
 	if code != 0 {
-		t.Errorf("clean jq should pass pedantic, got exit %d", code)
+		t.Errorf("clean jq should pass tidy lint, got exit %d", code)
 	}
 }
 
-func TestRun_PedanticFail(t *testing.T) {
-	_, stderr, code := runCLI(t, ".foo == false", "--pedantic")
+func TestRun_TidyLintFail(t *testing.T) {
+	_, stderr, code := runCLI(t, ".foo == false", "--tidy")
 	if code == 0 {
-		t.Error("expected pedantic failure for == false")
+		t.Error("expected tidy lint failure for == false")
 	}
 	if !strings.Contains(stderr, "== false") {
 		t.Errorf("expected violation message, got %q", stderr)
@@ -1038,9 +1025,9 @@ func TestRun_ASTDiff(t *testing.T) {
 	}
 }
 
-func TestRun_PedanticWithDiff(t *testing.T) {
-	_, _, code := runCLI(t, "FROM debian:bookworm-slim\nRUN apt-get update && apt-get install -y --no-install-recommends curl\n", "--pedantic --diff")
-	// --pedantic --diff shows what tidy changes
+func TestRun_TidyWithDiff(t *testing.T) {
+	_, _, code := runCLI(t, "FROM debian:bookworm-slim\nRUN apt-get update && apt-get install -y --no-install-recommends curl\n", "--tidy --diff")
+	// --tidy --diff shows what tidy changes
 	_ = code // exit code varies
 }
 
@@ -1088,9 +1075,9 @@ func TestRun_MarkdownAST(t *testing.T) {
 
 // ── file-based tests covering paths not exercised via stdin ──────────────────
 
-func TestRun_PedanticMarkdownFile(t *testing.T) {
-	// Exercises lintMarkdown (0% before this test) via --pedantic on a .md file.
-	_, stderr, code := runCLI(t, "", "--pedantic testdata/pedantic-markdown/input.md")
+func TestRun_TidyMarkdownFile(t *testing.T) {
+	// Exercises lintMarkdown via --tidy on a .md file with a "sh" fence.
+	_, stderr, code := runCLI(t, "", "--tidy testdata/pedantic-markdown/input.md")
 	if code == 0 {
 		t.Error("expected non-zero exit for markdown with sh fence")
 	}
@@ -1155,15 +1142,15 @@ func TestRun_DiffFileClean(t *testing.T) {
 	}
 }
 
-func TestRun_PedanticFilePass(t *testing.T) {
-	// --pedantic on a well-formed jq file: exit 0.
+func TestRun_TidyFilePass(t *testing.T) {
+	// --tidy on a well-formed jq file: exit 0.
 	f, err := os.CreateTemp(t.TempDir(), "*.jq")
 	if err != nil {
 		t.Fatal(err)
 	}
 	f.WriteString(".foo | not\n")
 	f.Close()
-	_, _, code := runCLI(t, "", "--pedantic "+f.Name())
+	_, _, code := runCLI(t, "", "--tidy "+f.Name())
 	if code != 0 {
 		t.Errorf("expected exit 0 for clean jq file, got %d", code)
 	}

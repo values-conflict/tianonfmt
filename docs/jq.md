@@ -501,8 +501,8 @@ Things Tianon **never** does in standalone `.jq` files:
 - `reduce`/`foreach` written on a single line when the expression is non-trivial — short expressions that fit comfortably on one line do appear: `reduce .[] as $a ([]; if IN(.[]; $a) then . else . += [$a] end)`
 - Empty `{}` or `[]` with spaces inside: `{ }`, `[ ]` — uses `{}`, `[]`
 - `null` in place of `empty` for "nothing" in generators — `empty` is preferred
-- `not` written as `== false` (always `| not`) — note: `| not` also matches `null`, so the two are not always equivalent; `--pedantic` flags `== false`
-- Positive boolean checks written as `== true` — use the expression directly; `--pedantic` flags `== true`
-- `!= false` (truthy check) — use the expression directly; `--pedantic` flags it
-- `!= true` (negation) — use `| not`; `--pedantic` flags it
+- `not` written as `== false` (always `| not`) — note: `| not` also matches `null`, so the two are not always equivalent; `--tidy` flags `== false`
+- Positive boolean checks written as `== true` — use the expression directly; `--tidy` flags `== true`
+- `!= false` (truthy check) — use the expression directly; `--tidy` flags it
+- `!= true` (negation) — use `| not`; `--tidy` flags it
 - Quoted object keys for plain identifiers: `{"foo": .}` should be `{foo: .}` — the formatter enforces this automatically

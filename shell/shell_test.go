@@ -317,9 +317,9 @@ func TestNormalizeSetFlags_POSIX(t *testing.T) {
 	}
 }
 
-func TestFormatWithPedantic_SetNormalization(t *testing.T) {
+func TestFormatWithTidy_SetNormalization(t *testing.T) {
 	src := "#!/usr/bin/env bash\nset -e\necho hi\n"
-	out, err := shell.FormatWithPedantic(src, syntax.LangBash, nil)
+	out, err := shell.FormatWithTidy(src, syntax.LangBash, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -328,9 +328,9 @@ func TestFormatWithPedantic_SetNormalization(t *testing.T) {
 	}
 }
 
-func TestFormatWithPedantic_AlreadyCanonical(t *testing.T) {
+func TestFormatWithTidy_SetAlreadyCanonical(t *testing.T) {
 	src := "#!/usr/bin/env bash\nset -Eeuo pipefail\necho hi\n"
-	out, err := shell.FormatWithPedantic(src, syntax.LangBash, nil)
+	out, err := shell.FormatWithTidy(src, syntax.LangBash, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

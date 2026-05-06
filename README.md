@@ -43,19 +43,15 @@ $ tianonfmt -w Dockerfile script.sh *.jq
 $ tianonfmt -d script.sh
 ```
 
-`-t` (`--tidy`) applies idiomatic rewrites beyond basic formatting:
+`-t` (`--tidy`) applies idiomatic rewrites beyond basic formatting and fails (exit 1) if any constructs remain that I consider Wrong.  Combine with `-d` to see exactly what needs changing:
 
-- shell: `#!/bin/bash` → `#!/usr/bin/env bash`; `|| true` → `|| :`; `which` → `command -v`
+- shell: `#!/bin/bash` → `#!/usr/bin/env bash`; `|| true` → `|| :`; `which` → `command -v`; `set -e` → `set -Eeuo pipefail` (bash) or `set -eu` (sh)
 - Dockerfile `RUN`: `&&`-chained commands → `set -eux; semicolon; separated` form
+- Dockerfile `CMD`/`ENTRYPOINT`: shell-form → exec form (with `/bin/sh -c` wrapper for commands using shell features)
 
 ```console
 $ tianonfmt -t -w script.sh Dockerfile
-```
-
-`-p` (`--pedantic`) implies `--tidy` and fails (exit 1) if any constructs remain that I consider Wrong.  Combine with `-d` to see exactly what needs changing:
-
-```console
-$ tianonfmt -p -d script.sh
+$ tianonfmt -t -d script.sh
 ```
 
 ## Why?

@@ -335,7 +335,7 @@ declare -A files=(
 
 ### Here-documents
 
-`<<-` (with tab-stripping) is **always** used in preference to `<<`; `--pedantic` flags bare `<<` heredocs.  The `-` variant strips leading tab characters from the body and from the delimiter line, which lets the heredoc content be indented naturally with the surrounding code.  Beyond the immediate indentation benefit, using `<<-` consistently means the heredoc can be freely moved inside a deeper control structure later without having to change the operator.
+`<<-` (with tab-stripping) is **always** used in preference to `<<`; `--tidy` flags bare `<<` heredocs.  The `-` variant strips leading tab characters from the body and from the delimiter line, which lets the heredoc content be indented naturally with the surrounding code.  Beyond the immediate indentation benefit, using `<<-` consistently means the heredoc can be freely moved inside a deeper control structure later without having to change the operator.
 
 ```bash
 cat <<-EOH
@@ -518,16 +518,16 @@ See [jq-sh.md](jq-sh.md) for the full conventions.  The short summary: `jq <<<"$
 Things Tianon **never** does in standalone shell scripts:
 
 - `#!/bin/bash` or `#!/bin/sh` shebang (always `#!/usr/bin/env bash`) — `--tidy` fixes this automatically
-- `set -e` alone (bare minimum with no `-u`) — `--pedantic` flags bare `set -e` and also auto-normalises it: bash scripts get `set -Eeuo pipefail`; POSIX/sh scripts get `set -eu`.  If `-x` is already present, it is preserved (`-eux` → `-Eeuxo pipefail`).  Simpler forms already containing `-u` (`set -eu`, `set -eux`) appear in Tianon's corpus for entrypoints and are not changed by `--pedantic`; only bare `set -e` is normalised.
+- `set -e` alone (bare minimum with no `-u`) — `--tidy` auto-normalises it: bash scripts get `set -Eeuo pipefail`; POSIX/sh scripts get `set -eu`.  If `-x` is already present, it is preserved (`-eux` → `-Eeuxo pipefail`).  Simpler forms already containing `-u` (`set -eu`, `set -eux`) appear in Tianon's corpus for entrypoints and are not changed; only bare `set -e` is normalised.  `--tidy` also flags the bare form in its lint check.
 - `which` to locate commands (`command -v` is the POSIX-correct alternative; Tianon even aliases `which='command -v'` in his own bashrc) — `--tidy` fixes flag-free `which cmd` calls automatically
-- `echo -e` for escape sequences — `printf` handles escapes portably; `echo -e` is not POSIX; `--pedantic` flags this
-- `echo -n` for output without a trailing newline — use `printf '%s'` instead; `--pedantic` flags this
+- `echo -e` for escape sequences — `printf` handles escapes portably; `echo -e` is not POSIX; `--tidy` flags this
+- `echo -n` for output without a trailing newline — use `printf '%s'` instead; `--tidy` flags this
 - Backtick command substitution — always `$(...)` style; `--tidy` converts `` `cmd` `` → `$(cmd)` automatically
 - The `function` keyword — always `name() { ... }` style; `--tidy` removes `function` automatically
-- `set -x` at the global level — only `set -x` / `set +x` pairs locally; `--tidy` strips `-x` from top-level `set` normalisations; `--pedantic` flags any global `set` containing `-x`
+- `set -x` at the global level — only `set -x` / `set +x` pairs locally; `--tidy` strips `-x` from top-level `set` normalisations and flags any global `set` containing `-x`
 - `[ ]` tests with `==` (uses `=` for POSIX string comparison) — `--tidy` converts `[ ... == ... ]` → `[ ... = ... ]` automatically
-- Arithmetic with `let` or `$((var = expr))` assignment — use `$((...))` or `var=$((expr))`; `--pedantic` flags `let`
-- `declare -i` for integer-type variables — use untyped variables; `--pedantic` flags this
+- Arithmetic with `let` or `$((var = expr))` assignment — use `$((...))` or `var=$((expr))`; `--tidy` flags `let`
+- `declare -i` for integer-type variables — use untyped variables; `--tidy` flags this
 - `&&` or `||` at the *end* of a continuation line (always at the start of the next line) — the formatter enforces this automatically via `BinaryNextLine` mode
 
 **Things that appear less often than you might expect:**

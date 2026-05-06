@@ -184,7 +184,7 @@ func MarshalFile(src, filename string) any {
 	}
 }
 
-// Lint returns pedantic violations in a markdown file.
+// Lint returns violations in a markdown file that --tidy cannot auto-fix.
 // Currently detects: "sh" or "shell" language identifiers in fenced blocks.
 func Lint(src string) []Violation {
 	var out []Violation
@@ -214,7 +214,7 @@ func Lint(src string) []Violation {
 	return out
 }
 
-// Violation is a pedantic style issue in a markdown file.
+// Violation is a style issue in a markdown file that --tidy cannot auto-fix.
 type Violation struct {
 	Line int
 	Msg  string
