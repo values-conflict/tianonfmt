@@ -75,7 +75,97 @@ func printShell(f *syntax.File) (string, error) {
 	if err := newPrinter().Print(&buf, f); err != nil {
 		return "", fmt.Errorf("shell format: %w", err)
 	}
-	return buf.String(), nil
+	return fixMultiLineClauses(buf.String()), nil
+}
+
+// fixMultiLineClauses normalises multi-line for/while/if constructs so that
+// "; do" and "; then" always sit on their own line at the keyword's indentation
+// level, with a trailing "\" on every preceding item line.
+//
+// The printer produces two broken forms:
+//
+//  1. Last item joined with "; do" on the same line:
+//     \tbookworm; do  →  \tbookworm \
+//                        ; do
+//
+//  2. "; do" indented one level too deep (same as the items):
+//     \t; do  →  ; do
+//
+// Both corrections are only applied when the preceding line ends with "\"
+// (the trailing-backslash signal for a multi-line construct).
+func fixMultiLineClauses(src string) string {
+	lines := strings.Split(src, "\n")
+	out := make([]string, 0, len(lines)+4)
+	changed := false
+
+	for i, line := range lines {
+		prevHasBackslash := i > 0 && len(lines[i-1]) > 0 && lines[i-1][len(lines[i-1])-1] == '\\'
+		if prevHasBackslash {
+			// Fix 1: bare "; do"/"; then" sitting one tab level too deep — dedent it.
+			if tabs, kw, ok := matchSemiClauseAlone(line); ok && len(tabs) > 0 {
+				out = append(out, tabs[1:]+"; "+kw)
+				changed = true
+				continue
+			}
+			// Fix 2: "item; do" on one line — add "\" to item, put "; do" on own line.
+			if tabs, item, kw, ok := matchSemiClauseJoined(line); ok {
+				prevTabs := ""
+				if len(tabs) > 0 {
+					prevTabs = tabs[1:]
+				}
+				out = append(out, tabs+item+" \\")
+				out = append(out, prevTabs+"; "+kw)
+				changed = true
+				continue
+			}
+		}
+		out = append(out, line)
+	}
+
+	if !changed {
+		return src
+	}
+	return strings.Join(out, "\n")
+}
+
+// matchSemiClauseAlone matches a line of the form "\t+; do" or "\t+; then".
+func matchSemiClauseAlone(line string) (tabs, keyword string, ok bool) {
+	i := 0
+	for i < len(line) && line[i] == '\t' {
+		i++
+	}
+	if i == 0 {
+		return "", "", false
+	}
+	rest := line[i:]
+	switch rest {
+	case "; do", "; then":
+		return line[:i], rest[2:], true
+	}
+	return "", "", false
+}
+
+// matchSemiClauseJoined matches a line of the form "\t+<item>; do" or
+// "\t+<item>; then" where <item> does not end with "\".
+func matchSemiClauseJoined(line string) (tabs, item, keyword string, ok bool) {
+	i := 0
+	for i < len(line) && line[i] == '\t' {
+		i++
+	}
+	if i == 0 {
+		return "", "", "", false
+	}
+	tabs = line[:i]
+	rest := line[i:]
+	for _, kw := range []string{"; do", "; then"} {
+		if strings.HasSuffix(rest, kw) {
+			body := rest[:len(rest)-len(kw)]
+			if len(body) > 0 && body[len(body)-1] != '\\' {
+				return tabs, body, kw[2:], true
+			}
+		}
+	}
+	return "", "", "", false
 }
 
 func newPrinter() *syntax.Printer {

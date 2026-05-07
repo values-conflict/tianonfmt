@@ -207,19 +207,32 @@ else
 fi
 ```
 
-When the condition itself is too long and uses `\` continuation, `; then` moves to its own line at the same indentation as the conditions:
+When the condition itself is too long and uses `\` continuation, `; then` moves to its own line at `if`'s indentation level (one tab less than the condition lines).  The trailing `\` is kept on **every** condition line including the last, so all lines are visually uniform:
 
 ```bash
-if ! docker-sbuild \
-        --mount "type=bind,src=$dscDir,dst=/dsc,ro" \
-        --workdir /dsc \
-        "$targetDirectory" \
-    ; then
-    # ...
+if [ "${DOCKER_HOST#tcp:}" != "$DOCKER_HOST" ] \
+	&& [ -z "${DOCKER_TLS_VERIFY:-}" ] \
+	&& [ -z "${DOCKER_CERT_PATH:-}" ] \
+	&& _should_tls \
+; then
+	export DOCKER_TLS_VERIFY=1
 fi
 ```
 
-`fi` is always on its own line at the same indentation as `if`.
+The same pattern applies to `while` and `for` loops: items with `\` continuation all keep their trailing `\`, and `; do` sits on its own line at the loop keyword's indentation:
+
+```bash
+for suite in \
+	"$debian" \
+	bookworm \
+; do
+	…
+done
+```
+
+The `; then` / `; do` is semantically equivalent to a newline before `then` / `do`, and the trailing `\` on the last item is technically redundant — the sole purpose of both is to let every item line look identical, making additions and reorderings diff-clean.
+
+`fi` and `done` are always on their own line at the same indentation as the keyword.
 
 POSIX `[ ]` test brackets are used; `[[ ]]` bash-specific tests appear but are not preferred — `case` is usually the POSIX-compatible alternative for pattern matching.
 

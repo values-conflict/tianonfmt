@@ -1,0 +1,152 @@
+{
+	"type": "shell",
+	"file": "input.sh",
+	"stmts": [
+		{
+			"type": "call",
+			"args": [
+				"set",
+				"-Eeuo",
+				"pipefail"
+			]
+		},
+		{
+			"type": "call",
+			"args": [
+				"[",
+				"-e",
+				"versions.json",
+				"]"
+			]
+		},
+		{
+			"type": "call",
+			"assigns": [
+				"dir=\"$(readlink -ve \"$BASH_SOURCE\")\""
+			],
+			"args": []
+		},
+		{
+			"type": "call",
+			"assigns": [
+				"dir=\"$(dirname \"$dir\")\""
+			],
+			"args": []
+		},
+		{
+			"type": "call",
+			"args": [
+				"source",
+				"\"$dir/../.libs/deb-repo.sh\""
+			]
+		},
+		{
+			"type": "call",
+			"args": [
+				"source",
+				"\"$dir/../.libs/git.sh\""
+			]
+		},
+		{
+			"type": "call",
+			"assigns": [
+				"debian='trixie'"
+			],
+			"args": []
+		},
+		{
+			"type": "call",
+			"assigns": [
+				"json=\"$(jq -nc --arg debian \"$debian\" '{ debian: { version: $debian } }')\""
+			],
+			"args": []
+		},
+		{
+			"type": "call",
+			"assigns": [
+				"uri='https://apt.tianon.xyz/moby'"
+			],
+			"args": []
+		},
+		{
+			"type": "call",
+			"assigns": [
+				"component='main'"
+			],
+			"args": []
+		},
+		{
+			"type": "for",
+			"loop": {
+				"type": "wordIter",
+				"name": "suite",
+				"items": [
+					"\"$debian\"",
+					"bookworm"
+				]
+			},
+			"do": [
+				{
+					"type": "for",
+					"loop": {
+						"type": "wordIter",
+						"name": "binpkg",
+						"items": [
+							"engine",
+							"containerd",
+							"runc",
+							"cli",
+							"cli-plugin-buildx"
+						]
+					},
+					"do": [
+						{
+							"type": "call",
+							"assigns": [
+								"cjson=\"$(\\\n\tpackage=\"moby-$binpkg\"\nif [ \"$suite\" = 'bookworm' ]; then\n\tarch='mips64el'\nfi\ndeb-repo\n)\""
+							],
+							"args": []
+						},
+						{
+							"type": "call",
+							"assigns": [
+								"json=\"$(jq \u003c\u003c\u003c\"$json\" -c --arg suite \"$suite\" --arg binpkg \"$binpkg\" --argjson cjson \"$cjson\" '\n\t\t\tif $suite == \"bookworm\" then\n\t\t\t\t.[\"bookworm\"][$binpkg] = $cjson\n\t\t\telse\n\t\t\t\t.[$binpkg] = $cjson\n\t\t\tend\n\t\t')\""
+							],
+							"args": []
+						}
+					]
+				}
+			]
+		},
+		{
+			"type": "call",
+			"assigns": [
+				"dind=\"$(github-file-commit 'docker/docker' 'HEAD' 'hack/dind')\""
+			],
+			"args": []
+		},
+		{
+			"type": "stmt",
+			"cmd": {
+				"type": "call",
+				"args": [
+					"jq",
+					"--argjson",
+					"dind",
+					"\"$dind\"",
+					"'\n\tdef upstream_version:\n\t\tif index(\":\") then\n\t\t\tsplit(\":\")[1]\n\t\telse . end\n\t\t| split(\"-\")[0]\n\t;\n\tdef v(v):\n\t\tv | split(\".\")\n\t;\n\t.dind = $dind\n\t| (.engine.version | upstream_version) as $eng\n\t| (.cli.version | upstream_version) as $cli\n\t| (.bookworm.engine.version | upstream_version) as $ueng\n\t| (.bookworm.cli.version | upstream_version) as $ucli\n\t| if v($eng) \u003e= v($cli) and $eng == $ueng and v($eng) \u003e= v($ucli) then\n\t\t.version = $eng\n\telse . end\n\t| .variants = [ \"\", \"bookworm\" ] # make sure \"apply-templates.sh\" creates \"Dockerfile.bookworm\" too\n'"
+				]
+			},
+			"redirs": [
+				{
+					"op": "\u003c\u003c\u003c",
+					"word": "\"$json\""
+				},
+				{
+					"op": "\u003e",
+					"word": "versions.json"
+				}
+			]
+		}
+	]
+}

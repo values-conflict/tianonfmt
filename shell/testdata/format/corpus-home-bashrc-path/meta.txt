@@ -1,0 +1,2 @@
+Source: https://github.com/tianon/home/blob/720c476e79a50ab0dd133f7187bd046b32cd5b73/bashrc.d/path.sh
+License: Expat

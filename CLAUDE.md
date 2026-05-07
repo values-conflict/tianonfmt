@@ -26,11 +26,16 @@ If coverage drops, add tests before moving on.  Rechecking after a refactor is n
 
 Prefer in this order:
 
-1. **Real corpus fixtures** — inputs taken verbatim from `../corpus/` and committed to `testdata/`.  Most convincing; proves the formatter round-trips actual code.
+1. **Real corpus fixtures** — inputs taken verbatim from `../corpus/` or `../anticorpus/` and committed to `testdata/`.  Most convincing; proves the formatter round-trips actual code.
 2. **Contrived golden fixtures** — hand-written input/output pairs in `testdata/`.  Use when the corpus doesn't cover an edge case.
 3. **Go table/unit tests** — only when a golden file would be awkward (e.g., testing a pure function with many small inputs, or testing error paths).
 
-Never write a plain unit test when a golden file could serve the same purpose (and achieve the same coverage).
+**HARD RULE: never write a `func TestXxx` for new formatter behaviour when a golden fixture would cover the same case.**  A test function that calls `shell.FormatWithTidy(src, ...)` and asserts on the output is always worse than a golden fixture — it's less readable, doesn't document intent, and isn't backed by real code.  The only legitimate uses of new `func TestXxx` beyond the standard `TestFormat`/`TestTidy`/etc. suite runners are:
+- error paths (parse failures, invalid input)
+- pure-function unit tests for small helpers (e.g. `sortFlagsByOrder`)
+- edge cases that literally cannot be expressed as a file-in/file-out golden fixture
+
+**When adding corpus/anticorpus fixtures:** always search `../corpus` and `../anticorpus` first before writing contrived fixtures.  The corpus search should target the specific pattern being tested (flag usage, if-condition style, etc.).  A contrived fixture is only justified when a corpus search turns up nothing useful.
 
 ## Golden fixture pattern
 
@@ -195,6 +200,17 @@ Style documentation lives in `docs/`.  Rules:
 - Document what differs from enforced ecosystem norms; do not document what `gofmt` already enforces automatically
 - Document intentional omissions explicitly under a "Notable omissions" section
 - `TODO` is always ALL-CAPS followed by a concrete, specific description — no vague TODOs
+
+## Definition of done
+
+A formatter change is not done until **all** of the following are true:
+
+1. **Tests pass** — `go test -coverprofile=... -coverpkg=./... ./...` green, no regression in coverage.
+2. **Corpus/anticorpus fixtures** — the new behaviour is demonstrated by at least one golden fixture sourced from `../corpus/` or `../anticorpus/`.  Contrived fixtures are acceptable only when the corpus contains no relevant example.  No new `func TestXxx` was added when a golden fixture could serve the same purpose.
+3. **Docs updated** — the relevant file in `docs/` documents the new rule/behaviour.  For shell formatter changes: `docs/bash.md`.  For jq formatter changes: `docs/jq.md` and/or `docs/jq-sh.md`.  For Dockerfile changes: `docs/dockerfile.md`.  For markdown changes: `docs/markdown.md`.
+4. **Idempotency** — running the formatter twice on any affected input produces identical output (`Idem: true` in the golden test, or verified manually).
+
+If any of these is missing, the task is not done.  Finish all four before reporting completion.
 
 ## LLM guidance
 

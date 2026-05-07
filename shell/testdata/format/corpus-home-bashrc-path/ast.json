@@ -1,0 +1,113 @@
+{
+	"type": "shell",
+	"file": "input.sh",
+	"stmts": [
+		{
+			"type": "for",
+			"loop": {
+				"type": "wordIter",
+				"name": "debianBinDir",
+				"items": [
+					"\"$HOME/docker/debian-bin\"",
+					"\"$HOME/git/debian-bin\""
+				]
+			},
+			"do": [
+				{
+					"type": "if",
+					"cond": [
+						{
+							"type": "call",
+							"args": [
+								"[",
+								"-d",
+								"\"$debianBinDir\"",
+								"]"
+							]
+						}
+					],
+					"then": [
+						{
+							"args": [
+								"PATH=\"$PATH:$debianBinDir/generic:$debianBinDir/docker-sbuild\""
+							],
+							"type": "export"
+						},
+						{
+							"type": "call",
+							"args": [
+								"break"
+							]
+						}
+					]
+				}
+			]
+		},
+		{
+			"type": "call",
+			"args": [
+				"unset",
+				"debianBinDir"
+			]
+		},
+		{
+			"type": "call",
+			"assigns": [
+				"dockerBinDir=\"$HOME/docker/bin\""
+			],
+			"args": []
+		},
+		{
+			"type": "if",
+			"cond": [
+				{
+					"type": "call",
+					"args": [
+						"[",
+						"-d",
+						"\"$dockerBinDir\"",
+						"]"
+					]
+				}
+			],
+			"then": [
+				{
+					"args": [
+						"PATH=\"$PATH:$dockerBinDir:$dockerBinDir/sbuild\""
+					],
+					"type": "export"
+				},
+				{
+					"type": "if",
+					"cond": [
+						{
+							"type": "call",
+							"args": [
+								"[",
+								"-r",
+								"\"$dockerBinDir/smart/.bashrc\"",
+								"]"
+							]
+						}
+					],
+					"then": [
+						{
+							"type": "call",
+							"args": [
+								"source",
+								"\"$dockerBinDir/smart/.bashrc\""
+							]
+						}
+					]
+				}
+			]
+		},
+		{
+			"type": "call",
+			"args": [
+				"unset",
+				"dockerBinDir"
+			]
+		}
+	]
+}

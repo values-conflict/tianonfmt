@@ -1,0 +1,2 @@
+Source: https://github.com/tianon/dockerfiles/blob/6bc48289b2204723ceb8fb4eaca12c0c0bfcd1d5/docker-master/docker-entrypoint.sh
+License: Expat

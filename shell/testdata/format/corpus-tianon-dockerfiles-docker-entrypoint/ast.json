@@ -1,0 +1,393 @@
+{
+	"type": "shell",
+	"file": "input.sh",
+	"stmts": [
+		{
+			"type": "call",
+			"args": [
+				"set",
+				"-eu"
+			]
+		},
+		{
+			"type": "if",
+			"cond": [
+				{
+					"type": "call",
+					"args": [
+						"[",
+						"\"${1#-}\"",
+						"!=",
+						"\"$1\"",
+						"]"
+					]
+				}
+			],
+			"then": [
+				{
+					"type": "call",
+					"args": [
+						"set",
+						"--",
+						"docker",
+						"\"$@\""
+					]
+				}
+			]
+		},
+		{
+			"type": "if",
+			"cond": [
+				{
+					"type": "stmt",
+					"cmd": {
+						"type": "call",
+						"args": [
+							"docker",
+							"help",
+							"\"$1\""
+						]
+					},
+					"redirs": [
+						{
+							"op": "\u003e",
+							"word": "/dev/null"
+						},
+						{
+							"op": "\u003e\u0026",
+							"word": "1",
+							"n": "2"
+						}
+					]
+				}
+			],
+			"then": [
+				{
+					"type": "call",
+					"args": [
+						"set",
+						"--",
+						"docker",
+						"\"$@\""
+					]
+				}
+			]
+		},
+		{
+			"type": "funcDecl",
+			"name": "_should_tls",
+			"body": {
+				"type": "block",
+				"stmts": [
+					{
+						"type": "binary",
+						"op": "\u0026\u0026",
+						"x": {
+							"type": "binary",
+							"op": "\u0026\u0026",
+							"x": {
+								"type": "binary",
+								"op": "\u0026\u0026",
+								"x": {
+									"type": "call",
+									"args": [
+										"[",
+										"-n",
+										"\"${DOCKER_TLS_CERTDIR:-}\"",
+										"]"
+									]
+								},
+								"y": {
+									"type": "call",
+									"args": [
+										"[",
+										"-s",
+										"\"$DOCKER_TLS_CERTDIR/client/ca.pem\"",
+										"]"
+									]
+								}
+							},
+							"y": {
+								"type": "call",
+								"args": [
+									"[",
+									"-s",
+									"\"$DOCKER_TLS_CERTDIR/client/cert.pem\"",
+									"]"
+								]
+							}
+						},
+						"y": {
+							"type": "call",
+							"args": [
+								"[",
+								"-s",
+								"\"$DOCKER_TLS_CERTDIR/client/key.pem\"",
+								"]"
+							]
+						}
+					}
+				]
+			}
+		},
+		{
+			"type": "if",
+			"cond": [
+				{
+					"type": "binary",
+					"op": "\u0026\u0026",
+					"x": {
+						"type": "call",
+						"args": [
+							"[",
+							"-z",
+							"\"${DOCKER_HOST:-}\"",
+							"]"
+						]
+					},
+					"y": {
+						"type": "call",
+						"args": [
+							"[",
+							"-S",
+							"/var/run/docker.sock",
+							"]"
+						]
+					}
+				}
+			],
+			"then": [
+				{
+					"type": "call",
+					"args": [
+						"export",
+						"DOCKER_HOST=unix:///var/run/docker.sock"
+					]
+				}
+			],
+			"elifs": [
+				{
+					"cond": [
+						{
+							"type": "binary",
+							"op": "\u0026\u0026",
+							"x": {
+								"type": "binary",
+								"op": "\u0026\u0026",
+								"x": {
+									"type": "call",
+									"args": [
+										"[",
+										"-z",
+										"\"${DOCKER_HOST:-}\"",
+										"]"
+									]
+								},
+								"y": {
+									"type": "call",
+									"assigns": [
+										"XDG_RUNTIME_DIR=\"${XDG_RUNTIME_DIR:-/run/user/$(id -u)}\""
+									],
+									"args": []
+								}
+							},
+							"y": {
+								"type": "call",
+								"args": [
+									"[",
+									"-S",
+									"\"$XDG_RUNTIME_DIR/docker.sock\"",
+									"]"
+								]
+							}
+						}
+					],
+					"then": [
+						{
+							"type": "call",
+							"args": [
+								"export",
+								"DOCKER_HOST=\"unix://$XDG_RUNTIME_DIR/docker.sock\""
+							]
+						}
+					]
+				}
+			]
+		},
+		{
+			"type": "if",
+			"cond": [
+				{
+					"type": "call",
+					"args": [
+						"[",
+						"-z",
+						"\"${DOCKER_HOST:-}\"",
+						"]"
+					]
+				}
+			],
+			"then": [
+				{
+					"type": "if",
+					"cond": [
+						{
+							"type": "binary",
+							"op": "||",
+							"x": {
+								"type": "call",
+								"args": [
+									"_should_tls"
+								]
+							},
+							"y": {
+								"type": "call",
+								"args": [
+									"[",
+									"-n",
+									"\"${DOCKER_TLS_VERIFY:-}\"",
+									"]"
+								]
+							}
+						}
+					],
+					"then": [
+						{
+							"type": "call",
+							"args": [
+								"export",
+								"DOCKER_HOST='tcp://docker:2376'"
+							]
+						}
+					],
+					"else": [
+						{
+							"type": "call",
+							"args": [
+								"export",
+								"DOCKER_HOST='tcp://docker:2375'"
+							]
+						}
+					]
+				}
+			]
+		},
+		{
+			"type": "if",
+			"cond": [
+				{
+					"type": "binary",
+					"op": "\u0026\u0026",
+					"x": {
+						"type": "binary",
+						"op": "\u0026\u0026",
+						"x": {
+							"type": "binary",
+							"op": "\u0026\u0026",
+							"x": {
+								"type": "call",
+								"args": [
+									"[",
+									"\"${DOCKER_HOST#tcp:}\"",
+									"!=",
+									"\"$DOCKER_HOST\"",
+									"]"
+								]
+							},
+							"y": {
+								"type": "call",
+								"args": [
+									"[",
+									"-z",
+									"\"${DOCKER_TLS_VERIFY:-}\"",
+									"]"
+								]
+							}
+						},
+						"y": {
+							"type": "call",
+							"args": [
+								"[",
+								"-z",
+								"\"${DOCKER_CERT_PATH:-}\"",
+								"]"
+							]
+						}
+					},
+					"y": {
+						"type": "call",
+						"args": [
+							"_should_tls"
+						]
+					}
+				}
+			],
+			"then": [
+				{
+					"type": "call",
+					"args": [
+						"export",
+						"DOCKER_TLS_VERIFY=1"
+					]
+				},
+				{
+					"type": "call",
+					"args": [
+						"export",
+						"DOCKER_CERT_PATH=\"$DOCKER_TLS_CERTDIR/client\""
+					]
+				}
+			]
+		},
+		{
+			"type": "if",
+			"cond": [
+				{
+					"type": "call",
+					"args": [
+						"[",
+						"\"$1\"",
+						"=",
+						"'dockerd'",
+						"]"
+					]
+				}
+			],
+			"then": [
+				{
+					"type": "stmt",
+					"cmd": {
+						"type": "call",
+						"args": [
+							"cat"
+						]
+					},
+					"redirs": [
+						{
+							"op": "\u003e\u0026",
+							"word": "2"
+						},
+						{
+							"op": "\u003c\u003c-",
+							"word": "'EOW'"
+						}
+					]
+				},
+				{
+					"type": "call",
+					"args": [
+						"sleep",
+						"3"
+					]
+				}
+			]
+		},
+		{
+			"type": "call",
+			"args": [
+				"exec",
+				"\"$@\""
+			]
+		}
+	]
+}
