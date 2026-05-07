@@ -41,7 +41,7 @@ def deploy_objects:
 			else
 				{
 					type: "manifest",
-					refs: [$ref],
+					refs: [ $ref ],
 
 					# add appropriate "lookup" values for copying child objects properly
 					lookup: (
@@ -74,5 +74,5 @@ def deploy_objects:
 			end
 		)
 	)
-	| [.[]] # strip off our synthetic map keys to avoid leaking our implementation detail
+	| [ .[] ] # strip off our synthetic map keys to avoid leaking our implementation detail
 ;

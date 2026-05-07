@@ -175,6 +175,8 @@ eval "items=( $shell )"
 
 `@sh` in jq produces shell-quoted strings safe to `eval`.  `@json` converts values to their JSON string representation before shell-quoting.
 
+The formatter also quotes bare `eval $(...)` to `eval "$(...)"`  — unquoted command substitution in `eval` is almost never correct and causes word-splitting on the output.
+
 Corpus ref: [`debian-bin/repo/buildd.sh#L91-L92`](https://github.com/tianon/debian-bin/blob/d508ea34f15e88b8ac63d71ffb1938fccbc21206/repo/buildd.sh#L91-L92).
 
 ## jq inside YAML `run:` steps
@@ -215,8 +217,10 @@ Corpus ref: [`tianon-dockerfiles/.github/workflows/update.yml#L31-L47`](https://
 When `tianonfmt` formats a shell script, it also reformats any jq expressions it finds inside `jq '...'` invocations:
 
 - **Single-line expressions** are kept on one line and formatted compactly (e.g. quoted object keys are unquoted: `'{"foo": .bar}'` → `'{foo: .bar}'`).
-- **Multi-line expressions** (opening `'` followed by a newline) are reformatted using the same rules as standalone `.jq` files, then re-indented to match the surrounding shell indentation.
+- **Multi-line expressions** (opening `'` followed by a newline) are reformatted using the same rules as standalone `.jq` files, then re-indented to the correct depth.  The indentation is computed from the shell nesting depth of the `jq` call — a call at the top level gets 1-tab content; inside a `for`/`if`/`while` body it gets 2-tab content; etc.  The existing indentation in the source is **not** preserved — it is replaced with the correct depth-based indentation regardless of what was there.
 - If a jq expression cannot be parsed (e.g. it uses unknown syntax), it is left unchanged.
+
+**`--tidy` additionally normalises short jq flags to their long-form equivalents**: `jq -r` → `jq --raw-output`, `jq -c` → `jq --compact-output`, `jq -n` → `jq --null-input`, etc.  (See docs/bash.md for the full flag normalisation rules.)
 
 Detection heuristic: the formatter recognises `jq '...'` calls where the last non-flag, non-value-flag argument is a single-quoted string.  Value flags (`--arg`, `--argjson`, `--slurpfile`, `--rawfile`, `-f`) consume their following arguments and are skipped.  The last remaining single-quoted argument is treated as the filter expression.
 

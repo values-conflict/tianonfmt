@@ -12,6 +12,6 @@ result="$(jq -r '
 	{
 		foo: .foo,
 		bar: .bar,
-		baz: [.items[] | select(.active) | .name],
+		baz: [ .items[] | select(.active) | .name ],
 	}
 ' <<<"$json")"

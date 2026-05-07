@@ -1217,8 +1217,8 @@ func (p *printer) arrayExpr(v *Array) {
 	// be multi-line — `empty` signals that each real element deserves its own
 	// line.  The fixture all-node-types had [.j, .k, empty] on one line, but
 	// that was a mechanical test fixture, not representative of Tianon's style.
-	if elemInline != "" && !strings.Contains(elemInline, "\n") && !commaChainContainsEmpty(v.Elem) && len("["+elemInline+"]") <= shortThreshold {
-		p.write("[" + elemInline + "]")
+	if elemInline != "" && !strings.Contains(elemInline, "\n") && !commaChainContainsEmpty(v.Elem) && len("[ "+elemInline+" ]") <= shortThreshold {
+		p.write("[ " + elemInline + " ]")
 		return
 	}
 	p.write("[")

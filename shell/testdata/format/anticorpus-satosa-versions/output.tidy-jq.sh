@@ -20,7 +20,7 @@ eval "$(
 	curl --silent --show-error https://raw.githubusercontent.com/docker-library/python/master/versions.json \
 		| jq --raw-output '
 			. as $versions
-			| [$versions | keys[] | select(contains("-rc") | not)]
+			| [ $versions | keys[] | select(contains("-rc") | not) ]
 			| sort_by(split(".") | map(tonumber)) | last as $latest
 			| [
 				$versions

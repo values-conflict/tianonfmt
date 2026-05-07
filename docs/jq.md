@@ -286,7 +286,7 @@ Corpus refs: [`tianon-dockerfiles/scratch/multiarch.jq#L5-L16`](https://github.c
 
 ## Array literals
 
-**Inline** when all elements fit within ~60 characters: `["amd64", "arm64"]`.
+**Inline** when all elements fit within ~60 characters: `[ "amd64", "arm64" ]`.  Inline arrays always have a space after `[` and before `]`.
 
 **Multi-line** with one element per line:
 
@@ -499,7 +499,7 @@ Things Tianon **never** does in standalone `.jq` files:
 - Semi-colons at the end of `def` bodies on the same line as the body when the body is multi-line
 - `if` without `end` (the `end` is never omitted, even when following `else`)
 - `reduce`/`foreach` written on a single line when the expression is non-trivial — short expressions that fit comfortably on one line do appear: `reduce .[] as $a ([]; if IN(.[]; $a) then . else . += [$a] end)`
-- Empty `{}` or `[]` with spaces inside: `{ }`, `[ ]` — uses `{}`, `[]`
+- Empty `[]` — uses `[]`, not `[ ]`; only non-empty inline arrays have inner spaces
 - `null` in place of `empty` for "nothing" in generators — `empty` is preferred
 - `not` written as `== false` (always `| not`) — note: `| not` also matches `null`, so the two are not always equivalent; `--tidy` flags `== false`
 - Positive boolean checks written as `== true` — use the expression directly; `--tidy` flags `== true`
