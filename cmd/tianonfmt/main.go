@@ -728,8 +728,10 @@ func aptGetInstallViolation(args string, line int) *jq.Violation {
 		}
 		break
 	}
-	if !strings.Contains(segment, " -y") && !strings.Contains(segment, "\t-y") {
-		return &jq.Violation{Line: line, Msg: `apt-get install missing "-y" flag`}
+	hasYes := strings.Contains(segment, " -y") || strings.Contains(segment, "\t-y") ||
+		strings.Contains(segment, "--yes") || strings.Contains(segment, "--assume-yes")
+	if !hasYes {
+		return &jq.Violation{Line: line, Msg: `apt-get install missing "-y" / "--yes" flag`}
 	}
 	if !strings.Contains(segment, "--no-install-recommends") {
 		return &jq.Violation{Line: line, Msg: `apt-get install missing "--no-install-recommends" flag`}

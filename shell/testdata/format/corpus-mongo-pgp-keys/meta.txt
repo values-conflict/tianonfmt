@@ -1,0 +1,2 @@
+Source: https://github.com/docker-library/mongo/blob/86029db35cb8c8e7ef215e240ae43cb0919bdb33/pgp-keys.sh
+License: Apache-2.0

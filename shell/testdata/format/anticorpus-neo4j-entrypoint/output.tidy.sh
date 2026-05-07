@@ -224,7 +224,7 @@ add_env_setting_to_conf() {
 	local _value=${2}
 	local _neo4j_home=${3}
 
-	if grep -q -F "${_setting}=" "${_neo4j_home}"/conf/neo4j.conf; then
+	if grep -qF "${_setting}=" "${_neo4j_home}"/conf/neo4j.conf; then
 		# Remove any lines containing the setting already
 		sed --in-place "/^${_setting}=.*/d" "${_neo4j_home}"/conf/neo4j.conf
 	fi

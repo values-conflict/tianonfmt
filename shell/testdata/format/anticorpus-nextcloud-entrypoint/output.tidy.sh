@@ -3,7 +3,7 @@ set -Eeuo pipefail
 
 # version_greater A B returns whether A > B
 version_greater() {
-	[ "$(printf '%s\n' "$@" | sort -t '.' -n -k1,1 -k2,2 -k3,3 -k4,4 | head -n 1)" != "$1" ]
+	[ "$(printf '%s\n' "$@" | sort --field-separator '.' -n -k1,1 -k2,2 -k3,3 -k4,4 | head -n 1)" != "$1" ]
 }
 
 # return true if specified directory is empty
@@ -64,8 +64,8 @@ file_env() {
 	local var="$1"
 	local fileVar="${var}_FILE"
 	local def="${2:-}"
-	local varValue=$(env | grep -E "^${var}=" | sed -E -e "s/^${var}=//")
-	local fileVarValue=$(env | grep -E "^${fileVar}=" | sed -E -e "s/^${fileVar}=//")
+	local varValue=$(env | grep -E "^${var}=" | sed --regexp-extended -e "s/^${var}=//")
+	local fileVarValue=$(env | grep -E "^${fileVar}=" | sed --regexp-extended -e "s/^${fileVar}=//")
 	if [ -n "${varValue}" ] && [ -n "${fileVarValue}" ]; then
 		echo >&2 "error: both $var and $fileVar are set (but are exclusive)"
 		exit 1
@@ -82,9 +82,9 @@ file_env() {
 
 get_enabled_apps() {
 	run_as 'php /var/www/html/occ app:list' \
-		| sed -n '/^Enabled:$/,/^Disabled:$/p' \
+		| sed --quiet '/^Enabled:$/,/^Disabled:$/p' \
 		| sed '1d;$d' \
-		| sed -n 's/^  - \([^:]*\):.*/\1/p' \
+		| sed --quiet 's/^  - \([^:]*\):.*/\1/p' \
 		| sort
 }
 

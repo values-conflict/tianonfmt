@@ -1,0 +1,98 @@
+{
+	"type": "shell",
+	"file": "input.sh",
+	"stmts": [
+		{
+			"type": "call",
+			"args": [
+				"set",
+				"-Eeuo",
+				"pipefail"
+			]
+		},
+		{
+			"type": "call",
+			"assigns": [
+				"versions=\"$(jq -r 'keys_unsorted | map(@sh) | join(\" \")' pgp-keys.json)\""
+			],
+			"args": []
+		},
+		{
+			"type": "call",
+			"args": [
+				"eval",
+				"\"set -- $versions\""
+			]
+		},
+		{
+			"type": "call",
+			"assigns": [
+				"json='{}'"
+			],
+			"args": []
+		},
+		{
+			"type": "for",
+			"loop": {
+				"type": "wordIter",
+				"name": "version"
+			},
+			"do": [
+				{
+					"type": "call",
+					"assigns": [
+						"url=\"https://pgp.mongodb.com/server-$version.asc\""
+					],
+					"args": []
+				},
+				{
+					"args": [
+						"version",
+						"url"
+					],
+					"type": "export"
+				},
+				{
+					"type": "call",
+					"assigns": [
+						"fingerprints=\"$(docker run --rm --env url buildpack-deps:bookworm-curl bash -Eeuo pipefail -xc '\n\t\t\twget -O key.asc \"$url\" \u003e\u00262\n\t\t\tgpg --batch --import key.asc \u003e\u00262\n\t\t\tgpg --batch --fingerprint --with-colons | grep \"^fpr:\" | cut -d: -f10\n\t\t'\n)\""
+					],
+					"args": []
+				},
+				{
+					"args": [
+						"fingerprints"
+					],
+					"type": "export"
+				},
+				{
+					"type": "call",
+					"assigns": [
+						"json=\"$(jq \u003c\u003c\u003c\"$json\" -c '\n\t\t.[env.version] = {\n\t\t\turl: env.url,\n\t\t\tfingerprints: (\n\t\t\t\tenv.fingerprints\n\t\t\t\t| rtrimstr(\"\\n\")\n\t\t\t\t| split(\"\\n\")\n\t\t\t),\n\t\t}\n\t')\""
+					],
+					"args": []
+				}
+			]
+		},
+		{
+			"type": "stmt",
+			"cmd": {
+				"type": "call",
+				"args": [
+					"jq",
+					"'\n\tto_entries\n\t| sort_by(.key | split(\".\") | map(tonumber? // .))\n\t| reverse\n\t| from_entries\n'"
+				]
+			},
+			"redirs": [
+				{
+					"op": "\u003c\u003c\u003c",
+					"word": "\"$json\""
+				},
+				{
+					"op": "\u003e",
+					"word": "pgp-keys.json"
+				}
+			]
+		}
+	]
+}

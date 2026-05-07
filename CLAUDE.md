@@ -15,6 +15,10 @@ go tool cover -func=/tmp/cov.out | tail -1
 - `jqNode()` / `nodePos()` one-liner interface-marker methods in `jq/ast.go` — Go's coverage tool shows these as 0% because they are empty `{}` bodies or single-return stubs whose only purpose is interface satisfaction; there is no executable statement to instrument.
 - `templateSeg()` marker methods in `template/template.go` — same reason.
 - `main()` in `cmd/tianonfmt/main.go` — the test harness calls `run()` directly; `main()` is intentionally excluded.
+- `sortFlagsByOrder` `pri < 0` branch in `shell/flags.go` — fires only if a canonical combined-flag group contains a char absent from the order string, which is a configuration error impossible via well-formed input.
+- `preMergeFlags` `fs.hasArg` guard in `shell/flags.go` — fires if a hasArg flag is listed in a command's merge group; current configuration never puts hasArg flags in merge groups.
+- `movePriorityFlags` stable-second-pass exit path in `shell/flags.go` — the outer `for changed` loop's second iteration exits immediately when no further moves are needed; the `changed = false` reset is instrumented but the "nothing to do" steady state is indistinguishable from a fully-covered run.
+- `reorderCombinedGroups` `sorted != flags` branch in `shell/flags.go` — fires only when a command has `order` but no `merge` spec; all current commands with `order` also have `merge`, so `preMergeFlags` already sorts during merge and this branch is unreachable with the current configuration.
 
 If coverage drops, add tests before moving on.  Rechecking after a refactor is not optional — it has caught real regressions in this codebase.
 

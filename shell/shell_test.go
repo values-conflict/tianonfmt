@@ -339,6 +339,465 @@ func TestFormatWithTidy_SetAlreadyCanonical(t *testing.T) {
 	}
 }
 
+// ── normalizeShortFlags edge cases ───────────────────────────────────────────
+
+// ── canonical preservation ────────────────────────────────────────────────────
+
+func TestNormalizeShortFlags_CanonicalGroupPreserved(t *testing.T) {
+	// curl -fsSL: all flags canonical with pairWith constraints satisfied → keep.
+	src := "curl -fsSL https://example.com\n"
+	out, err := shell.FormatWithTidy(src, syntax.LangBash, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, "-fsSL") {
+		t.Errorf("canonical curl -fsSL should be preserved: %q", out)
+	}
+}
+
+func TestNormalizeShortFlags_CanonicalSubsetPreserved(t *testing.T) {
+	// curl -fL: both canonical, no pairWith → keep.
+	src := "curl -fL https://example.com\n"
+	out, err := shell.FormatWithTidy(src, syntax.LangBash, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, "-fL") {
+		t.Errorf("canonical curl -fL should be preserved: %q", out)
+	}
+}
+
+func TestNormalizeShortFlags_PairWithUnsatisfied(t *testing.T) {
+	// curl -sL: -s needs {S,f,L} but S and f are absent → expand.
+	src := "curl -sL https://example.com\n"
+	out, err := shell.FormatWithTidy(src, syntax.LangBash, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(out, "-sL") {
+		t.Errorf("curl -sL (s without S and f) should be expanded: %q", out)
+	}
+	if !strings.Contains(out, "--silent") {
+		t.Errorf("expected --silent in output: %q", out)
+	}
+}
+
+// ── reordering and merging ─────────────────────────────────────────────────────
+
+func TestNormalizeShortFlags_ReorderCombined(t *testing.T) {
+	// curl -Lf: combined but wrong order → reorder to -fL.
+	src := "curl -Lf https://example.com\n"
+	out, err := shell.FormatWithTidy(src, syntax.LangBash, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, "-fL") {
+		t.Errorf("curl -Lf should be reordered to -fL: %q", out)
+	}
+}
+
+func TestNormalizeShortFlags_ReorderFullMnemonic(t *testing.T) {
+	// curl -LSsf: combined wrong order → -fsSL.
+	src := "curl -LSsf https://example.com\n"
+	out, err := shell.FormatWithTidy(src, syntax.LangBash, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, "-fsSL") {
+		t.Errorf("curl -LSsf should be reordered to -fsSL: %q", out)
+	}
+}
+
+func TestNormalizeShortFlags_MergeSeparate(t *testing.T) {
+	// curl -f -s -S -L: four separate flags → merged to -fsSL.
+	src := "curl -f -s -S -L https://example.com\n"
+	out, err := shell.FormatWithTidy(src, syntax.LangBash, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, "-fsSL") {
+		t.Errorf("curl -f -s -S -L should merge to -fsSL: %q", out)
+	}
+}
+
+func TestNormalizeShortFlags_MergeSeparateSubset(t *testing.T) {
+	// curl -f -L: two separate canonical flags → merged to -fL.
+	src := "curl -f -L https://example.com\n"
+	out, err := shell.FormatWithTidy(src, syntax.LangBash, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, "-fL") || strings.Contains(out, "-f -L") {
+		t.Errorf("curl -f -L should merge to -fL: %q", out)
+	}
+}
+
+func TestNormalizeShortFlags_GrepReorderCombined(t *testing.T) {
+	// grep -Eq: v>q>o>E in canonical order, so -qE → -qE (q before E, already correct).
+	// But -Eq → -qE (E was before q, now reordered).
+	src := "grep -Eq 'pattern' file\n"
+	out, err := shell.FormatWithTidy(src, syntax.LangBash, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, "-qE") {
+		t.Errorf("grep -Eq should be reordered to -qE: %q", out)
+	}
+}
+
+func TestNormalizeShortFlags_GrepMergeSeparate(t *testing.T) {
+	// grep -q -E: separate canonical flags → merged to -qE.
+	src := "grep -q -E 'pattern' file\n"
+	out, err := shell.FormatWithTidy(src, syntax.LangBash, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, "-qE") || strings.Contains(out, "-q -E") {
+		t.Errorf("grep -q -E should merge to -qE: %q", out)
+	}
+}
+
+func TestNormalizeShortFlags_GrepMergeFromCombined(t *testing.T) {
+	// grep -oE -v: -v is separate, -oE is combined; all canonical → merge to -voE.
+	src := "grep -oE -v 'pattern' file\n"
+	out, err := shell.FormatWithTidy(src, syntax.LangBash, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, "-voE") {
+		t.Errorf("grep -oE -v should merge to -voE: %q", out)
+	}
+	if strings.Contains(out, "-oE") && strings.Contains(out, "-v ") {
+		t.Errorf("flags should be combined, not separate: %q", out)
+	}
+}
+
+func TestNormalizeShortFlags_GrepPriorityBeforeLong(t *testing.T) {
+	// grep --extended-regexp -v: priority -v should move before --extended-regexp.
+	src := "grep --extended-regexp -v 'pattern' file\n"
+	out, err := shell.FormatWithTidy(src, syntax.LangBash, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	vIdx := strings.Index(out, "-v")
+	eIdx := strings.Index(out, "--extended-regexp")
+	if vIdx < 0 || eIdx < 0 || vIdx > eIdx {
+		t.Errorf("grep -v should appear before --extended-regexp: %q", out)
+	}
+}
+
+func TestNormalizeShortFlags_SeparateNonCanonicalNotMerged(t *testing.T) {
+	// curl -s -L: collected {s,L} but s's pairWith {S,f,L} is incomplete (missing S,f)
+	// → no merge, -s expands to --silent.
+	src := "curl -s -L https://example.com\n"
+	out, err := shell.FormatWithTidy(src, syntax.LangBash, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(out, "-sL") || strings.Contains(out, "-Ls") {
+		t.Errorf("incomplete mnemonic should not be merged: %q", out)
+	}
+	if !strings.Contains(out, "--silent") {
+		t.Errorf("unpaired -s should expand to --silent: %q", out)
+	}
+}
+
+func TestNormalizeShortFlags_MergeResidualChars(t *testing.T) {
+	// curl -Lfo output url: -L and -f are in the merge group; -o is not.
+	// -L and -f should be extracted and merged to -fL; -o stays as a separate arg.
+	src := "curl -Lfo output https://example.com\n"
+	out, err := shell.FormatWithTidy(src, syntax.LangBash, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, "-fL") {
+		t.Errorf("merge-group chars should be extracted and sorted: %q", out)
+	}
+	if !strings.Contains(out, "-o ") {
+		t.Errorf("non-merge-group residual -o should remain: %q", out)
+	}
+}
+
+func TestNormalizeShortFlags_MergeStopsAtEndOfFlags(t *testing.T) {
+	// -- stops pre-merge scanning; -s -S after it are not merged.
+	src := "curl -f -L -- -s -S https://example.com\n"
+	out, err := shell.FormatWithTidy(src, syntax.LangBash, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// -f and -L before -- should merge; -s and -S after are literal args, not flags.
+	if !strings.Contains(out, "-fL") {
+		t.Errorf("flags before -- should be merged: %q", out)
+	}
+	if !strings.Contains(out, "-- -s -S") {
+		t.Errorf("args after -- should be preserved verbatim: %q", out)
+	}
+}
+
+func TestNormalizeShortFlags_PriorityNoPrecedingLongFlag(t *testing.T) {
+	// grep -P -v: -P is not canonical (→ --perl-regexp), leaving -v with no long
+	// flag before it → priority movement is a no-op for that position.
+	src := "grep -P -v 'pattern' file\n"
+	out, err := shell.FormatWithTidy(src, syntax.LangBash, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// After normalization: --perl-regexp -v pattern → -v moved before --perl-regexp.
+	vIdx := strings.Index(out, "-v")
+	pIdx := strings.Index(out, "--perl-regexp")
+	if vIdx < 0 || pIdx < 0 {
+		t.Fatalf("expected -v and --perl-regexp in output: %q", out)
+	}
+	if vIdx > pIdx {
+		t.Errorf("priority -v should precede --perl-regexp: %q", out)
+	}
+}
+
+func TestNormalizeShortFlags_PartialMnemonic(t *testing.T) {
+	// curl -fsS: has f, s, S but missing L → not the full -fsSL mnemonic → expand.
+	src := "curl -fsS https://example.com\n"
+	out, err := shell.FormatWithTidy(src, syntax.LangBash, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(out, "-fsS") {
+		t.Errorf("curl -fsS (missing -L) should be expanded: %q", out)
+	}
+	if !strings.Contains(out, "--silent") {
+		t.Errorf("expected --silent in expanded output: %q", out)
+	}
+}
+
+func TestNormalizeShortFlags_PairWithSingleFlag(t *testing.T) {
+	// curl -s alone: pairWith:S unsatisfied → expand to --silent.
+	src := "curl -s https://example.com\n"
+	out, err := shell.FormatWithTidy(src, syntax.LangBash, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, "--silent") {
+		t.Errorf("lone curl -s should expand to --silent: %q", out)
+	}
+}
+
+func TestNormalizeShortFlags_CanonicalSinglePreserved(t *testing.T) {
+	// grep -v: canonical, no pairWith → keep short.
+	src := "grep -v '^#' file\n"
+	out, err := shell.FormatWithTidy(src, syntax.LangBash, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, "-v") {
+		t.Errorf("canonical grep -v should be preserved: %q", out)
+	}
+}
+
+func TestNormalizeShortFlags_NonCanonicalExpanded(t *testing.T) {
+	// grep -n: not canonical → expand to --line-number.
+	src := "grep -n 'pattern' file\n"
+	out, err := shell.FormatWithTidy(src, syntax.LangBash, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, "--line-number") {
+		t.Errorf("non-canonical grep -n should expand: %q", out)
+	}
+}
+
+func TestNormalizeShortFlags_MixedGroupExpanded(t *testing.T) {
+	// grep -vn: -v canonical but -n is not → whole group expands.
+	src := "grep -vn 'pattern' file\n"
+	out, err := shell.FormatWithTidy(src, syntax.LangBash, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(out, "-vn") {
+		t.Errorf("mixed canonical/non-canonical group should be expanded: %q", out)
+	}
+	if !strings.Contains(out, "--invert-match") {
+		t.Errorf("expected --invert-match in output: %q", out)
+	}
+}
+
+func TestNormalizeShortFlags_AptGetReverseNorm(t *testing.T) {
+	// apt-get --yes → -y (reverse normalization).
+	src := "apt-get install --yes curl\n"
+	out, err := shell.FormatWithTidy(src, syntax.LangBash, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, "-y") {
+		t.Errorf("apt-get --yes should normalize to -y: %q", out)
+	}
+	if strings.Contains(out, "--yes") {
+		t.Errorf("--yes should be replaced by -y: %q", out)
+	}
+}
+
+func TestNormalizeShortFlags_AptGetShortPreserved(t *testing.T) {
+	// apt-get -y: canonical → keep short.
+	src := "apt-get install -y curl\n"
+	out, err := shell.FormatWithTidy(src, syntax.LangBash, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, "-y") {
+		t.Errorf("canonical apt-get -y should be preserved: %q", out)
+	}
+}
+
+func TestNormalizeShortFlags_AptGetNonCanonicalExpanded(t *testing.T) {
+	// apt-get -q: not canonical → expand to --quiet.
+	src := "apt-get -q update\n"
+	out, err := shell.FormatWithTidy(src, syntax.LangBash, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, "--quiet") {
+		t.Errorf("non-canonical apt-get -q should expand to --quiet: %q", out)
+	}
+}
+
+// ── longFirst and longPairs invariants ───────────────────────────────────────
+
+func TestNormalizeShortFlags_GpgBatchAdded(t *testing.T) {
+	// gpg without --batch → --batch inserted at position 1.
+	src := "gpg --verify sig.asc file\n"
+	out, err := shell.FormatWithTidy(src, syntax.LangBash, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, "--batch") {
+		t.Errorf("--batch should be auto-added to gpg: %q", out)
+	}
+	// --batch must be the first argument.
+	batchIdx := strings.Index(out, "--batch")
+	verifyIdx := strings.Index(out, "--verify")
+	if batchIdx > verifyIdx {
+		t.Errorf("--batch must appear before other gpg flags: %q", out)
+	}
+}
+
+func TestNormalizeShortFlags_GpgBatchMovedFirst(t *testing.T) {
+	// gpg with --batch not first → moved to position 1.
+	src := "gpg --verify sig.asc --batch file\n"
+	out, err := shell.FormatWithTidy(src, syntax.LangBash, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	batchIdx := strings.Index(out, "--batch")
+	verifyIdx := strings.Index(out, "--verify")
+	if batchIdx < 0 || verifyIdx < 0 || batchIdx > verifyIdx {
+		t.Errorf("--batch should be moved before --verify: %q", out)
+	}
+}
+
+func TestNormalizeShortFlags_GpgBatchAlreadyFirst(t *testing.T) {
+	// gpg --batch already first → no change.
+	src := "gpg --batch --verify sig.asc file\n"
+	out, err := shell.FormatWithTidy(src, syntax.LangBash, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.HasPrefix(strings.TrimSpace(strings.SplitN(out, "\n", 2)[0]), "gpg --batch") {
+		t.Errorf("gpg --batch already first should be preserved: %q", out)
+	}
+}
+
+func TestNormalizeShortFlags_CurlSilentGetsPeer(t *testing.T) {
+	// curl --silent without --show-error → --show-error added after --silent.
+	src := "curl --silent https://example.com\n"
+	out, err := shell.FormatWithTidy(src, syntax.LangBash, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, "--show-error") {
+		t.Errorf("--show-error should be added when --silent is present: %q", out)
+	}
+	silentIdx := strings.Index(out, "--silent")
+	showErrIdx := strings.Index(out, "--show-error")
+	if silentIdx < 0 || showErrIdx < 0 || showErrIdx < silentIdx {
+		t.Errorf("--show-error should appear after --silent: %q", out)
+	}
+}
+
+func TestNormalizeShortFlags_CurlShowErrorGetsPeer(t *testing.T) {
+	// curl --show-error without --silent → --silent added.
+	src := "curl --show-error https://example.com\n"
+	out, err := shell.FormatWithTidy(src, syntax.LangBash, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, "--silent") {
+		t.Errorf("--silent should be added when --show-error is present: %q", out)
+	}
+}
+
+func TestNormalizeShortFlags_CurlFsSLNoPairAdded(t *testing.T) {
+	// curl -fsSL is canonical (s and S both present) → no peer added.
+	src := "curl -fsSL https://example.com\n"
+	out, err := shell.FormatWithTidy(src, syntax.LangBash, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(out, "--show-error") || strings.Contains(out, "--silent") {
+		t.Errorf("canonical -fsSL should not trigger long-form peer insertion: %q", out)
+	}
+}
+
+// ── end-of-flags and edge cases ───────────────────────────────────────────────
+
+func TestNormalizeShortFlags_EndOfFlags(t *testing.T) {
+	// -- stops flag processing; args after it are left verbatim.
+	src := "jq -r . -- -file\n"
+	out, err := shell.FormatWithTidy(src, syntax.LangBash, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, "--raw-output") {
+		t.Errorf("jq -r should be normalized before --: %q", out)
+	}
+	if !strings.Contains(out, "-- -file") {
+		t.Errorf("-- sentinel and subsequent args should be preserved verbatim: %q", out)
+	}
+}
+
+func TestNormalizeShortFlags_UnknownSingleFlag(t *testing.T) {
+	// jq -Z is not in the table — leave it unchanged.
+	src := "jq -Z '.x'\n"
+	out, err := shell.FormatWithTidy(src, syntax.LangBash, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, "-Z") {
+		t.Errorf("unknown single flag should be preserved: %q", out)
+	}
+}
+
+func TestNormalizeShortFlags_UnknownFlagInGroup(t *testing.T) {
+	// -rZ where Z is not in jq's table — leave the combined flag unchanged.
+	src := "jq -rZ '.x'\n"
+	out, err := shell.FormatWithTidy(src, syntax.LangBash, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, "-rZ") {
+		t.Errorf("combined flag with unknown char should be preserved: %q", out)
+	}
+}
+
+func TestNormalizeShortFlags_HasArgInMiddle(t *testing.T) {
+	// -ef where -e (--regexp, hasArg) is not last — ambiguous, do not expand.
+	src := "grep -ef pattern file\n"
+	out, err := shell.FormatWithTidy(src, syntax.LangBash, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, "-ef") {
+		t.Errorf("combined hasArg-in-middle flag should not be expanded: %q", out)
+	}
+}
+
 // ── FormatRUN with jq callback ────────────────────────────────────────────────
 
 // jqFmtPassthrough returns the expression unchanged — used when we only care

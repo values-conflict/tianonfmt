@@ -1,0 +1,163 @@
+{
+	"type": "shell",
+	"file": "input.sh",
+	"stmts": [
+		{
+			"type": "call",
+			"args": [
+				"set",
+				"-Eeuo",
+				"pipefail"
+			]
+		},
+		{
+			"type": "call",
+			"args": [
+				"shopt",
+				"-s",
+				"nullglob"
+			]
+		},
+		{
+			"type": "call",
+			"args": [
+				"cd",
+				"\"$(dirname \"$(readlink -f \"$BASH_SOURCE\")\")\""
+			]
+		},
+		{
+			"type": "call",
+			"assigns": [
+				"versions=(\"$@\")"
+			],
+			"args": []
+		},
+		{
+			"type": "if",
+			"cond": [
+				{
+					"type": "call",
+					"args": [
+						"[",
+						"${#versions[@]}",
+						"-eq",
+						"0",
+						"]"
+					]
+				}
+			],
+			"then": [
+				{
+					"type": "call",
+					"assigns": [
+						"versions=(*/)"
+					],
+					"args": []
+				},
+				{
+					"type": "call",
+					"assigns": [
+						"json='{}'"
+					],
+					"args": []
+				}
+			],
+			"else": [
+				{
+					"type": "call",
+					"assigns": [
+						"json=\"$(\u003cversions.json)\""
+					],
+					"args": []
+				}
+			]
+		},
+		{
+			"type": "call",
+			"assigns": [
+				"versions=(\"${versions[@]%/}\")"
+			],
+			"args": []
+		},
+		{
+			"type": "call",
+			"args": [
+				"eval",
+				"$(curl -s https://raw.githubusercontent.com/docker-library/python/master/versions.json \\\n\t| jq -r '\n\t\t\t. as $versions\n\t\t\t| [ $versions|keys[] | select(contains(\"-rc\") | not) ] | sort_by(split(\".\") | map(tonumber)) | last as $latest\n\t\t\t| [ $versions | .[$latest].variants[] | select(test(\"alpine3.22|slim-bookworm\")) ] | join(\" \") as $variants\n\t\t\t| @sh \"export python_version=\\($latest) variants=\\($variants)\"\n\t\t'\n)"
+			]
+		},
+		{
+			"type": "for",
+			"loop": {
+				"type": "wordIter",
+				"name": "version",
+				"items": [
+					"\"${versions[@]}\""
+				]
+			},
+			"do": [
+				{
+					"args": [
+						"version"
+					],
+					"type": "export"
+				},
+				{
+					"type": "call",
+					"assigns": [
+						"possibles=(\\\n\t$(\n\t\tgit ls-remote --tags https://github.com/IdentityPython/SATOSA.git \"refs/tags/v${version}.*\" \\\n\t\t\t| sed -r 's!^.*refs/tags/v([0-9a-z.]+).*$!\\1!' \\\n\t\t\t| grep -v -E -- '[a-zA-Z]+' \\\n\t\t\t| sort -ruV\n\t)\n)"
+					],
+					"args": []
+				},
+				{
+					"type": "call",
+					"assigns": [
+						"fullVersion=\"${possibles[0]}\""
+					],
+					"args": []
+				},
+				{
+					"type": "call",
+					"args": [
+						"echo",
+						"\"$version: $fullVersion\""
+					]
+				},
+				{
+					"args": [
+						"fullVersion"
+					],
+					"type": "export"
+				},
+				{
+					"type": "call",
+					"assigns": [
+						"json=\"$(jq \u003c\u003c\u003c\"$json\" -c '\n\t\t.[env.version] = {\n\t\t\tvariants: env.variants | sub(\"slim-\"; \"\") | split(\" \"),\n\t\t\tversion: env.fullVersion,\n\t\t\tpython_version: env.python_version,\n\t\t}\n\t')\""
+					],
+					"args": []
+				}
+			]
+		},
+		{
+			"type": "stmt",
+			"cmd": {
+				"type": "call",
+				"args": [
+					"jq",
+					"-S",
+					"."
+				]
+			},
+			"redirs": [
+				{
+					"op": "\u003c\u003c\u003c",
+					"word": "\"$json\""
+				},
+				{
+					"op": "\u003e",
+					"word": "versions.json"
+				}
+			]
+		}
+	]
+}

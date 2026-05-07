@@ -1,0 +1,554 @@
+{
+	"type": "shell",
+	"file": "input.sh",
+	"stmts": [
+		{
+			"type": "call",
+			"args": [
+				"set",
+				"-Eeuo",
+				"pipefail"
+			]
+		},
+		{
+			"type": "funcDecl",
+			"name": "usage",
+			"body": {
+				"type": "block",
+				"stmts": [
+					{
+						"args": [
+							"self=\"$0\""
+						],
+						"type": "local"
+					},
+					{
+						"type": "call",
+						"assigns": [
+							"self=\"$(basename \"$self\")\""
+						],
+						"args": []
+					},
+					{
+						"type": "call",
+						"args": [
+							"echo",
+							"\"usage: $self repo-dir/\""
+						]
+					}
+				]
+			}
+		},
+		{
+			"type": "funcDecl",
+			"name": "fatal_usage",
+			"body": {
+				"type": "block",
+				"stmts": [
+					{
+						"type": "if",
+						"cond": [
+							{
+								"type": "call",
+								"args": [
+									"[",
+									"\"$#\"",
+									"-gt",
+									"0",
+									"]"
+								]
+							}
+						],
+						"then": [
+							{
+								"type": "stmt",
+								"cmd": {
+									"type": "call",
+									"args": [
+										"echo",
+										"\"error: $*\""
+									]
+								},
+								"redirs": [
+									{
+										"op": "\u003e\u0026",
+										"word": "2"
+									}
+								]
+							},
+							{
+								"type": "stmt",
+								"cmd": {
+									"type": "call",
+									"args": [
+										"echo"
+									]
+								},
+								"redirs": [
+									{
+										"op": "\u003e\u0026",
+										"word": "2"
+									}
+								]
+							}
+						]
+					},
+					{
+						"type": "stmt",
+						"cmd": {
+							"type": "call",
+							"args": [
+								"usage"
+							]
+						},
+						"redirs": [
+							{
+								"op": "\u003e\u0026",
+								"word": "2"
+							}
+						]
+					},
+					{
+						"type": "call",
+						"args": [
+							"exit",
+							"1"
+						]
+					}
+				]
+			}
+		},
+		{
+			"type": "binary",
+			"op": "||",
+			"x": {
+				"type": "call",
+				"args": [
+					"[",
+					"\"$#\"",
+					"-eq",
+					"1",
+					"]"
+				]
+			},
+			"y": {
+				"type": "call",
+				"args": [
+					"fatal_usage",
+					"\"expected 1 argument (got $#)\""
+				]
+			}
+		},
+		{
+			"type": "call",
+			"assigns": [
+				"repo=\"$1\""
+			],
+			"args": []
+		},
+		{
+			"type": "call",
+			"args": [
+				"shift"
+			]
+		},
+		{
+			"type": "call",
+			"args": [
+				"cd",
+				"\"$repo\""
+			]
+		},
+		{
+			"type": "call",
+			"assigns": [
+				"shell=\"$(jq -r '\n\t.suites\n\t| to_entries[]\n\t| .key as $suite\n\t| .value\n\t| .components[]\n\t| $suite + \"/\" + .\n\t| @sh\n' metadata.json)\""
+			],
+			"args": []
+		},
+		{
+			"type": "call",
+			"args": [
+				"eval",
+				"\"process=( $shell )\""
+			]
+		},
+		{
+			"type": "for",
+			"loop": {
+				"type": "wordIter",
+				"name": "p",
+				"items": [
+					"\"${process[@]}\""
+				]
+			},
+			"do": [
+				{
+					"type": "call",
+					"assigns": [
+						"incomingDir=\"incoming/$p\""
+					],
+					"args": []
+				},
+				{
+					"type": "call",
+					"assigns": [
+						"poolBaseDir=\"pool/$p\""
+					],
+					"args": []
+				},
+				{
+					"type": "for",
+					"loop": {
+						"type": "wordIter",
+						"name": "changes",
+						"items": [
+							"\"$incomingDir\"/*.changes",
+							"\"$incomingDir\"/*.dsc"
+						]
+					},
+					"do": [
+						{
+							"type": "binary",
+							"op": "||",
+							"x": {
+								"type": "call",
+								"args": [
+									"[",
+									"-f",
+									"\"$changes\"",
+									"]"
+								]
+							},
+							"y": {
+								"type": "call",
+								"args": [
+									"continue"
+								]
+							}
+						},
+						{
+							"type": "call",
+							"assigns": [
+								"changesJson=\"$(deb822-json \"$changes\" | jq '.[0]')\""
+							],
+							"args": []
+						},
+						{
+							"type": "call",
+							"assigns": [
+								"json=\"$(dsc-extract-checksums \u003c\u003c\u003c\"$changesJson\")\""
+							],
+							"args": []
+						},
+						{
+							"type": "call",
+							"assigns": [
+								"dir=\"$(dirname \"$changes\")\""
+							],
+							"args": []
+						},
+						{
+							"args": [
+								"dir"
+							],
+							"type": "export"
+						},
+						{
+							"type": "if",
+							"cond": [
+								{
+									"type": "stmt",
+									"cmd": {
+										"type": "subshell",
+										"stmts": [
+											{
+												"type": "call",
+												"args": [
+													"set",
+													"-Eeuo",
+													"pipefail"
+												]
+											},
+											{
+												"type": "call",
+												"assigns": [
+													"shell=\"$(jq \u003c\u003c\u003c\"$json\" -r '.[].bashValidate // error(\"missing bashValidate from dsc-extract-checksums!\")')\""
+												],
+												"args": []
+											},
+											{
+												"type": "call",
+												"args": [
+													"[",
+													"-n",
+													"\"$shell\"",
+													"]"
+												]
+											},
+											{
+												"type": "call",
+												"args": [
+													"cd",
+													"\"$dir\""
+												]
+											},
+											{
+												"type": "call",
+												"args": [
+													"eval",
+													"\"$shell\""
+												]
+											}
+										]
+									},
+									"negated": true
+								}
+							],
+							"then": [
+								{
+									"type": "stmt",
+									"cmd": {
+										"type": "call",
+										"args": [
+											"echo",
+											"\"warning: '$changes' appears to be invalid or incomplete! (skipping)\""
+										]
+									},
+									"redirs": [
+										{
+											"op": "\u003e\u0026",
+											"word": "2"
+										}
+									]
+								},
+								{
+									"type": "call",
+									"args": [
+										"continue"
+									]
+								}
+							]
+						},
+						{
+							"type": "call",
+							"assigns": [
+								"files=\"$(jq \u003c\u003c\u003c\"$json\" -r '\n\t\t\tkeys\n\t\t\t| map(env.dir + \"/\" + . | @sh)\n\t\t\t| join (\" \")\n\t\t')\""
+							],
+							"args": []
+						},
+						{
+							"type": "call",
+							"args": [
+								"eval",
+								"\"files=( $files )\""
+							]
+						},
+						{
+							"type": "call",
+							"assigns": [
+								"files+=(\"$changes\")"
+							],
+							"args": []
+						},
+						{
+							"type": "call",
+							"assigns": [
+								"src=\"$(jq \u003c\u003c\u003c\"$changesJson\" -r '.Source')\""
+							],
+							"args": []
+						},
+						{
+							"type": "call",
+							"assigns": [
+								"poolDir=\"$poolBaseDir/$src\""
+							],
+							"args": []
+						},
+						{
+							"type": "call",
+							"assigns": [
+								"toDelete=()"
+							],
+							"args": []
+						},
+						{
+							"type": "call",
+							"assigns": [
+								"toMove=()"
+							],
+							"args": []
+						},
+						{
+							"type": "for",
+							"loop": {
+								"type": "wordIter",
+								"name": "f",
+								"items": [
+									"\"${files[@]}\""
+								]
+							},
+							"do": [
+								{
+									"type": "call",
+									"assigns": [
+										"base=\"$(basename \"$f\")\""
+									],
+									"args": []
+								},
+								{
+									"type": "call",
+									"assigns": [
+										"target=\"$poolDir/$base\""
+									],
+									"args": []
+								},
+								{
+									"type": "if",
+									"cond": [
+										{
+											"type": "call",
+											"args": [
+												"[",
+												"-e",
+												"\"$target\"",
+												"]"
+											]
+										}
+									],
+									"then": [
+										{
+											"type": "if",
+											"cond": [
+												{
+													"type": "stmt",
+													"cmd": {
+														"type": "call",
+														"args": [
+															"diff",
+															"-q",
+															"\"$f\"",
+															"\"$target\""
+														]
+													},
+													"negated": true,
+													"redirs": [
+														{
+															"op": "\u003e",
+															"word": "/dev/null"
+														}
+													]
+												}
+											],
+											"then": [
+												{
+													"type": "stmt",
+													"cmd": {
+														"type": "call",
+														"args": [
+															"echo",
+															"\"warning: '$changes' includes '$base' which already exists at '$target' (and the files are not identical!)\""
+														]
+													},
+													"redirs": [
+														{
+															"op": "\u003e\u0026",
+															"word": "2"
+														}
+													]
+												},
+												{
+													"type": "call",
+													"args": [
+														"continue",
+														"2"
+													]
+												}
+											]
+										},
+										{
+											"type": "call",
+											"assigns": [
+												"toDelete+=(\"$f\")"
+											],
+											"args": []
+										}
+									],
+									"else": [
+										{
+											"type": "call",
+											"assigns": [
+												"toMove+=(\"$f\")"
+											],
+											"args": []
+										}
+									]
+								}
+							]
+						},
+						{
+							"type": "if",
+							"cond": [
+								{
+									"type": "call",
+									"args": [
+										"[",
+										"\"${#toMove[@]}\"",
+										"-gt",
+										"0",
+										"]"
+									]
+								}
+							],
+							"then": [
+								{
+									"type": "call",
+									"args": [
+										"mkdir",
+										"--parents",
+										"--verbose",
+										"\"$poolDir\""
+									]
+								},
+								{
+									"type": "call",
+									"args": [
+										"mv",
+										"--verbose",
+										"--target-directory=\"$poolDir\"",
+										"\"${toMove[@]}\""
+									]
+								}
+							]
+						},
+						{
+							"type": "if",
+							"cond": [
+								{
+									"type": "call",
+									"args": [
+										"[",
+										"\"${#toDelete[@]}\"",
+										"-gt",
+										"0",
+										"]"
+									]
+								}
+							],
+							"then": [
+								{
+									"type": "call",
+									"args": [
+										"rm",
+										"--verbose",
+										"\"${toDelete[@]}\""
+									]
+								}
+							]
+						}
+					]
+				}
+			]
+		}
+	]
+}
