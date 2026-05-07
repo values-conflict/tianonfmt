@@ -1,0 +1,92 @@
+{
+	"type": "shell",
+	"file": "input.sh",
+	"stmts": [
+		{
+			"type": "call",
+			"args": [
+				"set",
+				"-e"
+			]
+		},
+		{
+			"type": "call",
+			"args": [
+				"cd",
+				"\"$(dirname \"$(readlink -f \"$BASH_SOURCE\")\")/artifacts\""
+			]
+		},
+		{
+			"type": "call",
+			"args": [
+				"set",
+				"-x"
+			]
+		},
+		{
+			"type": "call",
+			"args": [
+				"rm",
+				"-f",
+				"*.asc"
+			]
+		},
+		{
+			"type": "for",
+			"loop": {
+				"type": "wordIter",
+				"name": "f",
+				"items": [
+					"gosleep*"
+				]
+			},
+			"do": [
+				{
+					"type": "call",
+					"args": [
+						"gpg",
+						"--output",
+						"\"$f.asc\"",
+						"--detach-sign",
+						"\"$f\""
+					]
+				}
+			]
+		},
+		{
+			"type": "stmt",
+			"cmd": {
+				"type": "call",
+				"args": [
+					"sha256sum",
+					"gosleep*"
+				]
+			},
+			"redirs": [
+				{
+					"op": "\u003e",
+					"word": "SHA256SUMS"
+				}
+			]
+		},
+		{
+			"type": "call",
+			"args": [
+				"gpg",
+				"--output",
+				"SHA256SUMS.asc",
+				"--detach-sign",
+				"SHA256SUMS"
+			]
+		},
+		{
+			"type": "call",
+			"args": [
+				"ls",
+				"-lAFh",
+				"gosleep*",
+				"SHA256SUMS*"
+			]
+		}
+	]
+}

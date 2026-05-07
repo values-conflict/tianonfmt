@@ -1,0 +1,400 @@
+{
+	"type": "shell",
+	"file": "input.sh",
+	"stmts": [
+		{
+			"type": "call",
+			"args": [
+				"set",
+				"-eo",
+				"pipefail"
+			]
+		},
+		{
+			"type": "call",
+			"assigns": [
+				"jqExpression='.results[].name'"
+			],
+			"args": []
+		},
+		{
+			"type": "call",
+			"assigns": [
+				"self=\"$(basename \"$0\")\""
+			],
+			"args": []
+		},
+		{
+			"type": "funcDecl",
+			"name": "usage",
+			"body": {
+				"type": "block",
+				"stmts": [
+					{
+						"type": "stmt",
+						"cmd": {
+							"type": "call",
+							"args": [
+								"cat"
+							]
+						},
+						"redirs": [
+							{
+								"op": "\u003c\u003c-",
+								"word": "EOUSAGE"
+							}
+						]
+					}
+				]
+			}
+		},
+		{
+			"type": "call",
+			"assigns": [
+				"opts=\"$(getopt -o 'h?' --long 'help,jq:' -- \"$@\" || { usage \u003e\u00262 \u0026\u0026 false; })\""
+			],
+			"args": []
+		},
+		{
+			"type": "call",
+			"args": [
+				"eval",
+				"set",
+				"--",
+				"\"$opts\""
+			]
+		},
+		{
+			"type": "while",
+			"cond": [
+				{
+					"type": "call",
+					"args": [
+						"true"
+					]
+				}
+			],
+			"do": [
+				{
+					"type": "call",
+					"assigns": [
+						"flag=\"$1\""
+					],
+					"args": []
+				},
+				{
+					"type": "call",
+					"args": [
+						"shift"
+					]
+				},
+				{
+					"type": "case",
+					"word": "\"$flag\"",
+					"items": [
+						{
+							"patterns": [
+								"--jq"
+							],
+							"stmts": [
+								{
+									"type": "call",
+									"assigns": [
+										"jqExpression=\"$1\""
+									],
+									"args": []
+								},
+								{
+									"type": "call",
+									"args": [
+										"shift"
+									]
+								}
+							]
+						},
+						{
+							"patterns": [
+								"--help",
+								"-h",
+								"'-?'"
+							],
+							"stmts": [
+								{
+									"type": "call",
+									"args": [
+										"usage"
+									]
+								},
+								{
+									"type": "call",
+									"args": [
+										"exit",
+										"0"
+									]
+								}
+							]
+						},
+						{
+							"patterns": [
+								"--"
+							],
+							"stmts": [
+								{
+									"type": "call",
+									"args": [
+										"break"
+									]
+								}
+							]
+						},
+						{
+							"patterns": [
+								"*"
+							],
+							"stmts": [
+								{
+									"type": "stmt",
+									"cmd": {
+										"type": "block",
+										"stmts": [
+											{
+												"type": "call",
+												"args": [
+													"echo",
+													"\"error: unknown flag: $flag\""
+												]
+											},
+											{
+												"type": "call",
+												"args": [
+													"usage"
+												]
+											}
+										]
+									},
+									"redirs": [
+										{
+											"op": "\u003e\u0026",
+											"word": "2"
+										}
+									]
+								},
+								{
+									"type": "call",
+									"args": [
+										"exit",
+										"1"
+									]
+								}
+							]
+						}
+					]
+				}
+			]
+		},
+		{
+			"type": "if",
+			"cond": [
+				{
+					"type": "call",
+					"args": [
+						"[",
+						"\"$#\"",
+						"-eq",
+						"0",
+						"]"
+					]
+				}
+			],
+			"then": [
+				{
+					"type": "stmt",
+					"cmd": {
+						"type": "call",
+						"args": [
+							"echo",
+							"'error: expected at lease one \"repo\" argument'"
+						]
+					},
+					"redirs": [
+						{
+							"op": "\u003e\u0026",
+							"word": "2"
+						}
+					]
+				},
+				{
+					"type": "stmt",
+					"cmd": {
+						"type": "call",
+						"args": [
+							"usage"
+						]
+					},
+					"redirs": [
+						{
+							"op": "\u003e\u0026",
+							"word": "2"
+						}
+					]
+				},
+				{
+					"type": "call",
+					"args": [
+						"exit",
+						"1"
+					]
+				}
+			]
+		},
+		{
+			"type": "funcDecl",
+			"name": "_all",
+			"body": {
+				"type": "block",
+				"stmts": [
+					{
+						"args": [
+							"repo=\"$1\""
+						],
+						"type": "local"
+					},
+					{
+						"type": "call",
+						"args": [
+							"shift"
+						]
+					},
+					{
+						"args": [
+							"nextPage=\"https://hub.docker.com/v2/repositories/${repo}/tags/?page_size=100\""
+						],
+						"type": "local"
+					},
+					{
+						"type": "while",
+						"cond": [
+							{
+								"type": "call",
+								"args": [
+									"true"
+								]
+							}
+						],
+						"do": [
+							{
+								"args": [
+									"page=\"$(curl -fsSL \"$nextPage\")\""
+								],
+								"type": "local"
+							},
+							{
+								"type": "binary",
+								"op": "||",
+								"x": {
+									"type": "call",
+									"args": [
+										"[",
+										"\"$(echo \"$page\" | jq --raw-output '.results | length')\"",
+										"-gt",
+										"0",
+										"]"
+									]
+								},
+								"y": {
+									"type": "call",
+									"args": [
+										"break"
+									]
+								}
+							},
+							{
+								"type": "binary",
+								"op": "|",
+								"x": {
+									"type": "call",
+									"args": [
+										"echo",
+										"\"$page\""
+									]
+								},
+								"y": {
+									"type": "call",
+									"args": [
+										"jq",
+										"--raw-output",
+										"\"$jqExpression\""
+									]
+								}
+							},
+							{
+								"type": "call",
+								"assigns": [
+									"nextPage=\"$(echo \"$page\" | jq --raw-output '.next')\""
+								],
+								"args": []
+							},
+							{
+								"type": "binary",
+								"op": "||",
+								"x": {
+									"type": "call",
+									"args": [
+										"[",
+										"\"$nextPage\"",
+										"!=",
+										"'null'",
+										"]"
+									]
+								},
+								"y": {
+									"type": "call",
+									"args": [
+										"break"
+									]
+								}
+							}
+						]
+					}
+				]
+			}
+		},
+		{
+			"type": "while",
+			"cond": [
+				{
+					"type": "call",
+					"args": [
+						"[",
+						"\"$#\"",
+						"-gt",
+						"0",
+						"]"
+					]
+				}
+			],
+			"do": [
+				{
+					"type": "call",
+					"assigns": [
+						"repo=\"$1\""
+					],
+					"args": []
+				},
+				{
+					"type": "call",
+					"args": [
+						"shift"
+					]
+				},
+				{
+					"type": "call",
+					"args": [
+						"_all",
+						"\"$repo\""
+					]
+				}
+			]
+		}
+	]
+}

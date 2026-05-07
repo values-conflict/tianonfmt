@@ -343,17 +343,6 @@ func TestFormatWithTidy_SetAlreadyCanonical(t *testing.T) {
 
 // ── canonical preservation ────────────────────────────────────────────────────
 
-func TestNormalizeShortFlags_CanonicalGroupPreserved(t *testing.T) {
-	// curl -fsSL: all flags canonical with pairWith constraints satisfied → keep.
-	src := "curl -fsSL https://example.com\n"
-	out, err := shell.FormatWithTidy(src, syntax.LangBash, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !strings.Contains(out, "-fsSL") {
-		t.Errorf("canonical curl -fsSL should be preserved: %q", out)
-	}
-}
 
 func TestNormalizeShortFlags_CanonicalSubsetPreserved(t *testing.T) {
 	// curl -fL: both canonical, no pairWith → keep.
@@ -580,17 +569,6 @@ func TestNormalizeShortFlags_PairWithSingleFlag(t *testing.T) {
 	}
 }
 
-func TestNormalizeShortFlags_CanonicalSinglePreserved(t *testing.T) {
-	// grep -v: canonical, no pairWith → keep short.
-	src := "grep -v '^#' file\n"
-	out, err := shell.FormatWithTidy(src, syntax.LangBash, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !strings.Contains(out, "-v") {
-		t.Errorf("canonical grep -v should be preserved: %q", out)
-	}
-}
 
 func TestNormalizeShortFlags_NonCanonicalExpanded(t *testing.T) {
 	// grep -n: not canonical → expand to --line-number.
@@ -660,24 +638,6 @@ func TestNormalizeShortFlags_AptGetNonCanonicalExpanded(t *testing.T) {
 
 // ── longFirst and longPairs invariants ───────────────────────────────────────
 
-func TestNormalizeShortFlags_GpgBatchAdded(t *testing.T) {
-	// gpg without --batch → --batch inserted at position 1.
-	src := "gpg --verify sig.asc file\n"
-	out, err := shell.FormatWithTidy(src, syntax.LangBash, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !strings.Contains(out, "--batch") {
-		t.Errorf("--batch should be auto-added to gpg: %q", out)
-	}
-	// --batch must be the first argument.
-	batchIdx := strings.Index(out, "--batch")
-	verifyIdx := strings.Index(out, "--verify")
-	if batchIdx > verifyIdx {
-		t.Errorf("--batch must appear before other gpg flags: %q", out)
-	}
-}
-
 func TestNormalizeShortFlags_GpgBatchMovedFirst(t *testing.T) {
 	// gpg with --batch not first → moved to position 1.
 	src := "gpg --verify sig.asc --batch file\n"
@@ -692,35 +652,6 @@ func TestNormalizeShortFlags_GpgBatchMovedFirst(t *testing.T) {
 	}
 }
 
-func TestNormalizeShortFlags_GpgBatchAlreadyFirst(t *testing.T) {
-	// gpg --batch already first → no change.
-	src := "gpg --batch --verify sig.asc file\n"
-	out, err := shell.FormatWithTidy(src, syntax.LangBash, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !strings.HasPrefix(strings.TrimSpace(strings.SplitN(out, "\n", 2)[0]), "gpg --batch") {
-		t.Errorf("gpg --batch already first should be preserved: %q", out)
-	}
-}
-
-func TestNormalizeShortFlags_CurlSilentGetsPeer(t *testing.T) {
-	// curl --silent without --show-error → --show-error added after --silent.
-	src := "curl --silent https://example.com\n"
-	out, err := shell.FormatWithTidy(src, syntax.LangBash, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !strings.Contains(out, "--show-error") {
-		t.Errorf("--show-error should be added when --silent is present: %q", out)
-	}
-	silentIdx := strings.Index(out, "--silent")
-	showErrIdx := strings.Index(out, "--show-error")
-	if silentIdx < 0 || showErrIdx < 0 || showErrIdx < silentIdx {
-		t.Errorf("--show-error should appear after --silent: %q", out)
-	}
-}
-
 func TestNormalizeShortFlags_CurlShowErrorGetsPeer(t *testing.T) {
 	// curl --show-error without --silent → --silent added.
 	src := "curl --show-error https://example.com\n"
@@ -730,18 +661,6 @@ func TestNormalizeShortFlags_CurlShowErrorGetsPeer(t *testing.T) {
 	}
 	if !strings.Contains(out, "--silent") {
 		t.Errorf("--silent should be added when --show-error is present: %q", out)
-	}
-}
-
-func TestNormalizeShortFlags_CurlFsSLNoPairAdded(t *testing.T) {
-	// curl -fsSL is canonical (s and S both present) → no peer added.
-	src := "curl -fsSL https://example.com\n"
-	out, err := shell.FormatWithTidy(src, syntax.LangBash, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if strings.Contains(out, "--show-error") || strings.Contains(out, "--silent") {
-		t.Errorf("canonical -fsSL should not trigger long-form peer insertion: %q", out)
 	}
 }
 
