@@ -52,6 +52,9 @@ func TestFormat(t *testing.T) {
 		{Out: "output.format-jq.sh", Fn: func(src string) (string, error) {
 			return shell.Format(src, shell.DetectLang(src), realJQFmt)
 		}, Idem: true},
+		{Out: "output.tidy-jq.sh", Fn: func(src string) (string, error) {
+			return shell.FormatWithTidy(src, shell.DetectLang(src), realJQFmt)
+		}, Idem: true},
 		{Out: "ast.json", Fn: func(src string) (string, error) {
 			f, err := shell.ParseFile(src, shell.DetectLang(src))
 			if err != nil {
@@ -336,6 +339,44 @@ func TestFormatWithTidy_SetAlreadyCanonical(t *testing.T) {
 	}
 	if !strings.Contains(out, "set -Eeuo pipefail") {
 		t.Errorf("canonical form should be preserved: %q", out)
+	}
+}
+
+// ── quoteEvalArgs ─────────────────────────────────────────────────────────────
+
+func TestQuoteEvalArgs_BareCmdSubst(t *testing.T) {
+	// eval $(...) → eval "$(...)": bare CmdSubst gets double-quoted.
+	src := "eval $(jq -r .foo versions.json)\n"
+	out, err := shell.Format(src, syntax.LangBash, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, `eval "$(`) {
+		t.Errorf("eval $(...) should be quoted to eval \"$(...)\": %q", out)
+	}
+}
+
+func TestQuoteEvalArgs_AlreadyQuoted(t *testing.T) {
+	// eval "$(...)": already double-quoted → unchanged.
+	src := "eval \"$(jq -r .foo versions.json)\"\n"
+	out, err := shell.Format(src, syntax.LangBash, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, `eval "$(`) {
+		t.Errorf("already-quoted eval should be preserved: %q", out)
+	}
+}
+
+func TestQuoteEvalArgs_StringArg(t *testing.T) {
+	// eval "string $var": plain string arg (not a bare CmdSubst) → unchanged.
+	src := "eval \"set -- $versions\"\n"
+	out, err := shell.Format(src, syntax.LangBash, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(out, `"eval`) || !strings.Contains(out, `eval "set`) {
+		t.Errorf("string arg to eval should be unchanged: %q", out)
 	}
 }
 

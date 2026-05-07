@@ -16,8 +16,7 @@ else
 fi
 versions=("${versions[@]%/}")
 
-# determine latest Python container version and supported variants
-eval $(
+eval "$(
 	curl --silent --show-error https://raw.githubusercontent.com/docker-library/python/master/versions.json \
 		| jq --raw-output '
 			. as $versions
@@ -25,7 +24,7 @@ eval $(
 			| [ $versions | .[$latest].variants[] | select(test("alpine3.22|slim-bookworm")) ] | join(" ") as $variants
 			| @sh "export python_version=\($latest) variants=\($variants)"
 		'
-)
+)" # determine latest Python container version and supported variants
 
 for version in "${versions[@]}"; do
 	export version

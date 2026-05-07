@@ -1,0 +1,343 @@
+{
+	"type": "shell",
+	"file": "input.sh",
+	"stmts": [
+		{
+			"type": "call",
+			"args": [
+				"set",
+				"-Eeuo",
+				"pipefail"
+			]
+		},
+		{
+			"type": "if",
+			"cond": [
+				{
+					"type": "call",
+					"args": [
+						"[",
+						"!",
+						"-f",
+						"versions.json",
+						"]"
+					]
+				}
+			],
+			"then": [
+				{
+					"type": "call",
+					"args": [
+						"echo",
+						"run",
+						"\\\"versions.sh\\\"",
+						"first"
+					]
+				},
+				{
+					"type": "call",
+					"args": [
+						"exit",
+						"1"
+					]
+				}
+			]
+		},
+		{
+			"type": "call",
+			"assigns": [
+				"jqt='.jq-template.awk'"
+			],
+			"args": []
+		},
+		{
+			"type": "if",
+			"cond": [
+				{
+					"type": "call",
+					"args": [
+						"[",
+						"-n",
+						"\"${BASHBREW_SCRIPTS:-}\"",
+						"]"
+					]
+				}
+			],
+			"then": [
+				{
+					"type": "call",
+					"assigns": [
+						"jqt=\"$BASHBREW_SCRIPTS/jq-template.awk\""
+					],
+					"args": []
+				}
+			],
+			"elifs": [
+				{
+					"cond": [
+						{
+							"type": "call",
+							"args": [
+								"[",
+								"\"$BASH_SOURCE\"",
+								"-nt",
+								"\"$jqt\"",
+								"]"
+							]
+						}
+					],
+					"then": [
+						{
+							"type": "call",
+							"args": [
+								"wget",
+								"-qO",
+								"\"$jqt\"",
+								"'https://github.com/docker-library/bashbrew/raw/1da7341a79651d28fbcc3d14b9176593c4231942/scripts/jq-template.awk'"
+							]
+						}
+					]
+				}
+			]
+		},
+		{
+			"type": "if",
+			"cond": [
+				{
+					"type": "call",
+					"args": [
+						"[",
+						"\"$#\"",
+						"-eq",
+						"0",
+						"]"
+					]
+				}
+			],
+			"then": [
+				{
+					"type": "call",
+					"assigns": [
+						"versions=\"$(jq -r 'keys | map(@sh) | join(\" \")' versions.json)\""
+					],
+					"args": []
+				},
+				{
+					"type": "call",
+					"args": [
+						"eval",
+						"\"set -- $versions\""
+					]
+				}
+			]
+		},
+		{
+			"type": "funcDecl",
+			"name": "generated_warning",
+			"body": {
+				"type": "block",
+				"stmts": [
+					{
+						"type": "stmt",
+						"cmd": {
+							"type": "call",
+							"args": [
+								"cat"
+							]
+						},
+						"redirs": [
+							{
+								"op": "\u003c\u003c-",
+								"word": "EOH"
+							}
+						]
+					}
+				]
+			}
+		},
+		{
+			"type": "for",
+			"loop": {
+				"type": "wordIter",
+				"name": "version"
+			},
+			"do": [
+				{
+					"args": [
+						"version"
+					],
+					"type": "export"
+				},
+				{
+					"type": "call",
+					"args": [
+						"rm",
+						"-rf",
+						"\"$version/\""
+					]
+				},
+				{
+					"type": "call",
+					"args": [
+						"eval",
+						"$(jq -r '@sh \"export python_version=\\(.[env.version].python_version)\"' versions.json)"
+					]
+				},
+				{
+					"type": "call",
+					"assigns": [
+						"variants=\"$(jq -r '.[env.version].variants | map(@sh) | join(\" \")' versions.json)\""
+					],
+					"args": []
+				},
+				{
+					"type": "call",
+					"args": [
+						"eval",
+						"\"variants=( $variants )\""
+					]
+				},
+				{
+					"type": "for",
+					"loop": {
+						"type": "wordIter",
+						"name": "dir",
+						"items": [
+							"\"${variants[@]}\""
+						]
+					},
+					"do": [
+						{
+							"type": "call",
+							"assigns": [
+								"variant=\"$(basename \"$dir\")\""
+							],
+							"args": []
+						},
+						{
+							"args": [
+								"variant"
+							],
+							"type": "export"
+						},
+						{
+							"type": "case",
+							"word": "\"$dir\"",
+							"items": [
+								{
+									"patterns": [
+										"windows/*"
+									],
+									"stmts": [
+										{
+											"type": "call",
+											"assigns": [
+												"windowsVariant=\"${variant%%-*}\""
+											],
+											"args": []
+										},
+										{
+											"type": "call",
+											"assigns": [
+												"windowsRelease=\"${variant#$windowsVariant-}\""
+											],
+											"args": []
+										},
+										{
+											"type": "call",
+											"assigns": [
+												"windowsVariant=\"${windowsVariant#windows}\""
+											],
+											"args": []
+										},
+										{
+											"args": [
+												"windowsVariant",
+												"windowsRelease"
+											],
+											"type": "export"
+										},
+										{
+											"type": "call",
+											"assigns": [
+												"template='Dockerfile-windows.template'"
+											],
+											"args": []
+										}
+									]
+								},
+								{
+									"patterns": [
+										"*"
+									],
+									"stmts": [
+										{
+											"type": "call",
+											"assigns": [
+												"template='Dockerfile-linux.template'"
+											],
+											"args": []
+										}
+									]
+								}
+							]
+						},
+						{
+							"type": "call",
+							"args": [
+								"echo",
+								"\"processing $version/$dir ...\""
+							]
+						},
+						{
+							"type": "call",
+							"args": [
+								"mkdir",
+								"-p",
+								"\"$version/$dir\""
+							]
+						},
+						{
+							"type": "stmt",
+							"cmd": {
+								"type": "block",
+								"stmts": [
+									{
+										"type": "call",
+										"args": [
+											"generated_warning"
+										]
+									},
+									{
+										"type": "call",
+										"args": [
+											"gawk",
+											"-f",
+											"\"$jqt\"",
+											"\"$template\""
+										]
+									}
+								]
+							},
+							"redirs": [
+								{
+									"op": "\u003e",
+									"word": "\"$version/$dir/Dockerfile\""
+								}
+							]
+						},
+						{
+							"type": "call",
+							"args": [
+								"cp",
+								"-a",
+								"docker-entrypoint.sh",
+								"\"$version/$dir/\""
+							]
+						}
+					]
+				}
+			]
+		}
+	]
+}

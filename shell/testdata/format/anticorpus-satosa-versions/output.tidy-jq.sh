@@ -17,8 +17,8 @@ fi
 versions=("${versions[@]%/}")
 
 eval "$(
-	curl -s https://raw.githubusercontent.com/docker-library/python/master/versions.json \
-		| jq -r '
+	curl --silent --show-error https://raw.githubusercontent.com/docker-library/python/master/versions.json \
+		| jq --raw-output '
 			. as $versions
 			| [$versions | keys[] | select(contains("-rc") | not)]
 			| sort_by(split(".") | map(tonumber)) | last as $latest
@@ -40,7 +40,7 @@ for version in "${versions[@]}"; do
 		$(
 			git ls-remote --tags https://github.com/IdentityPython/SATOSA.git "refs/tags/v${version}.*" \
 				| sed -r 's!^.*refs/tags/v([0-9a-z.]+).*$!\1!' \
-				| grep -v -E -- '[a-zA-Z]+' \
+				| grep -vE -- '[a-zA-Z]+' \
 				| sort -ruV
 		)
 	)
@@ -51,7 +51,7 @@ for version in "${versions[@]}"; do
 	# generate the versions.json entry for this SATOSA release
 	echo "$version: $fullVersion"
 	export fullVersion
-	json="$(jq <<<"$json" -c '
+	json="$(jq <<<"$json" --compact-output '
 		.[env.version] = {
 			variants: env.variants | sub("slim-"; "") | split(" "),
 			version: env.fullVersion,
@@ -60,4 +60,4 @@ for version in "${versions[@]}"; do
 	')"
 done
 
-jq <<<"$json" -S . >versions.json
+jq <<<"$json" --sort-keys . >versions.json

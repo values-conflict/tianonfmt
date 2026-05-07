@@ -1,0 +1,28 @@
+{
+	"type": "shell",
+	"file": "input.sh",
+	"stmts": [
+		{
+			"type": "call",
+			"args": [
+				"set",
+				"-Eeuo",
+				"pipefail"
+			]
+		},
+		{
+			"type": "call",
+			"assigns": [
+				"var=\"$(jq -r '\n    .foo\n    | .bar\n' \u003c\u003c\u003c\"$input\")\""
+			],
+			"args": []
+		},
+		{
+			"type": "call",
+			"assigns": [
+				"result=\"$(jq -r '\n    {foo:.foo,bar:.bar,baz:[.items[]|select(.active)|.name]}\n' \u003c\u003c\u003c\"$json\")\""
+			],
+			"args": []
+		}
+	]
+}
