@@ -156,6 +156,23 @@ else
 end
 ```
 
+**Complex condition form**: when the condition itself requires multiple lines (e.g. it contains a generator using the `empty` trailing-comma idiom, or a deeply nested function call that cannot fit on one line), `if` goes on its own line, the condition is indented one tab, and `then` has its own line:
+
+```jq
+if
+	any(.items[]; (
+		"prefix-a/",
+		"prefix-b/",
+		empty
+	) as $p | startswith($p))
+	| not
+then
+	.filtered
+end
+```
+
+The distinguishing trigger is whether the condition itself would need a newline to render — if it renders on a single line, `if CONDITION then` stays compact.  This is the same "fits inline?" heuristic used everywhere else.  The same rule applies to `elif`.
+
 **When `then` is multi-line, `else` must also be multi-line.**  If the `then` body spans multiple lines (e.g. because it has a leading comment before its value, producing a comment line + value line), the `else` branch must also be fully multi-line — not the short `else VALUE end` form.  The reason is visual symmetry: once the `then` body fills more than one line, collapsing the `else` onto a single line looks inconsistent:
 
 ```jq

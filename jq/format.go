@@ -863,6 +863,35 @@ func (p *printer) binOp(v *BinOp) {
 	}
 }
 
+// writeIfClause writes an `if COND then` or `elif COND then` clause.
+// When the condition renders multi-line the keyword and `then` each get their
+// own line:
+//
+//	if
+//		COMPLEX_CONDITION
+//	then
+//
+// When the condition is single-line the compact form is used:
+//
+//	if SIMPLE_COND then
+func (p *printer) writeIfClause(keyword string, cond Node) {
+	condInline := p.inlineSafe(cond)
+	if condInline == "" || strings.Contains(condInline, "\n") {
+		// Multi-line condition: keyword and then on their own lines.
+		p.write(keyword)
+		p.indent()
+		p.newline()
+		p.node(cond)
+		p.dedent()
+		p.newline()
+		p.write("then")
+	} else {
+		p.write(keyword + " ")
+		p.node(cond)
+		p.write(" then")
+	}
+}
+
 // ifExpr formats if/then/else/end.
 // Inline when everything fits; multi-line otherwise.
 // Style refs: dpkg-version.jq:22-29 (multi), :35 (inline); deb822.jq:18-35
@@ -909,9 +938,7 @@ func (p *printer) ifExpr(v *IfExpr) {
 		p.writeln(c.Text)
 		p.write(p.tab())
 	}
-	p.write("if ")
-	p.node(cond)
-	p.write(" then")
+	p.writeIfClause("if", cond)
 	p.indent()
 	p.newline()
 	p.node(v.Then)
@@ -919,9 +946,7 @@ func (p *printer) ifExpr(v *IfExpr) {
 
 	for _, ei := range v.ElseIfs {
 		p.newline()
-		p.write("elif ")
-		p.node(ei.Cond)
-		p.write(" then")
+		p.writeIfClause("elif", ei.Cond)
 		p.indent()
 		p.newline()
 		p.node(ei.Then)

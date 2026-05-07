@@ -1,0 +1,64 @@
+{
+	"type": "jq",
+	"query": {
+		"type": "if",
+		"cond": {
+			"type": "pipe",
+			"left": {
+				"type": "call",
+				"name": "any",
+				"args": [
+					{
+						"type": "identity"
+					},
+					{
+						"type": "as",
+						"expr": {
+							"type": "paren",
+							"expr": {
+								"type": "comma",
+								"left": {
+									"type": "comma",
+									"left": {
+										"type": "string",
+										"raw": "\"prefix-a/\""
+									},
+									"right": {
+										"type": "string",
+										"raw": "\"prefix-b/\""
+									}
+								},
+								"right": {
+									"type": "call",
+									"name": "empty"
+								}
+							}
+						},
+						"pattern": {
+							"type": "var",
+							"name": "$p"
+						},
+						"body": {
+							"type": "call",
+							"name": "startswith",
+							"args": [
+								{
+									"type": "var",
+									"name": "$p"
+								}
+							]
+						}
+					}
+				]
+			},
+			"right": {
+				"type": "call",
+				"name": "not"
+			}
+		},
+		"then": {
+			"type": "field",
+			"name": ".items"
+		}
+	}
+}
