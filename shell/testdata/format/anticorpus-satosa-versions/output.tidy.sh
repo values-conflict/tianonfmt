@@ -45,7 +45,7 @@ for version in "${versions[@]}"; do
 	# generate the versions.json entry for this SATOSA release
 	echo "$version: $fullVersion"
 	export fullVersion
-	json="$(jq <<< "$json" --compact-output '
+	json="$(jq <<<"$json" --compact-output '
 		.[env.version] = {
 			variants: env.variants | sub("slim-"; "") | split(" "),
 			version: env.fullVersion,
@@ -54,4 +54,4 @@ for version in "${versions[@]}"; do
 	')"
 done
 
-jq <<< "$json" --sort-keys . > versions.json
+jq <<<"$json" --sort-keys . > versions.json

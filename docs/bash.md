@@ -97,7 +97,7 @@ The Bash-specific features that *are* used deliberately:
 - **Arrays** (`variants=( ... )`, `${array[@]}`) — considered worth the Bash dependency
 - **`$BASH_SOURCE`** — required for correct self-location when a script may be `source`d
 - **`set -Eeuo pipefail`** — `-E` and `-o pipefail` are Bash extensions; `-E` in particular makes trap inheritance reliable
-- **Here-strings** (`<<<`) — cleaner than a pipe from `echo` and avoids a subshell
+- **Here-strings** (`<<<`) — always written **cuddled** with the following word: `<<<"$var"` not `<<< "$var"`.  The content is semantically attached to the operator with no separation.
 - **`shopt`** — for `dotglob`, `nullglob`, etc. when needed
 - **`local`** — used freely (supported by BusyBox and dash; see above)
 
@@ -432,6 +432,25 @@ if \
 ```
 
 Short chains naturally stay on one line: `git remote remove origin || :`.
+
+### Positional parameter consumption: `var="$1"; shift`
+
+When a function or script reads a positional parameter into a variable and immediately shifts, the assignment and `shift` live on **one line** separated by `; `:
+
+```bash
+repo="$1"; shift
+arch="$1"; shift
+
+foo() {
+	local dist="$1"; shift
+	local suite="$1"; shift
+	…
+}
+```
+
+The `;` makes the semantic coupling visible: "consume `$1` into `repo`, then discard it".  Splitting onto two separate lines hides this relationship.  The formatter enforces this automatically.
+
+Corpus refs: [`debian-bin/repo/buildd.sh#L19-L32`](https://github.com/tianon/debian-bin/blob/d508ea34f15e88b8ac63d71ffb1938fccbc21206/repo/buildd.sh#L19-L32), [`debian-bin/repo/needs-build.sh#L19-L22`](https://github.com/tianon/debian-bin/blob/d508ea34f15e88b8ac63d71ffb1938fccbc21206/repo/needs-build.sh#L19-L22).
 
 The corpus contains zero examples of `&&` or `||` at the end of a line before a continuation.
 

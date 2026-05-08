@@ -85,8 +85,8 @@ for dir in "${directories[@]}"; do
 	dockerfile="$(git show "$commit:$dir/Dockerfile")"
 
 	# extract "FROM" and "GROOVY_VERSION" from Dockerfile
-	from="$(awk <<< "$dockerfile" 'toupper($1) == "FROM" { print $2; exit }')"
-	version="$(awk <<< "$dockerfile" -F '[=[:space:]]+' 'toupper($1) == "ENV" && $2 == "GROOVY_VERSION" { print $3; exit }')"
+	from="$(awk <<<"$dockerfile" 'toupper($1) == "FROM" { print $2; exit }')"
+	version="$(awk <<<"$dockerfile" -F '[=[:space:]]+' 'toupper($1) == "ENV" && $2 == "GROOVY_VERSION" { print $3; exit }')"
 	# add a patch version of 0 if missing
 	if [[ "$version" =~ ^[0-9]+\.[0-9]+$ ]]; then
 		version="${version}.0"

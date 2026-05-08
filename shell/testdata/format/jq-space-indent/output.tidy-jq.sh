@@ -5,7 +5,7 @@ set -Eeuo pipefail
 var="$(jq --raw-output '
 	.foo
 	| .bar
-' <<< "$input")"
+' <<<"$input")"
 
 # Complex expression: reformatted by jq formatter — space indent normalised to tabs.
 result="$(jq --raw-output '
@@ -14,4 +14,4 @@ result="$(jq --raw-output '
 		bar: .bar,
 		baz: [ .items[] | select(.active) | .name ],
 	}
-' <<< "$json")"
+' <<<"$json")"

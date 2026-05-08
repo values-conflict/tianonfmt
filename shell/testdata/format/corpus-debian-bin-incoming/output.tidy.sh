@@ -16,8 +16,7 @@ fatal_usage() {
 }
 [ "$#" -eq 1 ] || fatal_usage "expected 1 argument (got $#)"
 
-repo="$1"
-shift
+repo="$1"; shift
 cd "$repo"
 
 shell="$(jq --raw-output '
@@ -39,13 +38,13 @@ for p in "${process[@]}"; do
 
 		changesJson="$(deb822-json "$changes" | jq '.[0]')"
 
-		json="$(dsc-extract-checksums <<< "$changesJson")"
+		json="$(dsc-extract-checksums <<<"$changesJson")"
 		dir="$(dirname "$changes")"
 		export dir
 
 		if ! (
 			set -Eeuo pipefail
-			shell="$(jq <<< "$json" --raw-output '.[].bashValidate // error("missing bashValidate from dsc-extract-checksums!")')"
+			shell="$(jq <<<"$json" --raw-output '.[].bashValidate // error("missing bashValidate from dsc-extract-checksums!")')"
 			[ -n "$shell" ]
 			cd "$dir"
 			eval "$shell"
@@ -54,7 +53,7 @@ for p in "${process[@]}"; do
 			continue
 		fi
 
-		files="$(jq <<< "$json" --raw-output '
+		files="$(jq <<<"$json" --raw-output '
 			keys
 			| map(env.dir + "/" + . | @sh)
 			| join (" ")
@@ -62,7 +61,7 @@ for p in "${process[@]}"; do
 		eval "files=( $files )"
 		files+=( "$changes" )
 
-		src="$(jq <<< "$changesJson" --raw-output '.Source')"
+		src="$(jq <<<"$changesJson" --raw-output '.Source')"
 		poolDir="$poolBaseDir/$src"
 
 		# verify that the files either don't already exist or are already the same (before copying anything)

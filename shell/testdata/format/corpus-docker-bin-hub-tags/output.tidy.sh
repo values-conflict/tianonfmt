@@ -28,12 +28,10 @@ opts="$(getopt -o 'h?' --long 'help,jq:' -- "$@" || { usage >&2 && false; })"
 eval set -- "$opts"
 
 while true; do
-	flag="$1"
-	shift
+	flag="$1"; shift
 	case "$flag" in
 		--jq)
-			jqExpression="$1"
-			shift
+			jqExpression="$1"; shift
 			;;
 		--help | -h | '-?')
 			usage
@@ -57,8 +55,7 @@ if [ "$#" -eq 0 ]; then
 fi
 
 _all() {
-	local repo="$1"
-	shift
+	local repo="$1"; shift
 
 	local nextPage="https://hub.docker.com/v2/repositories/${repo}/tags/?page_size=100"
 	while true; do
@@ -73,7 +70,6 @@ _all() {
 }
 
 while [ "$#" -gt 0 ]; do
-	repo="$1"
-	shift
+	repo="$1"; shift
 	_all "$repo"
 done

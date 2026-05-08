@@ -179,8 +179,8 @@ apply_plugin_default_configuration() {
 	local _property _value
 	echo "Applying default values for plugin ${_plugin_name} to neo4j.conf"
 	for _entry in $(jq --compact-output --raw-output "with_entries( select(.key==\"${_plugin_name}\") ) | to_entries[] | .value.properties | to_entries[]" /neo4jlabs-plugins.json); do
-		_property="$(jq --raw-output '.key' <<< "${_entry}")"
-		_value="$(jq --raw-output '.value' <<< "${_entry}")"
+		_property="$(jq --raw-output '.key' <<<"${_entry}")"
+		_value="$(jq --raw-output '.value' <<<"${_entry}")"
 
 		# the first grep strips out comments
 		if grep -o "^[^#]*" "${_reference_conf}" | grep -q --fixed-strings "${_property}="; then

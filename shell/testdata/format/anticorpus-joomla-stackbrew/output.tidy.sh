@@ -11,7 +11,7 @@ fi
 
 # sort version numbers with highest first
 IFS=$'\n'
-set -- $(sort -rV <<< "$*")
+set -- $(sort -rV <<<"$*")
 unset IFS
 
 # get the most recent commit which modified any of "$@"
@@ -21,8 +21,7 @@ fileCommit() {
 
 # get the most recent commit which modified "$1/Dockerfile" or any file COPY'd from "$1/Dockerfile"
 dirCommit() {
-	local dir="$1"
-	shift
+	local dir="$1"; shift
 	(
 		cd "$dir"
 		fileCommit \
@@ -58,8 +57,7 @@ gawkParents='
 '
 
 getArches() {
-	local repo="$1"
-	shift
+	local repo="$1"; shift
 
 	local parentRepoToArchesStr
 	parentRepoToArchesStr="$(
@@ -88,8 +86,7 @@ EOH
 
 # prints "$2$1$3$1...$N"
 join() {
-	local sep="$1"
-	shift
+	local sep="$1"; shift
 	local out
 	printf -v out "${sep//%/%%}%s" "$@"
 	echo "${out#$sep}"
@@ -167,8 +164,8 @@ for version; do
 				else
 					variantArches="$(
 						comm -12 \
-							<(xargs -n1 <<< "$variantArches" | sort -u) \
-							<(xargs -n1 <<< "$parentArches" | sort -u)
+							<(xargs -n1 <<<"$variantArches" | sort -u) \
+							<(xargs -n1 <<<"$parentArches" | sort -u)
 					)"
 				fi
 			done

@@ -77,7 +77,100 @@ func printShell(f *syntax.File) (string, error) {
 	}
 	s := fixMultiLineClauses(buf.String())
 	s = fixArraySpacing(s)
+	s = fixHereStringSpacing(s)
+	s = joinShiftPairs(s)
 	return s, nil
+}
+
+// fixHereStringSpacing removes the space that SpaceRedirects inserts after <<<.
+// Tianon always cuddles here-strings: <<<"$var" not <<< "$var".
+// SpaceRedirects correctly spaces output redirects (> file) but <<< should
+// never have a space — the content is semantically attached to the operator.
+func fixHereStringSpacing(src string) string {
+	return strings.ReplaceAll(src, "<<< ", "<<<")
+}
+
+// joinShiftPairs collapses consecutive assignment + shift lines onto one line
+// to emphasise the semantic relationship between consuming a positional
+// parameter and advancing the argument list:
+//
+//	repo="$1"          →   repo="$1"; shift
+//	shift
+//
+//	local a="$1"       →   local a="$1"; shift
+//	shift
+//
+// Both lines must be at the same indentation level.  The next line may be a
+// bare "shift" or "shift N" (with a count).  Already-joined lines are skipped.
+func joinShiftPairs(src string) string {
+	lines := strings.Split(src, "\n")
+	out := make([]string, 0, len(lines))
+	changed := false
+
+	i := 0
+	for i < len(lines) {
+		line := lines[i]
+		if i+1 < len(lines) {
+			next := lines[i+1]
+			indent := leadingTabs(line)
+			body := line[len(indent):]
+			nextIndent := leadingTabs(next)
+			nextBody := next[len(nextIndent):]
+
+			if indent == nextIndent &&
+				isShiftableAssignment(body) &&
+				isShiftStatement(nextBody) {
+				out = append(out, line+"; "+nextBody)
+				i += 2
+				changed = true
+				continue
+			}
+		}
+		out = append(out, line)
+		i++
+	}
+
+	if !changed {
+		return src
+	}
+	return strings.Join(out, "\n")
+}
+
+// isShiftableAssignment reports whether s is a plain variable assignment line
+// (with optional local/declare prefix) that pairs naturally with a following
+// shift.  Lines already containing ';' are excluded (already joined).
+func isShiftableAssignment(s string) bool {
+	if strings.Contains(s, ";") {
+		return false
+	}
+	// Strip optional prefixes: local, local -r, declare, declare -r, etc.
+	stripped := s
+	for _, pfx := range []string{
+		"local -r ", "local -x ", "local -n ", "local ",
+		"declare -r ", "declare -x ", "declare ",
+		"readonly ", "export ",
+	} {
+		if strings.HasPrefix(s, pfx) {
+			stripped = s[len(pfx):]
+			break
+		}
+	}
+	// Remaining must start with IDENTIFIER=
+	j := 0
+	for j < len(stripped) && isShellIdentChar(stripped[j]) {
+		j++
+	}
+	return j > 0 && j < len(stripped) && stripped[j] == '='
+}
+
+// isShiftStatement reports whether s (trimmed body) is a shift statement.
+func isShiftStatement(s string) bool {
+	return s == "shift" || strings.HasPrefix(s, "shift ")
+}
+
+func isShellIdentChar(c byte) bool {
+	return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
+		(c >= '0' && c <= '9') || c == '_'
 }
 
 // fixArraySpacing adds spaces inside non-empty inline bash array literals:
