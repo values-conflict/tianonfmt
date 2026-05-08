@@ -126,20 +126,20 @@ configure_redis_session() {
 		# redis.session.lock_wait_time is specified in microseconds.
 		# Wait 10ms before retrying the lock rather than the default 2ms.
 		echo "redis.session.lock_wait_time = 10000"
-	} >/usr/local/etc/php/conf.d/redis-session.ini
+	} > /usr/local/etc/php/conf.d/redis-session.ini
 }
 
 ########################################################################
 # Main
 ########################################################################
 
-if expr "$1" : "apache" 1>/dev/null; then
+if expr "$1" : "apache" 1> /dev/null; then
 	if [ -n "${APACHE_DISABLE_REWRITE_IP+x}" ]; then
 		a2disconf remoteip
 	fi
 fi
 
-if expr "$1" : "apache" 1>/dev/null || [ "$1" = "php-fpm" ] || [ "${NEXTCLOUD_UPDATE:-0}" -eq 1 ]; then
+if expr "$1" : "apache" 1> /dev/null || [ "$1" = "php-fpm" ] || [ "${NEXTCLOUD_UPDATE:-0}" -eq 1 ]; then
 	uid="$(id -u)"
 	gid="$(id -g)"
 	if [ "$uid" = '0' ]; then
@@ -195,7 +195,7 @@ if expr "$1" : "apache" 1>/dev/null || [ "$1" = "php-fpm" ] || [ "${NEXTCLOUD_UP
 					exit 1
 				fi
 				echo "Upgrading nextcloud from $installed_version ..."
-				get_enabled_apps >/tmp/list_before
+				get_enabled_apps > /tmp/list_before
 			fi
 			if [ "$(id -u)" = 0 ]; then
 				rsync_options="-rlDog --chown $user:$group"
@@ -292,7 +292,7 @@ if expr "$1" : "apache" 1>/dev/null || [ "$1" = "php-fpm" ] || [ "${NEXTCLOUD_UP
 
 				run_as 'php /var/www/html/occ upgrade'
 
-				get_enabled_apps >/tmp/list_after
+				get_enabled_apps > /tmp/list_after
 				disabled_apps="$(comm -23 /tmp/list_before /tmp/list_after || true)"
 				if [ -n "$disabled_apps" ]; then
 					echo "The following apps have been disabled:"
@@ -310,7 +310,7 @@ if expr "$1" : "apache" 1>/dev/null || [ "$1" = "php-fpm" ] || [ "${NEXTCLOUD_UP
 		if [ -n "${NEXTCLOUD_INIT_HTACCESS+x}" ] && [ "$installed_version" != "0.0.0.0" ]; then
 			run_as 'php /var/www/html/occ maintenance:update:htaccess'
 		fi
-	) 9>/var/www/html/nextcloud-init-sync.lock
+	) 9> /var/www/html/nextcloud-init-sync.lock
 
 	# warn if config files on persistent storage differ from the latest version of this image
 	for cfgPath in /usr/src/nextcloud/config/*.php; do

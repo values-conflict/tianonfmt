@@ -237,7 +237,7 @@
 						{
 							"type": "call",
 							"assigns": [
-								"json=\"$(dsc-extract-checksums \u003c\u003c\u003c\"$changesJson\")\""
+								"json=\"$(dsc-extract-checksums \u003c\u003c\u003c \"$changesJson\")\""
 							],
 							"args": []
 						},
@@ -273,7 +273,7 @@
 											{
 												"type": "call",
 												"assigns": [
-													"shell=\"$(jq \u003c\u003c\u003c\"$json\" -r '.[].bashValidate // error(\"missing bashValidate from dsc-extract-checksums!\")')\""
+													"shell=\"$(jq \u003c\u003c\u003c \"$json\" -r '.[].bashValidate // error(\"missing bashValidate from dsc-extract-checksums!\")')\""
 												],
 												"args": []
 											},
@@ -333,7 +333,7 @@
 						{
 							"type": "call",
 							"assigns": [
-								"files=\"$(jq \u003c\u003c\u003c\"$json\" -r '\n\t\t\tkeys\n\t\t\t| map(env.dir + \"/\" + . | @sh)\n\t\t\t| join (\" \")\n\t\t')\""
+								"files=\"$(jq \u003c\u003c\u003c \"$json\" -r '\n\t\t\tkeys\n\t\t\t| map(env.dir + \"/\" + . | @sh)\n\t\t\t| join (\" \")\n\t\t')\""
 							],
 							"args": []
 						},
@@ -354,7 +354,7 @@
 						{
 							"type": "call",
 							"assigns": [
-								"src=\"$(jq \u003c\u003c\u003c\"$changesJson\" -r '.Source')\""
+								"src=\"$(jq \u003c\u003c\u003c \"$changesJson\" -r '.Source')\""
 							],
 							"args": []
 						},

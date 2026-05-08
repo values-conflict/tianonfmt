@@ -87,7 +87,7 @@
 		{
 			"type": "call",
 			"assigns": [
-				"common=\"$(cat \\\n\t\u003c\u003c-EOC\n\t\tGitFetch: refs/heads/$branch\n\tEOC\n)\""
+				"common=\"$(cat \\\n\t\u003c\u003c- EOC\n\t\tGitFetch: refs/heads/$branch\n\tEOC\n)\""
 			],
 			"args": []
 		},
@@ -158,14 +158,14 @@
 				{
 					"type": "call",
 					"assigns": [
-						"from=\"$(awk \u003c\u003c\u003c\"$dockerfile\" 'toupper($1) == \"FROM\" { print $2; exit }')\""
+						"from=\"$(awk \u003c\u003c\u003c \"$dockerfile\" 'toupper($1) == \"FROM\" { print $2; exit }')\""
 					],
 					"args": []
 				},
 				{
 					"type": "call",
 					"assigns": [
-						"version=\"$(awk \u003c\u003c\u003c\"$dockerfile\" -F '[=[:space:]]+' 'toupper($1) == \"ENV\" \u0026\u0026 $2 == \"GROOVY_VERSION\" { print $3; exit }')\""
+						"version=\"$(awk \u003c\u003c\u003c \"$dockerfile\" -F '[=[:space:]]+' 'toupper($1) == \"ENV\" \u0026\u0026 $2 == \"GROOVY_VERSION\" { print $3; exit }')\""
 					],
 					"args": []
 				},

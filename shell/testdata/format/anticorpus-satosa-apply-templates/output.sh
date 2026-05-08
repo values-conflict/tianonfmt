@@ -20,7 +20,7 @@ if [ "$#" -eq 0 ]; then
 fi
 
 generated_warning() {
-	cat <<-EOH
+	cat <<- EOH
 		#
 		# NOTE: THIS DOCKERFILE IS GENERATED VIA "apply-templates.sh".
 		#
@@ -65,7 +65,7 @@ for version; do
 		{
 			generated_warning
 			gawk -f "$jqt" "$template"
-		} >"$version/$dir/Dockerfile"
+		} > "$version/$dir/Dockerfile"
 
 		cp -a docker-entrypoint.sh "$version/$dir/"
 	done

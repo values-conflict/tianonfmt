@@ -75,7 +75,149 @@ func printShell(f *syntax.File) (string, error) {
 	if err := newPrinter().Print(&buf, f); err != nil {
 		return "", fmt.Errorf("shell format: %w", err)
 	}
-	return fixMultiLineClauses(buf.String()), nil
+	s := fixMultiLineClauses(buf.String())
+	s = fixArraySpacing(s)
+	return s, nil
+}
+
+// fixArraySpacing adds spaces inside non-empty inline bash array literals:
+//
+//	args=(--tab -L "$dir")   →  args=( --tab -L "$dir" )
+//	files+=("$x")            →  files+=( "$x" )
+//	toDelete=()              →  unchanged (empty)
+//	declare -A m=(           →  unchanged (multi-line: no ')' on same line)
+//
+// Multi-line arrays are untouched because the matching ')' is on a later line.
+func fixArraySpacing(src string) string {
+	lines := strings.Split(src, "\n")
+	out := make([]string, 0, len(lines))
+	changed := false
+	for _, line := range lines {
+		fixed := fixArraySpacingLine(line)
+		if fixed != line {
+			changed = true
+		}
+		out = append(out, fixed)
+	}
+	if !changed {
+		return src
+	}
+	return strings.Join(out, "\n")
+}
+
+func fixArraySpacingLine(line string) string {
+	if !strings.Contains(line, "=(") {
+		return line
+	}
+	var result strings.Builder
+	i := 0
+	for i < len(line) {
+		c := line[i]
+		// Skip single-quoted strings: no array assignments inside.
+		if c == '\'' {
+			result.WriteByte(c)
+			i++
+			for i < len(line) && line[i] != '\'' {
+				result.WriteByte(line[i])
+				i++
+			}
+			if i < len(line) {
+				result.WriteByte(line[i]) // closing '
+				i++
+			}
+			continue
+		}
+		// Skip double-quoted strings.
+		if c == '"' {
+			result.WriteByte(c)
+			i++
+			for i < len(line) && line[i] != '"' {
+				if line[i] == '\\' && i+1 < len(line) {
+					result.WriteByte(line[i])
+					i++
+				}
+				result.WriteByte(line[i])
+				i++
+			}
+			if i < len(line) {
+				result.WriteByte(line[i]) // closing "
+				i++
+			}
+			continue
+		}
+		// Skip shell comments.
+		if c == '#' {
+			result.WriteString(line[i:])
+			break
+		}
+		// Match =( — the array opening.
+		if c == '=' && i+1 < len(line) && line[i+1] == '(' {
+			close := arrayCloseParen(line, i+1)
+			if close > 0 {
+				content := line[i+2 : close]
+				if content == "" {
+					result.WriteString("=()")
+				} else {
+					l, r := " ", " "
+					if content[0] == ' ' {
+						l = ""
+					}
+					if content[len(content)-1] == ' ' {
+						r = ""
+					}
+					result.WriteString("=(")
+					result.WriteString(l)
+					result.WriteString(content)
+					result.WriteString(r)
+					result.WriteString(")")
+				}
+				i = close + 1
+				continue
+			}
+		}
+		result.WriteByte(c)
+		i++
+	}
+	return result.String()
+}
+
+// arrayCloseParen returns the index of the ')' that closes the '(' at openPos,
+// or -1 if the closing paren is not found on the same line (multi-line array).
+// Tracks paren depth and skips quoted strings and command substitutions.
+func arrayCloseParen(line string, openPos int) int {
+	depth := 1
+	i := openPos + 1
+	for i < len(line) && depth > 0 {
+		switch line[i] {
+		case '(':
+			depth++
+		case ')':
+			depth--
+			if depth == 0 {
+				return i
+			}
+		case '\'': // single-quoted: scan to closing '
+			i++
+			for i < len(line) && line[i] != '\'' {
+				i++
+			}
+		case '"': // double-quoted: scan to closing " (respect \")
+			i++
+			for i < len(line) && line[i] != '"' {
+				if line[i] == '\\' && i+1 < len(line) {
+					i++
+				}
+				i++
+			}
+		case '`': // backtick substitution
+			i++
+			for i < len(line) && line[i] != '`' {
+				i++
+			}
+		}
+		i++
+	}
+	return -1 // no matching ) on this line
 }
 
 // fixMultiLineClauses normalises multi-line for/while/if constructs so that
@@ -170,10 +312,11 @@ func matchSemiClauseJoined(line string) (tabs, item, keyword string, ok bool) {
 
 func newPrinter() *syntax.Printer {
 	return syntax.NewPrinter(
-		syntax.Indent(0),            // 0 = tabs (corpus: all .sh files use tabs)
-		syntax.BinaryNextLine(true), // && / || at start of continuation line (bash.md §Notable omissions)
+		syntax.Indent(0),             // 0 = tabs (corpus: all .sh files use tabs)
+		syntax.BinaryNextLine(true),  // && / || at start of continuation line (bash.md §Notable omissions)
 		syntax.SwitchCaseIndent(true),
 		syntax.KeepPadding(false),
+		syntax.SpaceRedirects(true),  // ">file" → "> file"; does not affect ">&2" (bash.md §Redirections)
 	)
 }
 

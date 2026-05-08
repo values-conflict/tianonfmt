@@ -334,6 +334,13 @@ variants=(
 )
 ```
 
+**Inline arrays always have spaces inside the parentheses** — `( elements )`, never `(elements)`.  Empty arrays are `()` with no spaces.  The formatter enforces this automatically:
+
+```bash
+args=( --tab -L "$dir" --from-file "$t" )   # spaces inside
+toDelete=()                                   # empty: no spaces
+```
+
 When the array is short enough to fit clearly on one line: `sbuildArgs+=( --arch "$dpkgArch" --no-arch-all )`.
 
 Array expansion is always quoted: `"${variants[@]}"`.

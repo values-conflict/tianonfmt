@@ -2,5 +2,5 @@
 set -Eeuo pipefail
 
 json="$(jq -n --arg foo "bar" '{ foo: $foo }')"
-result="$(jq -r '.foo' <<<"$json")"
+result="$(jq -r '.foo' <<< "$json")"
 echo "$result"

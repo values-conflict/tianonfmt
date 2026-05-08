@@ -6,10 +6,10 @@ set -o errexit -o nounset -o pipefail
 # usage: ./generate-stackbrew-library.sh > ../official-images/library/groovy
 
 # front-load the "command-not-found" notices
-jq --version >/dev/null
-bashbrew --version >/dev/null
+jq --version > /dev/null
+bashbrew --version > /dev/null
 
-cat <<-'EOH'
+cat <<- 'EOH'
 	Maintainers: Keegan Witt <keeganwitt@gmail.com> (@keeganwitt)
 	GitRepo: https://github.com/groovy/docker-groovy.git
 EOH
@@ -18,7 +18,7 @@ declare -A usedTags=() archesLookupCache=() seenVersions=()
 commit="$(git rev-parse HEAD)"
 branch="$(git rev-parse --abbrev-ref HEAD)"
 common="$(
-	cat <<-EOC
+	cat <<- EOC
 		GitFetch: refs/heads/$branch
 	EOC
 )"
@@ -89,8 +89,8 @@ for dir in "${directories[@]}"; do
 	dockerfile="$(git show "$commit:$dir/Dockerfile")"
 
 	# extract "FROM" and "GROOVY_VERSION" from Dockerfile
-	from="$(awk <<<"$dockerfile" 'toupper($1) == "FROM" { print $2; exit }')"
-	version="$(awk <<<"$dockerfile" -F '[=[:space:]]+' 'toupper($1) == "ENV" && $2 == "GROOVY_VERSION" { print $3; exit }')"
+	from="$(awk <<< "$dockerfile" 'toupper($1) == "FROM" { print $2; exit }')"
+	version="$(awk <<< "$dockerfile" -F '[=[:space:]]+' 'toupper($1) == "ENV" && $2 == "GROOVY_VERSION" { print $3; exit }')"
 	# add a patch version of 0 if missing
 	if [[ "$version" =~ ^[0-9]+\.[0-9]+$ ]]; then
 		version="${version}.0"
@@ -131,14 +131,14 @@ for dir in "${directories[@]}"; do
 		"${version%.*.*}" # X
 		''                # this will lead to some tags that start with hyphen; we'll clean them up afterwards (it makes the logic easier to write correctly so we get all of "X.Y.Z-foo", "X.Y-foo", "X-foo", *and* "foo")
 	)
-	tags+=("${versions[@]/%/-$jdk${variant:+-$variant}}") # "X.Y.Z-jdkNN-alpine"
+	tags+=( "${versions[@]/%/-$jdk${variant:+-$variant}}" ) # "X.Y.Z-jdkNN-alpine"
 	case "$variant" in
 		'')
-			tags+=("${versions[@]/%/-$jdk-$suite}") # "X.Y.Z-jdkNN-noble"
+			tags+=( "${versions[@]/%/-$jdk-$suite}" ) # "X.Y.Z-jdkNN-noble"
 
 			# Only add "latest" tag for Groovy 5
 			if [[ "$version" == 5.* ]]; then
-				tags+=('latest')
+				tags+=( 'latest' )
 			fi
 
 			tags+=(
@@ -154,7 +154,7 @@ for dir in "${directories[@]}"; do
 				"${versions[@]/%/-alpine}"     # "X.Y.Z-alpine"
 			)
 			if [[ "$version" == 5.* ]]; then
-				tags+=('alpine')
+				tags+=( 'alpine' )
 			fi
 			;;
 	esac
@@ -176,7 +176,7 @@ for dir in "${directories[@]}"; do
 		archesLookupCache["$from"]="$arches"
 	fi
 
-	cat <<-EOE
+	cat <<- EOE
 
 		Tags: $actualTags
 		Architectures: $arches

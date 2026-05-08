@@ -20,4 +20,4 @@ esac
 	echo a
 	echo b
 }
-echo hi >/dev/null
+echo hi > /dev/null

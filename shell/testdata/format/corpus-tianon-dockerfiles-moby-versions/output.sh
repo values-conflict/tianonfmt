@@ -32,7 +32,7 @@ for suite in \
 			fi
 			deb-repo
 		)"
-		json="$(jq <<<"$json" -c --arg suite "$suite" --arg binpkg "$binpkg" --argjson cjson "$cjson" '
+		json="$(jq <<< "$json" -c --arg suite "$suite" --arg binpkg "$binpkg" --argjson cjson "$cjson" '
 			if $suite == "bookworm" then
 				.["bookworm"][$binpkg] = $cjson
 			else
@@ -44,7 +44,7 @@ done
 
 dind="$(github-file-commit 'docker/docker' 'HEAD' 'hack/dind')"
 
-jq <<<"$json" --argjson dind "$dind" '
+jq <<< "$json" --argjson dind "$dind" '
 	def upstream_version:
 		if index(":") then
 			split(":")[1]
@@ -63,4 +63,4 @@ jq <<<"$json" --argjson dind "$dind" '
 		.version = $eng
 	else . end
 	| .variants = [ "", "bookworm" ] # make sure "apply-templates.sh" creates "Dockerfile.bookworm" too
-' >versions.json
+' > versions.json

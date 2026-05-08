@@ -68,7 +68,7 @@
 				{
 					"type": "call",
 					"assigns": [
-						"json=\"$(jq \u003c\u003c\u003c\"$json\" -c '\n\t\t.[env.version] = {\n\t\t\turl: env.url,\n\t\t\tfingerprints: (\n\t\t\t\tenv.fingerprints\n\t\t\t\t| rtrimstr(\"\\n\")\n\t\t\t\t| split(\"\\n\")\n\t\t\t),\n\t\t}\n\t')\""
+						"json=\"$(jq \u003c\u003c\u003c \"$json\" -c '\n\t\t.[env.version] = {\n\t\t\turl: env.url,\n\t\t\tfingerprints: (\n\t\t\t\tenv.fingerprints\n\t\t\t\t| rtrimstr(\"\\n\")\n\t\t\t\t| split(\"\\n\")\n\t\t\t),\n\t\t}\n\t')\""
 					],
 					"args": []
 				}

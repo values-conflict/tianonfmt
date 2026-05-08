@@ -66,7 +66,7 @@
 				{
 					"type": "call",
 					"assigns": [
-						"json=\"$(\u003cversions.json)\""
+						"json=\"$(\u003c versions.json)\""
 					],
 					"args": []
 				}
@@ -132,7 +132,7 @@
 				{
 					"type": "call",
 					"assigns": [
-						"json=\"$(jq \u003c\u003c\u003c\"$json\" -c '\n\t\t.[env.version] = {\n\t\t\tvariants: env.variants | sub(\"slim-\"; \"\") | split(\" \"),\n\t\t\tversion: env.fullVersion,\n\t\t\tpython_version: env.python_version,\n\t\t}\n\t')\""
+						"json=\"$(jq \u003c\u003c\u003c \"$json\" -c '\n\t\t.[env.version] = {\n\t\t\tvariants: env.variants | sub(\"slim-\"; \"\") | split(\" \"),\n\t\t\tversion: env.fullVersion,\n\t\t\tpython_version: env.python_version,\n\t\t}\n\t')\""
 					],
 					"args": []
 				}

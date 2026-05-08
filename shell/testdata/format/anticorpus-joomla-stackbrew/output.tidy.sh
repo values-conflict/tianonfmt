@@ -11,7 +11,7 @@ fi
 
 # sort version numbers with highest first
 IFS=$'\n'
-set -- $(sort -rV <<<"$*")
+set -- $(sort -rV <<< "$*")
 unset IFS
 
 # get the most recent commit which modified any of "$@"
@@ -79,7 +79,7 @@ getArches 'joomla'
 # get the Joomla maintainers of these docker images
 joomlaMaintainers="$(jq --compact-output --raw-output '. | map(.firstname + " " + .lastname + " <" + .email + "> (@" + .github + ")") | join(",\n             ")' maintainers.json)"
 
-cat <<-EOH
+cat <<- EOH
 	# this file is generated via https://github.com/joomla-docker/docker-joomla/blob/$(fileCommit "$self")/$self
 
 	Maintainers: $joomlaMaintainers
@@ -113,7 +113,7 @@ for version; do
 	rcVersion="${version%-rc}"
 	versionAliases=()
 	while [ "$fullVersion" != "$rcVersion" -a "${fullVersion%[.]*}" != "$fullVersion" ]; do
-		versionAliases+=($fullVersion)
+		versionAliases+=( $fullVersion )
 		fullVersion="${fullVersion%[.]*}"
 	done
 	# get all that aliases of this Joomla version
@@ -134,27 +134,27 @@ for version; do
 			# get the commit hash from this docker file
 			commit="$(dirCommit "$dir")"
 
-			phpVersionAliases=("${versionAliases[@]/%/-$phpVersion}")
-			phpVersionAliases=("${phpVersionAliases[@]//latest-/}")
+			phpVersionAliases=( "${versionAliases[@]/%/-$phpVersion}" )
+			phpVersionAliases=( "${phpVersionAliases[@]//latest-/}" )
 
-			variantSuffixes=("$variant")
+			variantSuffixes=( "$variant" )
 
 			variantAliases=()
 			phpVersionVariantAliases=()
 			for variantSuffix in "${variantSuffixes[@]}"; do
-				variantAliases+=("${versionAliases[@]/%/-$variantSuffix}")
-				phpVersionVariantAliases+=("${phpVersionAliases[@]/%/-$variantSuffix}")
+				variantAliases+=( "${versionAliases[@]/%/-$variantSuffix}" )
+				phpVersionVariantAliases+=( "${phpVersionAliases[@]/%/-$variantSuffix}" )
 			done
-			variantAliases=("${variantAliases[@]//latest-/}")
-			phpVersionVariantAliases=("${phpVersionVariantAliases[@]//latest-/}")
+			variantAliases=( "${variantAliases[@]//latest-/}" )
+			phpVersionVariantAliases=( "${phpVersionVariantAliases[@]//latest-/}" )
 
 			fullAliases=()
 			if [ "$phpVersion" = "php$defaultPhpVersion" ] && [ "$variant" = "$defaultVariant" ]; then
-				fullAliases+=("${versionAliases[@]}")
-				fullAliases+=("${variantAliases[@]}")
-				fullAliases+=("${phpVersionAliases[@]}")
+				fullAliases+=( "${versionAliases[@]}" )
+				fullAliases+=( "${variantAliases[@]}" )
+				fullAliases+=( "${phpVersionAliases[@]}" )
 			fi
-			fullAliases+=("${phpVersionVariantAliases[@]}")
+			fullAliases+=( "${phpVersionVariantAliases[@]}" )
 
 			variantParents="$(gawk "$gawkParents" "$dir/Dockerfile")"
 			variantArches=
@@ -167,14 +167,14 @@ for version; do
 				else
 					variantArches="$(
 						comm -12 \
-							<(xargs -n1 <<<"$variantArches" | sort -u) \
-							<(xargs -n1 <<<"$parentArches" | sort -u)
+							<(xargs -n1 <<< "$variantArches" | sort -u) \
+							<(xargs -n1 <<< "$parentArches" | sort -u)
 					)"
 				fi
 			done
 
 			echo
-			cat <<-EOE
+			cat <<- EOE
 				Tags: $(join ', ' "${fullAliases[@]}")
 				Architectures: $(join ', ' $variantArches)
 				GitCommit: $commit

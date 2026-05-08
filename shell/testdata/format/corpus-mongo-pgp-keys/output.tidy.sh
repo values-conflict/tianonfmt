@@ -17,7 +17,7 @@ for version; do
 		'
 	)"
 	export fingerprints
-	json="$(jq <<<"$json" --compact-output '
+	json="$(jq <<< "$json" --compact-output '
 		.[env.version] = {
 			url: env.url,
 			fingerprints: (
@@ -29,9 +29,9 @@ for version; do
 	')"
 done
 
-jq <<<"$json" '
+jq <<< "$json" '
 	to_entries
 	| sort_by(.key | split(".") | map(tonumber? // .))
 	| reverse
 	| from_entries
-' >pgp-keys.json
+' > pgp-keys.json

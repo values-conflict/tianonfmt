@@ -179,8 +179,8 @@ apply_plugin_default_configuration() {
 	local _property _value
 	echo "Applying default values for plugin ${_plugin_name} to neo4j.conf"
 	for _entry in $(jq --compact-output --raw-output "with_entries( select(.key==\"${_plugin_name}\") ) | to_entries[] | .value.properties | to_entries[]" /neo4jlabs-plugins.json); do
-		_property="$(jq --raw-output '.key' <<<"${_entry}")"
-		_value="$(jq --raw-output '.value' <<<"${_entry}")"
+		_property="$(jq --raw-output '.key' <<< "${_entry}")"
+		_value="$(jq --raw-output '.value' <<< "${_entry}")"
 
 		# the first grep strips out comments
 		if grep -o "^[^#]*" "${_reference_conf}" | grep -q --fixed-strings "${_property}="; then
@@ -190,7 +190,7 @@ apply_plugin_default_configuration() {
 			if grep -o "^[^#]*" "${_neo4j_conf}" | grep -q --fixed-strings "${_property}="; then
 				sed --in-place "s/${_property}=/&${_value},/" "${_neo4j_conf}"
 			else
-				echo "${_property}=${_value}" >>"${_neo4j_conf}"
+				echo "${_property}=${_value}" >> "${_neo4j_conf}"
 			fi
 		fi
 	done
@@ -214,7 +214,7 @@ add_docker_default_to_conf() {
 	local _neo4j_home="${3}"
 
 	if ! grep -q "^${_setting}=" "${_neo4j_home}"/conf/neo4j.conf; then
-		echo -e "\n"${_setting}=${_value} >>"${_neo4j_home}"/conf/neo4j.conf
+		echo -e "\n"${_setting}=${_value} >> "${_neo4j_home}"/conf/neo4j.conf
 	fi
 }
 
@@ -229,7 +229,7 @@ add_env_setting_to_conf() {
 		sed --in-place "/^${_setting}=.*/d" "${_neo4j_home}"/conf/neo4j.conf
 	fi
 	# Then always append setting to file
-	echo "${_setting}=${_value}" >>"${_neo4j_home}"/conf/neo4j.conf
+	echo "${_setting}=${_value}" >> "${_neo4j_home}"/conf/neo4j.conf
 }
 
 set_initial_password() {
@@ -264,9 +264,9 @@ set_initial_password() {
 			# Will exit with error if users already exist (and print a message explaining that)
 			# we probably don't want the message though, since it throws an error message on restarting the container.
 			if [ "${do_reset}" = "true" ]; then
-				${neo4j_admin_cmd} set-initial-password "${password}" --require-password-change $(expand_commands_optionally) 2>/dev/null || :
+				${neo4j_admin_cmd} set-initial-password "${password}" --require-password-change $(expand_commands_optionally) 2> /dev/null || :
 			else
-				${neo4j_admin_cmd} set-initial-password "${password}" $(expand_commands_optionally) 2>/dev/null || :
+				${neo4j_admin_cmd} set-initial-password "${password}" $(expand_commands_optionally) 2> /dev/null || :
 			fi
 		elif [ -n "${_neo4j_auth:-}" ]; then
 			echo "$_neo4j_auth is invalid"
@@ -283,13 +283,13 @@ set_initial_password() {
 if running_as_root; then
 	userid="neo4j"
 	groupid="neo4j"
-	groups=($(id -G neo4j))
+	groups=( $(id -G neo4j) )
 	exec_cmd="exec gosu neo4j:neo4j"
 	neo4j_admin_cmd="gosu neo4j:neo4j neo4j-admin"
 else
 	userid="$(id -u)"
 	groupid="$(id -g)"
-	groups=($(id -G))
+	groups=( $(id -G) )
 	exec_cmd="exec"
 	neo4j_admin_cmd="neo4j-admin"
 fi

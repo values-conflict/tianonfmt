@@ -20,7 +20,7 @@
 		{
 			"type": "call",
 			"assigns": [
-				"result=\"$(jq -r '.foo' \u003c\u003c\u003c\"$json\")\""
+				"result=\"$(jq -r '.foo' \u003c\u003c\u003c \"$json\")\""
 			],
 			"args": []
 		},

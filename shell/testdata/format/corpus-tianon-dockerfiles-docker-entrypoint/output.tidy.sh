@@ -8,7 +8,7 @@ fi
 
 # if our command is a valid Docker subcommand, let's invoke it through Docker instead
 # (this allows for "docker run docker ps", etc)
-if docker help "$1" >/dev/null 2>&1; then
+if docker help "$1" > /dev/null 2>&1; then
 	set -- docker "$@"
 fi
 
@@ -44,7 +44,7 @@ if [ "${DOCKER_HOST#tcp:}" != "$DOCKER_HOST" ] \
 fi
 
 if [ "$1" = 'dockerd' ]; then
-	cat >&2 <<-'EOW'
+	cat >&2 <<- 'EOW'
 
 		📎 Hey there!  It looks like you're trying to run a Docker daemon.
 

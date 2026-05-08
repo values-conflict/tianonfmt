@@ -872,14 +872,14 @@
 							{
 								"type": "call",
 								"assigns": [
-									"_property=\"$(jq --raw-output '.key' \u003c\u003c\u003c\"${_entry}\")\""
+									"_property=\"$(jq --raw-output '.key' \u003c\u003c\u003c \"${_entry}\")\""
 								],
 								"args": []
 							},
 							{
 								"type": "call",
 								"assigns": [
-									"_value=\"$(jq --raw-output '.value' \u003c\u003c\u003c\"${_entry}\")\""
+									"_value=\"$(jq --raw-output '.value' \u003c\u003c\u003c \"${_entry}\")\""
 								],
 								"args": []
 							},

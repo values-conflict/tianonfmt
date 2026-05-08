@@ -67,7 +67,7 @@
 			"args": [
 				"set",
 				"--",
-				"$(sort -rV \u003c\u003c\u003c\"$*\")"
+				"$(sort -rV \u003c\u003c\u003c \"$*\")"
 			]
 		},
 		{
@@ -673,7 +673,7 @@
 												{
 													"type": "call",
 													"assigns": [
-														"variantArches=\"$(comm -12 \\\n\t\u003c(\n\t\txargs -n1 \u003c\u003c\u003c\"$variantArches\" | sort -u\n\t) \\\n\t\u003c(xargs -n1 \u003c\u003c\u003c\"$parentArches\" | sort -u)\n)\""
+														"variantArches=\"$(comm -12 \\\n\t\u003c(\n\t\txargs -n1 \u003c\u003c\u003c \"$variantArches\" | sort -u\n\t) \\\n\t\u003c(xargs -n1 \u003c\u003c\u003c \"$parentArches\" | sort -u)\n)\""
 													],
 													"args": []
 												}

@@ -1125,6 +1125,12 @@ func tokenizeShell(src string) []string {
 			}
 			tokens = append(tokens, "<<")
 			i += 2
+			// Emit <<- strip-tabs marker as its own token so that <<-WORD
+			// and <<- WORD (SpaceRedirects adds the space) tokenize identically.
+			if i < len(src) && src[i] == '-' {
+				tokens = append(tokens, "-")
+				i++
+			}
 			continue
 		}
 		if c == '>' && i+1 < len(src) && src[i+1] == '&' {
@@ -1296,6 +1302,9 @@ func shExpandSubshells(tok string) []string {
 //     recursively tokenized so that whitespace changes (leading/trailing spaces,
 //     indentation, pipe-placement) inside subshells are normalized away.
 //  4. Standalone '\' tokens (backslash line-continuation artifacts) filtered out.
+//  5. <<- strip-tabs marker emitted as a separate "-" token by tokenizeShell
+//     so that "<<-WORD" and "<<- WORD" (SpaceRedirects adds the space) are
+//     always identical in the token stream.
 func normalizeShell(src string) string {
 	toks := tokenizeShell(src)
 	var result []string

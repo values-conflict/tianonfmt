@@ -110,7 +110,7 @@
 						{
 							"type": "call",
 							"assigns": [
-								"json=\"$(jq \u003c\u003c\u003c\"$json\" -c --arg suite \"$suite\" --arg binpkg \"$binpkg\" --argjson cjson \"$cjson\" '\n\t\t\tif $suite == \"bookworm\" then\n\t\t\t\t.[\"bookworm\"][$binpkg] = $cjson\n\t\t\telse\n\t\t\t\t.[$binpkg] = $cjson\n\t\t\tend\n\t\t')\""
+								"json=\"$(jq \u003c\u003c\u003c \"$json\" -c --arg suite \"$suite\" --arg binpkg \"$binpkg\" --argjson cjson \"$cjson\" '\n\t\t\tif $suite == \"bookworm\" then\n\t\t\t\t.[\"bookworm\"][$binpkg] = $cjson\n\t\t\telse\n\t\t\t\t.[$binpkg] = $cjson\n\t\t\tend\n\t\t')\""
 							],
 							"args": []
 						}

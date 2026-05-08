@@ -7,14 +7,14 @@ cd "$(dirname "$(readlink -f "$BASH_SOURCE")")"
 
 # when bootstrapping, create a directory for each desired SATOSA
 # version, then run this script with no arguments
-versions=("$@")
+versions=( "$@" )
 if [ ${#versions[@]} -eq 0 ]; then
-	versions=(*/)
+	versions=( */ )
 	json='{}'
 else
-	json="$(<versions.json)"
+	json="$(< versions.json)"
 fi
-versions=("${versions[@]%/}")
+versions=( "${versions[@]%/}" )
 
 eval "$(
 	curl --silent --show-error https://raw.githubusercontent.com/docker-library/python/master/versions.json \
@@ -51,7 +51,7 @@ for version in "${versions[@]}"; do
 	# generate the versions.json entry for this SATOSA release
 	echo "$version: $fullVersion"
 	export fullVersion
-	json="$(jq <<<"$json" --compact-output '
+	json="$(jq <<< "$json" --compact-output '
 		.[env.version] = {
 			variants: env.variants | sub("slim-"; "") | split(" "),
 			version: env.fullVersion,
@@ -60,4 +60,4 @@ for version in "${versions[@]}"; do
 	')"
 done
 
-jq <<<"$json" --sort-keys . >versions.json
+jq <<< "$json" --sort-keys . > versions.json

@@ -1,0 +1,289 @@
+{
+	"type": "shell",
+	"file": "input.sh",
+	"stmts": [
+		{
+			"type": "call",
+			"args": [
+				"set",
+				"-Eeuo",
+				"pipefail"
+			]
+		},
+		{
+			"type": "call",
+			"args": [
+				"shopt",
+				"-s",
+				"nullglob"
+			]
+		},
+		{
+			"type": "call",
+			"assigns": [
+				"dir=\"$(dirname \"$BASH_SOURCE\")\""
+			],
+			"args": []
+		},
+		{
+			"type": "call",
+			"assigns": [
+				"dir=\"$(readlink -ve \"$dir\")\""
+			],
+			"args": []
+		},
+		{
+			"type": "for",
+			"loop": {
+				"type": "wordIter",
+				"name": "t",
+				"items": [
+					"\"$dir/\"*\"/t.jq\""
+				]
+			},
+			"do": [
+				{
+					"type": "call",
+					"assigns": [
+						"td=\"$(dirname \"$t\")\""
+					],
+					"args": []
+				},
+				{
+					"type": "call",
+					"assigns": [
+						"tdb=\"$(basename \"$td\")\""
+					],
+					"args": []
+				},
+				{
+					"type": "call",
+					"args": [
+						"echo",
+						"\"- $tdb\""
+					]
+				},
+				{
+					"type": "for",
+					"loop": {
+						"type": "wordIter",
+						"name": "input",
+						"items": [
+							"\"$td\"/in.*",
+							"\"$td\"/in-*.*"
+						]
+					},
+					"do": [
+						{
+							"type": "call",
+							"assigns": [
+								"args=(--tab -L \"$dir/..\" --from-file \"$t\")"
+							],
+							"args": []
+						},
+						{
+							"type": "call",
+							"assigns": [
+								"base=\"${input#$td/in}\""
+							],
+							"args": []
+						},
+						{
+							"type": "call",
+							"assigns": [
+								"ext=\"${base##*.}\""
+							],
+							"args": []
+						},
+						{
+							"type": "call",
+							"assigns": [
+								"inputb=\"$(basename \"$input\")\""
+							],
+							"args": []
+						},
+						{
+							"type": "if",
+							"cond": [
+								{
+									"type": "call",
+									"args": [
+										"[",
+										"\"$ext\"",
+										"!=",
+										"'json'",
+										"]"
+									]
+								}
+							],
+							"then": [
+								{
+									"type": "call",
+									"assigns": [
+										"args+=(--raw-input --slurp)"
+									],
+									"args": []
+								}
+							]
+						},
+						{
+							"type": "call",
+							"assigns": [
+								"output=\"$td/out${base%.$ext}\""
+							],
+							"args": []
+						},
+						{
+							"type": "call",
+							"assigns": [
+								"outputs=(\"$output\".*)"
+							],
+							"args": []
+						},
+						{
+							"type": "case",
+							"word": "\"${#outputs[@]}\"",
+							"items": [
+								{
+									"patterns": [
+										"0"
+									],
+									"stmts": [
+										{
+											"type": "stmt",
+											"cmd": {
+												"type": "call",
+												"args": [
+													"echo",
+													"\"error: '$in' missing '$output.*' counterpart\""
+												]
+											},
+											"redirs": [
+												{
+													"op": "\u003e\u0026",
+													"word": "2"
+												}
+											]
+										},
+										{
+											"type": "call",
+											"args": [
+												"exit",
+												"1"
+											]
+										}
+									]
+								},
+								{
+									"patterns": [
+										"1"
+									],
+									"stmts": []
+								},
+								{
+									"patterns": [
+										"*"
+									],
+									"stmts": [
+										{
+											"type": "stmt",
+											"cmd": {
+												"type": "call",
+												"args": [
+													"echo",
+													"\"error: '$in' has too many '$output.*' counterparts: ${outputs[*]}\""
+												]
+											},
+											"redirs": [
+												{
+													"op": "\u003e\u0026",
+													"word": "2"
+												}
+											]
+										},
+										{
+											"type": "call",
+											"args": [
+												"exit",
+												"1"
+											]
+										}
+									]
+								}
+							]
+						},
+						{
+							"type": "call",
+							"assigns": [
+								"output=\"${outputs[0]}\""
+							],
+							"args": []
+						},
+						{
+							"type": "call",
+							"assigns": [
+								"outputExt=\"${output##*.}\""
+							],
+							"args": []
+						},
+						{
+							"type": "call",
+							"assigns": [
+								"outputb=\"$(basename \"$output\")\""
+							],
+							"args": []
+						},
+						{
+							"type": "if",
+							"cond": [
+								{
+									"type": "call",
+									"args": [
+										"[",
+										"\"$outputExt\"",
+										"!=",
+										"'json'",
+										"]"
+									]
+								}
+							],
+							"then": [
+								{
+									"type": "call",
+									"assigns": [
+										"args+=(--raw-output)"
+									],
+									"args": []
+								}
+							]
+						},
+						{
+							"type": "call",
+							"args": [
+								"echo",
+								"\"  - $inputb =\u003e $outputb\""
+							]
+						},
+						{
+							"type": "stmt",
+							"cmd": {
+								"type": "call",
+								"args": [
+									"jq",
+									"\"${args[@]}\"",
+									"\"$input\""
+								]
+							},
+							"redirs": [
+								{
+									"op": "\u003e",
+									"word": "\"$output\""
+								}
+							]
+						}
+					]
+				}
+			]
+		}
+	]
+}
