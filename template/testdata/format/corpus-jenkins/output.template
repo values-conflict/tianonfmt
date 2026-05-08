@@ -34,7 +34,7 @@ ENV JENKINS_GPG_KEY {{
 	.[env.variant].version
 	| split(".")
 	| map(tonumber? // .)
-	| if . >= [2, 543] or (. < [2, 542] and . >= [2, 541, 1]) then
+	| if . >= [ 2, 543 ] or (. < [ 2, 542 ] and . >= [ 2, 541, 1 ]) then
 		# https://www.jenkins.io/blog/2025/12/23/repository-signing-keys-changing/
 		"5E386EADB55F01504CAE8BCF7198F4B714ABFC68"
 	else

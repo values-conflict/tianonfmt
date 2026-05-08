@@ -7,29 +7,30 @@ def validate(selector; condition; err):
 		try path(selector) catch "BORKBORKBORK"
 	] as $paths
 	| IN($paths[]; "BORKBORKBORK") as $bork
-	| (if $bork then [selector] else $paths end) as $data
-	| reduce $data[] as $maybepath (
-		.;
+	| (if $bork then [ selector ] else $paths end) as $data
+	| reduce $data[] as $maybepath (.;
 		(if $bork then $maybepath else getpath($maybepath) end) as $val
 		| try (if $val | condition then . else error("") end) catch (
 			# invalid .["foo"]["bar"]: ERROR MESSAGE HERE
 			# value: {"baz":"buzz"}
-			error("\ninvalid "
-			+ if $bork then
-				"value"
-			else
-				".\($maybepath | map("[\(tojson)]") | add // "")"
-			end
-			+ ":\n\t\($val | tojson)"
-			+ (
-				$val
-				| err
-				| if . and length > 0 then "\n\(.)" else "" end
+			error(
+				"\ninvalid "
+				+ if $bork then
+					"value"
+				else
+					".\($maybepath | map("[\(tojson)]") | add // "")"
+				end
+				+ ":\n\t\($val | tojson)"
+				+ (
+					$val
+					| err
+					| if . and length > 0 then "\n\(.)" else "" end
+				)
+				+ (
+					ltrimstr("\n")
+					| if . and length > 0 then "\n\(.)" else "" end
+				)
 			)
-			+ (
-				ltrimstr("\n")
-				| if . and length > 0 then "\n\(.)" else "" end
-			))
 		)
 	)
 ;

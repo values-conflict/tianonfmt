@@ -80,6 +80,8 @@ func printShell(f *syntax.File) (string, error) {
 	s := fixMultiLineClauses(buf.String())
 	s = fixArraySpacing(s)
 	s = fixHereStringSpacing(s)
+	s = fixArithSpacing(s)
+	s = fixEvalQuoting(s)
 	s = joinShiftPairs(s)
 	return s, nil
 }
@@ -89,6 +91,194 @@ func printShell(f *syntax.File) (string, error) {
 // The digit-prefix case (e.g. arithmetic << 2) is excluded by requiring the
 // character after the space to be non-digit.
 var reHeredocSpace = regexp.MustCompile(`(<<-?) (['"A-Za-z_])`)
+
+// fixEvalQuoting wraps bare $(...) arguments to eval in double quotes:
+//
+//	eval $(cmd)   →  eval "$(cmd)"
+//
+// eval $(cmd) is almost never correct: word-splitting on the output of $(cmd)
+// changes semantics unexpectedly.  Implemented as text post-processing rather
+// than an AST rewrite to avoid zero-position node issues that cause comment
+// misplacement in the printer.  Already-quoted calls are left unchanged.
+func fixEvalQuoting(src string) string {
+	lines := strings.Split(src, "\n")
+	out := make([]string, 0, len(lines))
+	changed := false
+
+	for i := 0; i < len(lines); i++ {
+		line := lines[i]
+		indent := leadingTabs(line)
+		body := line[len(indent):]
+
+		// Only act on "eval $(" lines (not already "eval "$(").
+		if !strings.HasPrefix(body, "eval $(") {
+			out = append(out, line)
+			continue
+		}
+
+		// Find the $( position within the line.
+		parenAt := len(indent) + len("eval ")
+		// Walk the remaining text (possibly spanning lines) to find matching ).
+		text := strings.Join(lines[i:], "\n")
+		closeRel := evalCmdSubstClose(text, parenAt+1) // just after $
+		if closeRel < 0 {
+			out = append(out, line)
+			continue
+		}
+		closeAbs := closeRel // relative to start of text (lines[i:])
+
+		// Reconstruct the quoted form.
+		full := text[:closeAbs+1] // everything up to and including )
+		tail := text[closeAbs+1:] // everything after )
+		// Take the newline as the boundary for the tail of the current segment.
+		quoted := full[:parenAt] + `"` + full[parenAt:] + `"` + tail
+		// Re-split on the newlines we consumed.
+		consumed := strings.Count(full, "\n")
+		newLines := strings.Split(quoted, "\n")
+		out = append(out, newLines[:consumed+1]...)
+		i += consumed
+		changed = true
+	}
+
+	if !changed {
+		return src
+	}
+	return strings.Join(out, "\n")
+}
+
+// evalCmdSubstClose finds the index of the ) that closes the $( starting at
+// src[start] (src[start] == '(' after the '$').  Returns -1 if not found.
+func evalCmdSubstClose(src string, start int) int {
+	depth := 1
+	i := start + 1 // skip the opening (
+	for i < len(src) && depth > 0 {
+		switch src[i] {
+		case '(':
+			depth++
+		case ')':
+			depth--
+			if depth == 0 {
+				return i
+			}
+		case '\'':
+			i++
+			for i < len(src) && src[i] != '\'' {
+				i++
+			}
+		case '"':
+			i++
+			for i < len(src) && src[i] != '"' {
+				if src[i] == '\\' && i+1 < len(src) {
+					i++
+				}
+				i++
+			}
+		case '`':
+			i++
+			for i < len(src) && src[i] != '`' {
+				i++
+			}
+		}
+		i++
+	}
+	return -1
+}
+
+// fixArithSpacing adds spaces inside non-empty arithmetic expressions:
+//
+//	((x++))        →  (( x++ ))
+//	$((a + b))     →  $(( a + b ))
+//	(())           →  unchanged (empty)
+//	(( x++ ))      →  unchanged (already spaced)
+//
+// The printer removes outer spaces; Tianon always writes them.
+func fixArithSpacing(src string) string {
+	var result strings.Builder
+	changed := false
+	i := 0
+	for i < len(src) {
+		dollar := i+3 <= len(src) && src[i] == '$' && src[i+1] == '(' && src[i+2] == '('
+		plain := !dollar && i+2 <= len(src) && src[i] == '(' && src[i+1] == '('
+
+		if !dollar && !plain {
+			result.WriteByte(src[i])
+			i++
+			continue
+		}
+
+		prefix := "(("
+		skip := 2
+		if dollar {
+			prefix = "$(("
+			skip = 3
+		}
+
+		close := arithCloseParen(src, i+skip)
+		if close < 0 {
+			result.WriteByte(src[i])
+			i++
+			continue
+		}
+
+		content := src[i+skip : close]
+		if content == "" {
+			result.WriteString(prefix + "))")
+		} else {
+			l, r := "", ""
+			if content[0] != ' ' {
+				l = " "
+				changed = true
+			}
+			if content[len(content)-1] != ' ' {
+				r = " "
+				changed = true
+			}
+			result.WriteString(prefix + l + content + r + "))")
+		}
+		i = close + 2
+	}
+	if !changed {
+		return src
+	}
+	return result.String()
+}
+
+// arithCloseParen returns the index of the first ')' of the closing '))'
+// for an arithmetic expression opening at src[start] (just after '((' or '$((').
+// Tracks inner paren depth and skips quoted strings.  Returns -1 if not found.
+func arithCloseParen(src string, start int) int {
+	depth := 0
+	i := start
+	for i < len(src) {
+		switch src[i] {
+		case '(':
+			depth++
+		case ')':
+			if depth == 0 {
+				if i+1 < len(src) && src[i+1] == ')' {
+					return i
+				}
+				return -1
+			}
+			depth--
+		case '\'':
+			i++
+			for i < len(src) && src[i] != '\'' {
+				i++
+			}
+		case '"':
+			i++
+			for i < len(src) && src[i] != '"' {
+				if src[i] == '\\' && i+1 < len(src) {
+					i++
+				}
+				i++
+			}
+		}
+		i++
+	}
+	return -1
+}
 
 // fixHereStringSpacing removes the space that SpaceRedirects inserts after
 // heredoc and here-string operators so that delimiters are always cuddled:
@@ -645,31 +835,10 @@ func isUnquotedHeredocWord(w *syntax.Word) bool {
 
 // applyFormatRewrites applies format-level AST rewrites that are always correct
 // regardless of tidy mode.  Called from both Format and FormatWithTidy.
-func applyFormatRewrites(f *syntax.File) {
-	quoteEvalArgs(f)
-}
-
-// quoteEvalArgs wraps bare $(...) arguments to eval in double quotes.
-// eval $(cmd) is almost never correct: word-splitting on the output of $(cmd)
-// changes semantics unexpectedly.  eval "$(cmd)" is the idiomatic safe form.
-// Only bare CmdSubst args are affected; already-quoted args are left alone.
-func quoteEvalArgs(f *syntax.File) {
-	syntax.Walk(f, func(n syntax.Node) bool {
-		ce, ok := n.(*syntax.CallExpr)
-		if !ok || len(ce.Args) == 0 || wordLit(ce.Args[0]) != "eval" {
-			return true
-		}
-		for _, arg := range ce.Args[1:] {
-			if len(arg.Parts) == 1 {
-				if cs, ok := arg.Parts[0].(*syntax.CmdSubst); ok {
-					arg.Parts[0] = &syntax.DblQuoted{
-						Parts: []syntax.WordPart{cs},
-					}
-				}
-			}
-		}
-		return true
-	})
+// Note: eval $(...) → eval "$(...)​" quoting is done as a text-level
+// post-process (fixEvalQuoting) to avoid AST position issues with
+// zero-position nodes that cause comment misplacement.
+func applyFormatRewrites(_ *syntax.File) {
 }
 
 // ── jq-in-shell AST rewriting ────────────────────────────────────────────────

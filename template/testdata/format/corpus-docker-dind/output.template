@@ -54,14 +54,15 @@ RUN set -eux; \
 RUN set -eux; \
 	\
 	{{
-		download({
+	download(
+		{
 			arches: .arches,
 			urlKey: "dockerUrl",
-
 			# TODO sha256Key (once Docker publishes them 😭)
 			target: "docker.tgz",
-		})
-	}}; \
+		}
+	)
+}}; \
 	\
 	tar --extract \
 		--file docker.tgz \

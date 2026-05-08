@@ -341,9 +341,12 @@ func (f *formatter) shell(src string) (string, error) {
 // If inline is true, a single-line compact format is returned.
 // Returns "" on any parse failure so that callers preserve the original.
 func jqFmtFunc(expr string, inline bool) string {
-	node, err := jq.ParseExpr(strings.TrimSpace(expr))
+	trimmed := strings.TrimSpace(expr)
+	node, err := jq.ParseExpr(trimmed)
 	if err != nil {
-		f, ferr := jq.ParseFile(strings.TrimSpace(expr))
+		// Fall back to full-file parse: handles assembled template programs,
+		// def/include/import with implied semicolons, and multi-statement files.
+		f, ferr := jq.ParseFile(trimmed)
 		if ferr != nil {
 			return "" // parse failure — caller preserves original
 		}

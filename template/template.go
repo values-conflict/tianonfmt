@@ -98,7 +98,7 @@ func Parse(src string) []Segment {
 			case 2:
 				depth--
 				if depth == 0 {
-					expr := strings.TrimSpace(remaining[:pos])
+					expr := stripMinIndent(remaining[:pos])
 					segs = append(segs, JQSeg{Expr: expr, EatEOL: true})
 					remaining = remaining[pos+len(closeEat):]
 				} else {
@@ -107,7 +107,7 @@ func Parse(src string) []Segment {
 			case 3:
 				depth--
 				if depth == 0 {
-					expr := strings.TrimSpace(remaining[:pos])
+					expr := stripMinIndent(remaining[:pos])
 					segs = append(segs, JQSeg{Expr: expr, EatEOL: false})
 					remaining = remaining[pos+len(close):]
 				} else {
@@ -130,151 +130,91 @@ func Parse(src string) []Segment {
 // Format reformats a template file.
 //
 // jqFmt is called for each jq expression found inside {{ }} blocks.
-// It receives the raw expression text and returns the formatted version.
-// If jqFmt returns an empty string (parse error), the expression is left as-is.
+// It receives the raw expression text and a bool indicating whether the
+// block is embedded inline (same line as non-whitespace text).  It returns
+// the formatted version, or "" on parse failure so the expression is kept
+// as-is.
 //
-// isInline is true when the {{ }} block is embedded within a larger text line
-// (i.e., the surrounding text on the same line is non-empty).  The caller
-// should format inline blocks compactly (no newlines).
-//
-// Auto-detection of inline vs block: a block is "inline" when the text
-// immediately preceding the {{ on the same line contains non-whitespace.
+// Non-def, non-comment block expressions are assembled into groups by
+// balanced bracket depth and formatted together so that fragments like
+// "{{ ) else ( -}}" receive proper context-aware indentation.
 func Format(src string, jqFmt func(expr string, inline bool) string) string {
 	segs := Parse(src)
 	if len(segs) == 0 {
 		return src
 	}
 
-	var b strings.Builder
-
-	for _, seg := range segs {
-		switch v := seg.(type) {
-		case TextSeg:
-			b.WriteString(v.Text)
-
-		case JQSeg:
-			// Determine inline vs block context.
-			// A block is inline if, looking back at the accumulated output,
-			// the last character before {{ on the current line is non-whitespace.
-			inline := isInlineContext(b.String())
-
-			// Pure comment blocks (every non-empty line is a # comment).
-			// Single comment line → collapsed inline: {{ # foo -}}
-			// Multiple comment lines → multi-line with one tab per line:
-			//   {{
-			//   \t# foo
-			//   \t# bar
-			//   -}}
-			if isPureComment(v.Expr) {
-				var parts []string
-				for _, line := range strings.Split(v.Expr, "\n") {
-					if t := strings.TrimSpace(line); t != "" {
-						parts = append(parts, t)
-					}
+	// ── Pass 1: classify each JQSeg ─────────────────────────────────────────
+	type segClass struct {
+		inline    bool
+		isDef     bool
+		isComment bool
+	}
+	classes := make([]segClass, len(segs))
+	{
+		var sim strings.Builder
+		for i, seg := range segs {
+			switch v := seg.(type) {
+			case TextSeg:
+				sim.WriteString(v.Text)
+			case JQSeg:
+				classes[i] = segClass{
+					inline:    isInlineContext(sim.String()),
+					isDef:     isDefLike(v.Expr),
+					isComment: isPureComment(v.Expr),
 				}
-				closer := " }}"
-				if v.EatEOL {
-					closer = " -}}"
-				}
-				if len(parts) == 1 {
-					b.WriteString("{{ ")
-					b.WriteString(parts[0])
-					b.WriteString(closer)
-				} else {
-					acc := b.String()
-					lastNL := strings.LastIndex(acc, "\n")
-					var openerIndent string
-					if lastNL >= 0 {
-						openerIndent = leadingTabs(acc[lastNL+1:])
-					}
-					b.WriteString("{{\n")
-					for _, part := range parts {
-						b.WriteString(openerIndent)
-						b.WriteString("\t")
-						b.WriteString(part)
-						b.WriteByte('\n')
-					}
-					b.WriteString(openerIndent)
-					b.WriteString(strings.TrimSpace(closer))
-				}
-				break
-			}
-
-			// Format the expression.
-			fmtOK := false
-			formatted := v.Expr
-			if jqFmt != nil && v.Expr != "" {
-				if result := jqFmt(v.Expr, inline); result != "" {
-					formatted = result
-					fmtOK = true
-				}
-			}
-
-			// jq '#' comments are newline-terminated: embedding one in an inline
-			// {{ expr }} block causes it to swallow subsequent tokens up to end of
-			// string, breaking the expression.  Force multi-line layout instead.
-			if fmtOK && inline && strings.Contains(formatted, "#") {
-				if result := jqFmt(v.Expr, false); result != "" {
-					formatted = result
-					inline = false
-				} else {
-					// Can't reformat multi-line; emit verbatim to preserve structure.
-					fmtOK = false
-					formatted = v.Expr
-				}
-			}
-
-			// Emit the block.
-			if inline || !strings.Contains(formatted, "\n") {
-				// Inline or single-line: {{ expr }} on same line.
-				b.WriteString("{{ ")
-				b.WriteString(strings.TrimSpace(formatted))
-				if v.EatEOL {
-					b.WriteString(" -}}")
-				} else {
-					b.WriteString(" }}")
-				}
-			} else if !fmtOK {
-				// jqFmt couldn't parse the expression — emit verbatim so the
-				// block is preserved exactly and re-formatting is idempotent.
-				b.WriteString("{{")
-				b.WriteString(v.Expr)
-				if v.EatEOL {
-					b.WriteString("-}}")
-				} else {
-					b.WriteString("}}")
-				}
-			} else {
-				// Multi-line block with a successfully formatted expression.
-				// The content is indented one level deeper than the {{ opener;
-				// the closing }} sits at the same level as the opener.
-				acc := b.String()
-				lastNL := strings.LastIndex(acc, "\n")
-				var openerIndent string
-				if lastNL >= 0 {
-					openerIndent = leadingTabs(acc[lastNL+1:])
-				}
-				contentIndent := openerIndent + "\t"
-				b.WriteString("{{\n")
-				for _, line := range strings.Split(strings.TrimRight(formatted, "\n"), "\n") {
-					if strings.TrimSpace(line) == "" {
-						b.WriteByte('\n')
-					} else {
-						b.WriteString(contentIndent)
-						b.WriteString(line)
-						b.WriteByte('\n')
-					}
-				}
-				b.WriteString(openerIndent)
-				if v.EatEOL {
-					b.WriteString("-}}")
-				} else {
-					b.WriteString("}}")
-				}
+				// Advance simulated output; use a non-whitespace placeholder
+				// so inline-context detection works for subsequent segs.
+				sim.WriteString("{{X}}")
 			}
 		}
 	}
 
+	// ── Pass 2: format each block-expr seg individually ─────────────────────
+	//
+	// Each non-def, non-comment, non-inline seg is formatted as a standalone
+	// jq expression.  Fragments (like ") else (" or "| (") that cannot be
+	// parsed fall through to the verbatim path in writeBlockExpr.
+	//
+	// formattedFor[i] holds the formatted expression for segs[i].
+	// An empty string means "use verbatim fallback".
+	formattedFor := make([]string, len(segs))
+
+	if jqFmt != nil {
+		for i, seg := range segs {
+			jqSeg, ok := seg.(JQSeg)
+			if !ok {
+				continue
+			}
+			cl := classes[i]
+			if cl.isComment || cl.isDef || cl.inline {
+				continue
+			}
+			if result := jqFmt(jqSeg.Expr, false); result != "" {
+				formattedFor[i] = result
+			}
+		}
+	}
+
+	// ── Pass 3: emit ─────────────────────────────────────────────────────────
+	var b strings.Builder
+	for i, seg := range segs {
+		switch v := seg.(type) {
+		case TextSeg:
+			b.WriteString(v.Text)
+		case JQSeg:
+			cl := classes[i]
+			if cl.isComment {
+				writeComment(&b, v)
+			} else if cl.isDef {
+				writeDefBlock(&b, v, jqFmt)
+			} else if cl.inline {
+				writeInlineBlock(&b, v, jqFmt)
+			} else {
+				writeBlockExpr(&b, v, formattedFor[i])
+			}
+		}
+	}
 	return b.String()
 }
 
@@ -283,10 +223,215 @@ func IsTemplate(src string) bool {
 	return strings.Contains(src, "{{") && strings.Contains(src, "}}")
 }
 
+// ── emit helpers ─────────────────────────────────────────────────────────────
+
+// writeComment emits a pure-comment JQSeg.
+func writeComment(b *strings.Builder, v JQSeg) {
+	var parts []string
+	for _, line := range strings.Split(v.Expr, "\n") {
+		if t := strings.TrimSpace(line); t != "" {
+			parts = append(parts, t)
+		}
+	}
+	closer := " }}"
+	if v.EatEOL {
+		closer = " -}}"
+	}
+	if len(parts) == 1 {
+		b.WriteString("{{ ")
+		b.WriteString(parts[0])
+		b.WriteString(closer)
+		return
+	}
+	// Multi-line: indent relative to the current {{ opener position.
+	acc := b.String()
+	lastNL := strings.LastIndex(acc, "\n")
+	var openerIndent string
+	if lastNL >= 0 {
+		openerIndent = leadingTabs(acc[lastNL+1:])
+	}
+	b.WriteString("{{\n")
+	for _, part := range parts {
+		b.WriteString(openerIndent)
+		b.WriteString("\t")
+		b.WriteString(part)
+		b.WriteByte('\n')
+	}
+	b.WriteString(openerIndent)
+	b.WriteString(strings.TrimSpace(closer))
+}
+
+// writeDefBlock formats and emits a def/include/import JQSeg.
+// The template engine (jq-template.awk) implies the trailing ";" that jq
+// requires; the formatted output should not include it.
+func writeDefBlock(b *strings.Builder, v JQSeg, jqFmt func(string, bool) string) {
+	formatted := ""
+	if jqFmt != nil {
+		expr := strings.TrimSpace(v.Expr)
+		// Try as-is first (expr may already carry a ";").
+		if result := jqFmt(expr, false); result != "" {
+			formatted = result
+		} else if result := jqFmt(expr+"\n;", false); result != "" {
+			// Strip the template-implied trailing ";\n".
+			stripped := stripImpliedSemicolon(result)
+			// Stability check: some jq expressions with comments are not
+			// idempotent under repeated formatting (comments migrate between
+			// positions).  Only accept the result if re-formatting converges.
+			if r2 := jqFmt(strings.TrimSpace(stripped)+"\n;", false); r2 != "" {
+				if stripImpliedSemicolon(r2) == stripped {
+					formatted = stripped
+				}
+				// else: unstable → fall through to verbatim
+			}
+		}
+	}
+	writeBlockExpr(b, v, formatted)
+}
+
+// writeInlineBlock formats and emits an inline JQSeg (embedded in a text line).
+func writeInlineBlock(b *strings.Builder, v JQSeg, jqFmt func(string, bool) string) {
+	closer := " }}"
+	if v.EatEOL {
+		closer = " -}}"
+	}
+
+	fmtOK := false
+	formatted := v.Expr
+	if jqFmt != nil && v.Expr != "" {
+		if result := jqFmt(v.Expr, true); result != "" {
+			formatted = result
+			fmtOK = true
+		}
+	}
+
+	// jq '#' comments are newline-terminated; an inline block containing one
+	// would swallow all text up to end-of-string.  Force multi-line layout.
+	forceBlock := fmtOK && strings.Contains(formatted, "#")
+	if forceBlock {
+		if result := jqFmt(v.Expr, false); result != "" {
+			formatted = result
+		} else {
+			fmtOK = false
+			formatted = v.Expr
+			forceBlock = false
+		}
+	}
+
+	if !forceBlock && (!fmtOK || !strings.Contains(formatted, "\n")) {
+		b.WriteString("{{ ")
+		b.WriteString(strings.TrimSpace(formatted))
+		b.WriteString(closer)
+		return
+	}
+
+	// Multi-line formatted result (fmtOK guaranteed true at this point).
+	writeBlockExpr(b, v, formatted)
+}
+
+// writeBlockExpr emits a non-inline, non-def, non-comment JQSeg.
+// formatted is the jq-formatted expression (may be ""), empty means verbatim.
+func writeBlockExpr(b *strings.Builder, v JQSeg, formatted string) {
+	closer := " }}"
+	if v.EatEOL {
+		closer = " -}}"
+	}
+
+	// Use formatted content if available, otherwise fall back to the raw expr.
+	content := formatted
+	if content == "" {
+		content = v.Expr
+	}
+
+	// Single-line (formatted or verbatim): no embedded newlines after trimming.
+	contentTrimmed := strings.TrimRight(content, " \t\n")
+	if !strings.Contains(contentTrimmed, "\n") {
+		b.WriteString("{{ ")
+		b.WriteString(contentTrimmed)
+		b.WriteString(closer)
+		return
+	}
+
+	if formatted != "" {
+		// Multi-line formatted content.
+		// Formatted output from the jq formatter is always at depth 0 (no
+		// leading indentation), so we add one level of indentation to place
+		// the content under the {{ opener.
+		lines := strings.Split(strings.TrimRight(content, "\n"), "\n")
+		b.WriteString("{{\n")
+		for _, line := range lines {
+			trimmed := strings.TrimRight(line, " \t")
+			if trimmed == "" {
+				b.WriteByte('\n')
+			} else {
+				b.WriteByte('\t')
+				b.WriteString(trimmed)
+				b.WriteByte('\n')
+			}
+		}
+		if v.EatEOL {
+			b.WriteString("-}}")
+		} else {
+			b.WriteString("}}")
+		}
+		return
+	}
+
+	// Multi-line verbatim fallback: preserve content indented under {{.
+	acc := b.String()
+	lastNL := strings.LastIndex(acc, "\n")
+	var openerIndent string
+	if lastNL >= 0 {
+		openerIndent = leadingTabs(acc[lastNL+1:])
+	}
+	contentIndent := openerIndent + "\t"
+	b.WriteString("{{\n")
+	for _, line := range strings.Split(strings.TrimRight(v.Expr, "\n"), "\n") {
+		if strings.TrimSpace(line) == "" {
+			b.WriteByte('\n')
+		} else {
+			b.WriteString(contentIndent)
+			b.WriteString(strings.TrimRight(line, " \t"))
+			b.WriteByte('\n')
+		}
+	}
+	b.WriteString(openerIndent)
+	if v.EatEOL {
+		b.WriteString("-}}")
+	} else {
+		b.WriteString("}}")
+	}
+}
+
+
+// ── def-block helpers ─────────────────────────────────────────────────────────
+
+// isDefLike reports whether expr is a def/include/import block.
+// The jq-template.awk engine hoists these to the top of the generated program
+// and appends ";" when assembling; they must not carry the ";" in template source.
+// Leading whitespace is ignored; stripMinIndent only removes tabs, so non-tab
+// leading whitespace (e.g. a space from "{{ def …") may survive.
+func isDefLike(expr string) bool {
+	t := strings.TrimSpace(expr)
+	return strings.HasPrefix(t, "def ") || strings.HasPrefix(t, "def\t") ||
+		strings.HasPrefix(t, "include ") || strings.HasPrefix(t, "import ")
+}
+
+// stripImpliedSemicolon removes the trailing ";\n" that FormatFile emits for
+// def/include/import programs.  The template engine implies the semicolon; it
+// must not appear in the template source.
+func stripImpliedSemicolon(s string) string {
+	s = strings.TrimRight(s, " \t\n")
+	if strings.HasSuffix(s, ";") {
+		s = strings.TrimRight(s[:len(s)-1], " \t")
+	}
+	return s + "\n"
+}
+
+// ── utility ───────────────────────────────────────────────────────────────────
+
 // isInlineContext returns true if the last character before the current
 // position in accumulated output is non-whitespace (meaning we're mid-line).
 func isInlineContext(acc string) bool {
-	// Find the last newline in acc.
 	lastNL := strings.LastIndex(acc, "\n")
 	var linesSoFar string
 	if lastNL < 0 {
@@ -298,8 +443,7 @@ func isInlineContext(acc string) bool {
 }
 
 // isPureComment reports whether expr consists entirely of jq comment lines
-// (every non-empty line begins with #).  A block that merely starts with a
-// comment but also contains expression content returns false.
+// (every non-empty line begins with #).
 func isPureComment(expr string) bool {
 	hasComment := false
 	for _, line := range strings.Split(expr, "\n") {
@@ -311,6 +455,54 @@ func isPureComment(expr string) bool {
 		}
 	}
 	return hasComment
+}
+
+// stripMinIndent normalises the indentation of a multi-line jq expression
+// extracted from a {{ }} block.  For single-line expressions it behaves like
+// strings.TrimSpace.  For multi-line expressions it:
+//
+//  1. Strips surrounding blank lines (the outer \n wrappers).
+//  2. Finds the minimum leading-tab count across all non-blank lines.
+//  3. Strips exactly that many tabs from the start of every non-blank line.
+//
+// This preserves relative indentation between lines while establishing a
+// consistent base (minimum indent = 0 tabs).
+func stripMinIndent(s string) string {
+	s = strings.Trim(s, "\n")
+	if !strings.Contains(s, "\n") {
+		return strings.TrimSpace(s)
+	}
+	lines := strings.Split(s, "\n")
+	minTabs := -1
+	for _, line := range lines {
+		if strings.TrimSpace(line) == "" {
+			continue
+		}
+		tabs := 0
+		for _, c := range line {
+			if c == '\t' {
+				tabs++
+			} else {
+				break
+			}
+		}
+		if minTabs < 0 || tabs < minTabs {
+			minTabs = tabs
+		}
+	}
+	if minTabs <= 0 {
+		return s
+	}
+	prefix := strings.Repeat("\t", minTabs)
+	result := make([]string, len(lines))
+	for i, line := range lines {
+		if strings.TrimSpace(line) == "" {
+			result[i] = ""
+		} else {
+			result[i] = strings.TrimPrefix(line, prefix)
+		}
+	}
+	return strings.Join(result, "\n")
 }
 
 // leadingTabs returns the leading tab characters of s.

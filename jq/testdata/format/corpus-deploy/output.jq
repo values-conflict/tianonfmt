@@ -3,8 +3,7 @@ include "oci";
 # input: array of "build" objects (with "buildId" top level keys)
 # output: map of { "tag": [ list of OCI descriptors ], ... }
 def tagged_manifests(builds_selector; tags_extractor):
-	reduce (.[] | select(.build.resolved and builds_selector)) as $i (
-		{};
+	reduce (.[] | select(.build.resolved and builds_selector)) as $i ({};
 		.[$i
 		| tags_extractor
 		| ..
@@ -26,18 +25,17 @@ def arch_tagged_manifests($arch):
 # input: output of tagged_manifests (map of tag -> list of OCI descriptors)
 # output: array of input objects for "cmd/deploy" ({ "type": "manifest", "refs": [ ... ], "data": { ... } })
 def deploy_objects:
-	reduce to_entries[] as $in (
-		{};
+	reduce to_entries[] as $in ({};
 		$in.key as $ref
 		| (
 			$in.value
 			| map(normalize_descriptor) # normalized platforms *and* normalized field ordering
 			| sort_manifests
 		) as $manifests
-		| ([$manifests[].digest] | join("\n")) as $key
+		| ([ $manifests[].digest ] | join("\n")) as $key
 		| .[$key] |= (
 			if . then
-				.refs += [$ref]
+				.refs += [ $ref ]
 			else
 				{
 					type: "manifest",
@@ -46,14 +44,16 @@ def deploy_objects:
 					# add appropriate "lookup" values for copying child objects properly
 					lookup: (
 						$manifests
-						| map({
-							key: .digest,
-							value: (
-								.digest as $dig
-								| .annotations["org.opencontainers.image.ref.name"]
-								| rtrimstr("@" + $dig)
-							),
-						})
+						| map(
+							{
+								key: .digest,
+								value: (
+									.digest as $dig
+									| .annotations["org.opencontainers.image.ref.name"]
+									| rtrimstr("@" + $dig)
+								),
+							}
+						)
 						| from_entries
 					),
 

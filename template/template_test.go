@@ -20,9 +20,10 @@ func TestMain(m *testing.M) {
 
 // realJQFmt mirrors the jqFmtFunc used by the CLI.
 func realJQFmt(expr string, inline bool) string {
-	node, err := jq.ParseExpr(strings.TrimSpace(expr))
+	trimmed := strings.TrimSpace(expr)
+	node, err := jq.ParseExpr(trimmed)
 	if err != nil {
-		f, ferr := jq.ParseFile(strings.TrimSpace(expr))
+		f, ferr := jq.ParseFile(trimmed)
 		if ferr != nil {
 			return ""
 		}
@@ -100,6 +101,46 @@ func TestParse_JQBlock(t *testing.T) {
 	}
 }
 
+func TestParse_NestedBraces(t *testing.T) {
+	// A block whose jq expression contains literal {{ and }} (e.g. in a string
+	// literal).  The parser must handle nested depth correctly.
+	src := "{{ if .x then \"{{\" else \"}}\" end }}\n"
+	segs := template.Parse(src)
+	// Should produce exactly one JQSeg (the expression is the whole block).
+	var jqSegs []template.JQSeg
+	for _, seg := range segs {
+		if j, ok := seg.(template.JQSeg); ok {
+			jqSegs = append(jqSegs, j)
+		}
+	}
+	if len(jqSegs) != 1 {
+		t.Fatalf("expected 1 JQSeg, got %d: %v", len(jqSegs), segs)
+	}
+	if !strings.Contains(jqSegs[0].Expr, "if .x") {
+		t.Errorf("unexpected expr: %q", jqSegs[0].Expr)
+	}
+}
+
+func TestParse_NestedEatClose(t *testing.T) {
+	// A block containing a nested {{ }} pair where the inner close is -}}.
+	// Exercises the "depth > 0 with -}}" code path (pos += len(closeEat)).
+	src := "{{ {{ inner -}} outer }}\n"
+	segs := template.Parse(src)
+	var jqSegs []template.JQSeg
+	for _, seg := range segs {
+		if j, ok := seg.(template.JQSeg); ok {
+			jqSegs = append(jqSegs, j)
+		}
+	}
+	if len(jqSegs) != 1 {
+		t.Fatalf("expected 1 JQSeg, got %d: %v", len(jqSegs), segs)
+	}
+	// The inner -}} should be treated as literal content, not a closer.
+	if !strings.Contains(jqSegs[0].Expr, "inner") {
+		t.Errorf("inner content missing from expr: %q", jqSegs[0].Expr)
+	}
+}
+
 func TestParse_EatEOL(t *testing.T) {
 	segs := template.Parse("FROM {{ .base -}}\n")
 	var found bool
@@ -114,6 +155,13 @@ func TestParse_EatEOL(t *testing.T) {
 }
 
 // ── Format edge cases ─────────────────────────────────────────────────────────
+
+func TestFormat_EmptySrc(t *testing.T) {
+	// Format("") must return "" (no segments → early return).
+	if out := template.Format("", nil); out != "" {
+		t.Errorf("Format(\"\") = %q, want \"\"", out)
+	}
+}
 
 func TestFormat_NilJQFmt(t *testing.T) {
 	// jqFmt=nil: jq expressions pass through verbatim.
@@ -148,6 +196,111 @@ func TestFormat_EatEOLPreserved(t *testing.T) {
 	out := template.Format(src, func(expr string, _ bool) string { return expr })
 	if !strings.Contains(out, "-}}") {
 		t.Errorf("EatEOL marker -}} not preserved in output: %q", out)
+	}
+}
+
+// ── additional Format edge cases ─────────────────────────────────────────────
+
+func TestFormat_DefWithSemicolon(t *testing.T) {
+	// A def block that already carries a ";" should be formatted without adding
+	// another one.  jqFmt succeeds on the as-is expr (ParseFile handles it).
+	src := "{{ def foo: .bar; -}}\nFROM debian\n"
+	out := template.Format(src, realJQFmt)
+	if !strings.Contains(out, "def foo") {
+		t.Errorf("def not preserved: %q", out)
+	}
+	// Idempotency: second pass should produce the same result.
+	if out2 := template.Format(out, realJQFmt); out2 != out {
+		t.Errorf("not idempotent:\npass1: %q\npass2: %q", out, out2)
+	}
+}
+
+func TestFormat_MultiLineVerbatim(t *testing.T) {
+	// A multi-line block that fails to parse falls back to verbatim emission
+	// with content indented one level under {{.
+	src := "{{\n\t.foo |\n\t.bar\n}}\n"
+	out := template.Format(src, realJQFmt)
+	if !strings.Contains(out, ".foo") || !strings.Contains(out, ".bar") {
+		t.Errorf("verbatim content not preserved: %q", out)
+	}
+}
+
+func TestFormat_MultiLineVerbatimBlankLine(t *testing.T) {
+	// Verbatim multi-line block with a blank line in the MIDDLE.
+	// The blank line must be interior (not trailing) so stripMinIndent keeps it.
+	// The trailing pipe makes the expression incomplete → verbatim fallback.
+	src := "{{\n.foo |\n\n.bar |\n}}\n"
+	out := template.Format(src, realJQFmt)
+	if !strings.Contains(out, ".foo") {
+		t.Errorf("verbatim content not preserved: %q", out)
+	}
+}
+
+func TestFormat_MultiLineCommentIndented(t *testing.T) {
+	// A multi-line comment block whose {{ opener is at a tabbed indent level.
+	// The preceding newline ensures leadingTabs sees the tab prefix correctly.
+	src := "FROM debian\n\t{{\n\t# comment1\n\t# comment2\n\t-}}\n"
+	out := template.Format(src, nil)
+	if !strings.Contains(out, "# comment1") || !strings.Contains(out, "# comment2") {
+		t.Errorf("multi-line comment not preserved: %q", out)
+	}
+}
+
+func TestFormat_VerbatimMultiLineWithIndent(t *testing.T) {
+	// Multi-line verbatim block preceded by text that includes a newline.
+	// Exercises the verbatim path's openerIndent/lastNL-based indentation.
+	src := "FROM debian\n{{\n\t.foo |\n\t.bar\n}}\n"
+	out := template.Format(src, realJQFmt)
+	if !strings.Contains(out, ".foo") {
+		t.Errorf("content not preserved: %q", out)
+	}
+}
+
+func TestFormat_VerbatimMultiLineEatEOL(t *testing.T) {
+	// Multi-line block that fails to parse with EatEOL=true (-}}).
+	src := "{{\n\t.foo |\n\t.bar\n-}}\n"
+	out := template.Format(src, realJQFmt)
+	if !strings.Contains(out, ".foo") || !strings.Contains(out, "-}}") {
+		t.Errorf("verbatim content or EatEOL not preserved: %q", out)
+	}
+}
+
+func TestFormat_InlineForceBlockFails(t *testing.T) {
+	// An inline block that formats to something with '#' but then fails
+	// to format as non-inline falls back to verbatim single-line.
+	callCount := 0
+	jqFmt := func(expr string, inline bool) string {
+		callCount++
+		if inline {
+			return "# comment " + expr // has '#' → forces block
+		}
+		return "" // fails on non-inline attempt
+	}
+	src := "FROM {{ .base }}\n"
+	out := template.Format(src, jqFmt)
+	// Should preserve the original expression (verbatim fallback)
+	if !strings.Contains(out, ".base") {
+		t.Errorf("expression not preserved after force-block failure: %q", out)
+	}
+}
+
+func TestFormat_UnterminatedBlock(t *testing.T) {
+	// An unterminated {{ block (no matching }}) — the remainder after {{ is
+	// emitted as a TextSeg.
+	src := "FROM {{ .base\n"
+	segs := template.Parse(src)
+	// Expect two TextSegs: "FROM " and " .base\n" (the unterminated remainder).
+	var textSegs []string
+	for _, seg := range segs {
+		if ts, ok := seg.(template.TextSeg); ok {
+			textSegs = append(textSegs, ts.Text)
+		}
+	}
+	if len(textSegs) != 2 {
+		t.Fatalf("expected 2 text segs, got %d: %v", len(textSegs), segs)
+	}
+	if !strings.Contains(textSegs[1], ".base") {
+		t.Errorf("unterminated remainder not in text segs: %v", textSegs)
 	}
 }
 

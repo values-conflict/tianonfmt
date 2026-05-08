@@ -39,7 +39,7 @@ run_path() {
 			fi
 
 			echo "==> Running the script (cwd: $(pwd)): \"${script_file_path}\""
-			found=$((found + 1))
+			found=$(( found + 1 ))
 			run_as "${script_file_path}" || {
 				return_code="$?"
 				echo "==> Failed at executing script \"${script_file_path}\". Exit code: ${return_code}"
@@ -189,7 +189,7 @@ if expr "$1" : "apache" 1> /dev/null || [ "$1" = "php-fpm" ] || [ "${NEXTCLOUD_U
 		if version_greater "$image_version" "$installed_version"; then
 			echo "Initializing nextcloud $image_version ..."
 			if [ "$installed_version" != "0.0.0.0" ]; then
-				if [ "${image_version%%.*}" -gt "$((${installed_version%%.*} + 1))" ]; then
+				if [ "${image_version%%.*}" -gt "$(( ${installed_version%%.*} + 1 ))" ]; then
 					echo "Can't start Nextcloud because upgrading from $installed_version to $image_version is not supported."
 					echo "It is only possible to upgrade one major version at a time. For example, if you want to upgrade from version 14 to 16, you will have to upgrade from version 14 to 15, then from 15 to 16."
 					exit 1
@@ -259,7 +259,7 @@ if expr "$1" : "apache" 1> /dev/null || [ "$1" = "php-fpm" ] || [ "${NEXTCLOUD_U
 						try=0
 						until [ "$try" -gt "$max_retries" ] || run_as "php /var/www/html/occ maintenance:install $install_options"; do
 							echo "Retrying install..."
-							try=$((try + 1))
+							try=$(( try + 1 ))
 							sleep 10s
 						done
 						if [ "$try" -gt "$max_retries" ]; then
@@ -273,7 +273,7 @@ if expr "$1" : "apache" 1> /dev/null || [ "$1" = "php-fpm" ] || [ "${NEXTCLOUD_U
 							for DOMAIN in ${NEXTCLOUD_TRUSTED_DOMAINS}; do
 								DOMAIN=$(echo "${DOMAIN}" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
 								run_as "php /var/www/html/occ config:system:set trusted_domains $NC_TRUSTED_DOMAIN_IDX --value=\"${DOMAIN}\""
-								NC_TRUSTED_DOMAIN_IDX=$((NC_TRUSTED_DOMAIN_IDX + 1))
+								NC_TRUSTED_DOMAIN_IDX=$(( NC_TRUSTED_DOMAIN_IDX + 1 ))
 							done
 							set +f # turn glob back on
 						fi

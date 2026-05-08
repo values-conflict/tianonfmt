@@ -1,8 +1,11 @@
-{{def is_alpine:
+{{
+	def is_alpine:
 		env.variant | startswith("alpine")
 	;
+
 	def alpine_version:
-		env.variant | ltrimstr("alpine")-}}
+		env.variant | ltrimstr("alpine")
+-}}
 {{ if is_alpine then ( -}}
 FROM alpine:{{ alpine_version }} AS build
 {{ ) else ( -}}
@@ -21,7 +24,8 @@ ARG GOLANG_COMMIT={{ .commit.version | @sh }}
 ENV GOLANG_COMMIT $GOLANG_COMMIT
 {{ ) end -}}
 
-{{def os_arches:
+{{
+	def os_arches:
 		if is_alpine then
 			{
 				# https://dl-cdn.alpinelinux.org/alpine/edge/main/
@@ -53,7 +57,8 @@ ENV GOLANG_COMMIT $GOLANG_COMMIT
 				riscv64: "riscv64",
 				s390x: "s390x",
 			}
-		end-}}
+		end
+-}}
 RUN set -eux; \
 	now="$(date '+%s')"; \
 {{ if is_alpine then ( -}}
@@ -76,7 +81,8 @@ RUN set -eux; \
 	url=; \
 {{ ) else "" end -}}
 	case "$arch" in \
-{{[
+{{
+	[
 		.arches | to_entries[]
 		| select(.value.supported)
 		| .key as $bashbrewArch
@@ -85,7 +91,8 @@ RUN set -eux; \
 			| .[$bashbrewArch] // empty
 		) as $osArch
 		| .value
-		| (-}}
+		| (
+-}}
 		{{ $osArch | @sh }}) \
 {{ if env.version != "tip" then ( -}}
 			url={{ .url | @sh }}; \
@@ -94,8 +101,10 @@ RUN set -eux; \
 			export {{ .env | to_entries | sort_by(.key) | map(.key + "=" + (.value | @sh)) | join(" ") }}; \
 {{ ) end -}}
 			;; \
-{{)
-	] | add-}}
+{{
+		)
+	] | add
+-}}
 		*) echo >&2 "error: unsupported architecture '$arch' (likely packaging update needed)"; exit 1 ;; \
 	esac; \
 	\

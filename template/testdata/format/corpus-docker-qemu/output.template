@@ -18,39 +18,49 @@ RUN set -eux; \
 	apt-get update; \
 # https://github.com/tianon/docker-qemu/issues/30
 	apt-get install -y --no-install-recommends ca-certificates; \
-{{def firmware_packages: {
-	amd64: "ovmf",
-	arm64: "qemu-efi-aarch64",
-	"armel | armhf": "qemu-efi-arm",
-	i386: "ovmf-ia32",
-	riscv64: "opensbi u-boot-qemu",
-# TODO add u-boot-qemu to more arches?  https://packages.debian.org/bookworm/u-boot-qemu
-}-}}
+{{
+	 def firmware_packages: {
+		amd64: "ovmf",
+		arm64: "qemu-efi-aarch64",
+		"armel | armhf": "qemu-efi-arm",
+		i386: "ovmf-ia32",
+		riscv64: "opensbi u-boot-qemu",
+	# TODO add u-boot-qemu to more arches?  https://packages.debian.org/bookworm/u-boot-qemu
+	}
+-}}
 # include "swtpm" for TPM emulation -- not automatically launched, but small and useful for running a TPM sidecar container (https://qemu-project.gitlab.io/qemu/specs/tpm.html#the-qemu-tpm-emulator-device)
 	apt-get install -y --no-install-recommends swtpm; \
 # install "firmware" packages (easier UEFI, etc)
 {{ if env.variant == "native" then ( -}}
 	arch="$(dpkg --print-architecture)"; \
 	case "$arch" in \
-{{[
+{{
+	[
 		firmware_packages
 		| to_entries[]
-		| (-}}
+		| (
+-}}
 		{{ .key }}) apt-get install -y --no-install-recommends {{ .value }} ;; \
-{{)
-	] | add-}}
+{{
+		)
+	] | add
+-}}
 		*) echo >&2 "warning: architecture '$arch' unknown 😅 (is there a 'QEMU firmware' package that should be installed here? likely candidates: https://packages.debian.org/source/$suite/edk2)" ;; \
 	esac; \
 {{ ) else ( -}}
 	apt-get install -y --no-install-recommends \
-{{[
+{{
+	[
 		firmware_packages
 		| to_entries[]
-		| (-}}
+		| (
+-}}
 # {{ .key }}
 		{{ .value }} \
-{{)
-	] | add-}}
+{{
+		)
+	] | add
+-}}
 	; \
 {{ ) end -}}
 	apt-get dist-clean

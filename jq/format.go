@@ -987,11 +987,11 @@ func (p *printer) reduceExpr(v *ReduceExpr) {
 	p.write(" as ")
 	p.node(v.Pattern)
 	p.write(" (")
-	p.indent()
-	p.newline()
+	// Init stays on the same line as "(": reduce EXPR as $v (INIT;
 	initInner, initTC := stripTrailing(v.Init)
 	p.node(initInner)
 	p.writeAfterPunct(";", initTC)
+	p.indent()
 	p.newline()
 	p.node(v.Update)
 	p.dedent()
@@ -1007,11 +1007,11 @@ func (p *printer) foreachExpr(v *ForeachExpr) {
 	p.write(" as ")
 	p.node(v.Pattern)
 	p.write(" (")
-	p.indent()
-	p.newline()
+	// Init stays on the same line as "(": foreach EXPR as $v (INIT;
 	initInner, initTC := stripTrailing(v.Init)
 	p.node(initInner)
 	p.writeAfterPunct(";", initTC)
+	p.indent()
 	p.newline()
 	updateInner, updateTC := stripTrailing(v.Update)
 	p.node(updateInner)
@@ -1198,6 +1198,22 @@ func (p *printer) callExpr(v *Call) {
 		p.newline()
 		p.write(")")
 		return
+	}
+
+	// Single argument that doesn't fit inline: use multi-line call format so
+	// the argument is indented under the opener, matching array/object style.
+	if len(args) == 1 && !hasAnyComment(args[0]) {
+		argInline := p.inlineSafe(args[0])
+		if argInline == "" || strings.Contains(argInline, "\n") {
+			p.write("(")
+			p.indent()
+			p.newline()
+			p.node(args[0])
+			p.dedent()
+			p.newline()
+			p.write(")")
+			return
+		}
 	}
 
 	p.write("(")
@@ -1634,9 +1650,9 @@ func (p *printer) nodeInline(n Node) {
 			p.node(n)
 			return
 		}
-		p.write("[")
+		p.write("[ ")
 		p.nodeInline(v.Elem)
-		p.write("]")
+		p.write(" ]")
 	case *Object:
 		inl := p.shortInlineObject(v)
 		if inl != "" {

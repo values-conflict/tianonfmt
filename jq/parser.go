@@ -986,7 +986,16 @@ func (p *parser) parseObject() (*Object, error) {
 		// lines: if the first upcoming token (comment or key) is 2+ lines after
 		// the last consumed token, there was an intentional blank line.
 		rawNext := p.lex.Peek()
-		blankBefore := rawNext.Line > lastFieldLine+1 && rawNext.Kind != EOF
+		// If leading comments were already absorbed into p.pending by the
+		// previous iteration's p.peek() call, the raw next token is the field
+		// key — not the comment.  Use the first absorbed comment's line as the
+		// effective "first token" for blank-line detection, so that a comment
+		// immediately after a comma (no blank line) is not mistaken for a gap.
+		effectiveNextLine := rawNext.Line
+		if len(p.pending) > 0 && p.pending[0].Line < rawNext.Line {
+			effectiveNextLine = p.pending[0].Line
+		}
+		blankBefore := effectiveNextLine > lastFieldLine+1 && rawNext.Kind != EOF
 		// Now absorb comments and check for closing brace.
 		if p.peek().Kind == RBRACE {
 			break

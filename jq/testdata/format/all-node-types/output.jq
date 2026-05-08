@@ -12,12 +12,10 @@ def g:
 ;
 
 label $lbl |
-foreach .[] as $item (
-	0;
+foreach .[] as $item (0;
 	. + $item
 ; . * 2)
-| reduce .[] as $x (
-	0;
+| reduce .[] as $x (0;
 	. + $x
 )
 | if . then .a elif .b then .c else .d end

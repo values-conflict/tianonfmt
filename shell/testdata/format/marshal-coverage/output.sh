@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-((x++))
+(( x++ ))
 [[ -f /etc/foo ]]
 let x=5 y=x+1
 time sleep 0
