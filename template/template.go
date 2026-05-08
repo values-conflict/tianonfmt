@@ -16,6 +16,8 @@
 package template
 
 import (
+	"regexp"
+	"strconv"
 	"strings"
 )
 
@@ -170,17 +172,83 @@ func Format(src string, jqFmt func(expr string, inline bool) string) string {
 		}
 	}
 
-	// ── Pass 2: format each block-expr seg individually ─────────────────────
+	// ── Pass 2: format block-expr segs via whole-program assembly ──────────
 	//
-	// Each non-def, non-comment, non-inline seg is formatted as a standalone
-	// jq expression.  Fragments (like ") else (" or "| (") that cannot be
-	// parsed fall through to the verbatim path in writeBlockExpr.
+	// Non-def, non-comment, non-inline block expressions are grouped by balanced
+	// bracket depth (when the running depth returns to 0, a group ends).  Each
+	// group is assembled into one jq expression with sentinel markers between
+	// blocks, formatted as a whole, then split back into per-block pieces.
+	//
+	// Sentinel choice per boundary:
+	//   - If block[i] ends with "(" AND block[i+1] starts with ")": string
+	//     sentinel "SENTINEL_N" fills the empty paren (jq disallows bare ()).
+	//   - Otherwise: comment sentinel # SENTINEL_N (safe between any expressions).
+	//
+	// After formatting, the jq formatter (with comment-placement fix) places:
+	//   - Comment sentinels on their own indented lines.
+	//   - String sentinels on their own indented lines (cuddled paren format
+	//     ensures the "then ()" bodies are rendered multi-line).
 	//
 	// formattedFor[i] holds the formatted expression for segs[i].
 	// An empty string means "use verbatim fallback".
 	formattedFor := make([]string, len(segs))
 
 	if jqFmt != nil {
+		type blockInfo struct {
+			idx  int
+			expr string
+		}
+		var curGroup []blockInfo
+		groupDepth := 0
+
+		flushGroup := func() {
+			if len(curGroup) == 0 {
+				return
+			}
+			// Single-block groups: format directly and we're done.
+			if len(curGroup) == 1 {
+				b := curGroup[0]
+				if result := jqFmt(b.expr, false); result != "" {
+					formattedFor[b.idx] = result
+				}
+				curGroup = curGroup[:0]
+				groupDepth = 0
+				return
+			}
+			// Multi-block groups: always assemble.  Blocks that can be
+			// formatted standalone (e.g. ".key" embedded in a deeper
+			// context) are still part of the same jq expression and
+			// must be formatted in context to get the right indentation.
+			// The split gives back a single-line piece for simple
+			// expressions; TrimSpace in writeBlockExpr strips depth tabs.
+			exprs := make([]string, len(curGroup))
+			for j, b := range curGroup {
+				exprs[j] = strings.TrimSpace(b.expr)
+			}
+			var parts []string
+			for j, e := range exprs {
+				parts = append(parts, e)
+				if j < len(exprs)-1 {
+					parts = append(parts, assemblySentinel(j, exprs[j], exprs[j+1]))
+				}
+			}
+			assembled := strings.Join(parts, "\n")
+			result := jqFmt(assembled, false)
+			if result != "" {
+				pieces := assemblySentinelRE.Split(result, -1)
+				if len(pieces) == len(curGroup) {
+					for j, b := range curGroup {
+						if p := trimPiece(pieces[j]); p != "" {
+							formattedFor[b.idx] = p
+						}
+					}
+				}
+				// Sentinel count mismatch → verbatim fallback for all in group.
+			}
+			curGroup = curGroup[:0]
+			groupDepth = 0
+		}
+
 		for i, seg := range segs {
 			jqSeg, ok := seg.(JQSeg)
 			if !ok {
@@ -190,10 +258,13 @@ func Format(src string, jqFmt func(expr string, inline bool) string) string {
 			if cl.isComment || cl.isDef || cl.inline {
 				continue
 			}
-			if result := jqFmt(jqSeg.Expr, false); result != "" {
-				formattedFor[i] = result
+			curGroup = append(curGroup, blockInfo{idx: i, expr: jqSeg.Expr})
+			groupDepth += bracketDelta(jqSeg.Expr)
+			if groupDepth <= 0 {
+				flushGroup()
 			}
 		}
+		flushGroup()
 	}
 
 	// ── Pass 3: emit ─────────────────────────────────────────────────────────
@@ -343,7 +414,10 @@ func writeBlockExpr(b *strings.Builder, v JQSeg, formatted string) {
 	}
 
 	// Single-line (formatted or verbatim): no embedded newlines after trimming.
-	contentTrimmed := strings.TrimRight(content, " \t\n")
+	// TrimSpace (not just TrimRight) removes depth-context leading tabs that
+	// arrive from whole-program assembly pieces — they carry no meaning in the
+	// emitted {{ expr }} form.
+	contentTrimmed := strings.TrimSpace(content)
 	if !strings.Contains(contentTrimmed, "\n") {
 		b.WriteString("{{ ")
 		b.WriteString(contentTrimmed)
@@ -353,17 +427,28 @@ func writeBlockExpr(b *strings.Builder, v JQSeg, formatted string) {
 
 	if formatted != "" {
 		// Multi-line formatted content.
-		// Formatted output from the jq formatter is always at depth 0 (no
-		// leading indentation), so we add one level of indentation to place
-		// the content under the {{ opener.
+		// When the formatted piece came from whole-program assembly (depth > 0),
+		// it already carries the correct leading indentation — emit as-is.
+		// When the piece is at depth 0 (single standalone expression or def),
+		// the jq formatter produces no leading tabs — add one level.
 		lines := strings.Split(strings.TrimRight(content, "\n"), "\n")
+		needsIndent := false
+		for _, line := range lines {
+			if strings.TrimSpace(line) != "" {
+				needsIndent = len(line) == 0 || line[0] != '\t'
+				break
+			}
+		}
 		b.WriteString("{{\n")
 		for _, line := range lines {
 			trimmed := strings.TrimRight(line, " \t")
 			if trimmed == "" {
 				b.WriteByte('\n')
-			} else {
+			} else if needsIndent {
 				b.WriteByte('\t')
+				b.WriteString(trimmed)
+				b.WriteByte('\n')
+			} else {
 				b.WriteString(trimmed)
 				b.WriteByte('\n')
 			}
@@ -425,6 +510,82 @@ func stripImpliedSemicolon(s string) string {
 		s = strings.TrimRight(s[:len(s)-1], " \t")
 	}
 	return s + "\n"
+}
+
+// ── assembly helpers ──────────────────────────────────────────────────────────
+
+// assemblySentinel returns the sentinel string to insert between expressions i
+// and i+1 during whole-program assembly.
+//
+// When expression i ends with "(" and expression i+1 starts with ")", jq
+// forbids an empty-paren body (jq does not allow "()" as an expression).  In
+// that case a string-literal sentinel "SENTINEL_N" is used to fill the paren.
+// In all other positions a comment sentinel # SENTINEL_N is used.
+func assemblySentinel(n int, exprBefore, exprAfter string) string {
+	lastBefore := strings.TrimRight(strings.TrimSpace(exprBefore), " \t")
+	firstAfter := strings.TrimLeft(strings.TrimSpace(exprAfter), " \t\n")
+	if strings.HasSuffix(lastBefore, "(") && strings.HasPrefix(firstAfter, ")") {
+		return "\"__TIANONFMT_" + strconv.Itoa(n) + "__\""
+	}
+	return "# __TIANONFMT_" + strconv.Itoa(n) + "__"
+}
+
+// assemblySentinelRE matches any line consisting solely of a sentinel marker
+// (comment form "# __TIANONFMT_N__" or string form "\"__TIANONFMT_N__\"").
+var assemblySentinelRE = regexp.MustCompile(`(?m)^\s*(?:# __TIANONFMT_\d+__|"__TIANONFMT_\d+__")\s*$`)
+
+// trimPiece strips leading and trailing blank lines while preserving internal
+// whitespace and indentation.
+func trimPiece(s string) string {
+	lines := strings.Split(s, "\n")
+	start := 0
+	for start < len(lines) && strings.TrimSpace(lines[start]) == "" {
+		start++
+	}
+	end := len(lines)
+	for end > start && strings.TrimSpace(lines[end-1]) == "" {
+		end--
+	}
+	if start >= end {
+		return ""
+	}
+	return strings.Join(lines[start:end], "\n")
+}
+
+// bracketDelta returns the net change in bracket depth for expr, counting
+// unquoted, non-commented (, [, { as +1 and ), ], } as -1.
+func bracketDelta(expr string) int {
+	depth := 0
+	inString := false
+	inComment := false
+	for i := 0; i < len(expr); i++ {
+		c := expr[i]
+		if inComment {
+			if c == '\n' {
+				inComment = false
+			}
+			continue
+		}
+		if inString {
+			if c == '\\' {
+				i++
+			} else if c == '"' {
+				inString = false
+			}
+			continue
+		}
+		switch c {
+		case '#':
+			inComment = true
+		case '"':
+			inString = true
+		case '(', '[', '{':
+			depth++
+		case ')', ']', '}':
+			depth--
+		}
+	}
+	return depth
 }
 
 // ── utility ───────────────────────────────────────────────────────────────────

@@ -36,39 +36,39 @@
 							}
 						},
 						"right": {
-							"type": "call",
-							"name": "select",
-							"args": [
-								{
-									"type": "pipe",
-									"left": {
-										"type": "commented",
-										"leadingComments": [
-											"# ignore comment lines (optional in the spec, but for documents that should not have them they are invalid syntax anyhow so should be fairly harmless to strip unilaterally)"
-										],
-										"expr": {
-											"type": "call",
-											"name": "startswith",
-											"args": [
-												{
-													"type": "string",
-													"raw": "\"#\""
-												}
-											]
-										}
-									},
-									"right": {
-										"type": "commented",
-										"leadingComments": [
-											"# TODO consider splitting this into a separate function, like \"filter_inline_pgp_noise\" ?"
-										],
-										"expr": {
+							"type": "commented",
+							"leadingComments": [
+								"# TODO consider splitting this into a separate function, like \"filter_inline_pgp_noise\" ?"
+							],
+							"expr": {
+								"type": "call",
+								"name": "select",
+								"args": [
+									{
+										"type": "pipe",
+										"left": {
+											"type": "commented",
+											"leadingComments": [
+												"# ignore comment lines (optional in the spec, but for documents that should not have them they are invalid syntax anyhow so should be fairly harmless to strip unilaterally)"
+											],
+											"expr": {
+												"type": "call",
+												"name": "startswith",
+												"args": [
+													{
+														"type": "string",
+														"raw": "\"#\""
+													}
+												]
+											}
+										},
+										"right": {
 											"type": "call",
 											"name": "not"
 										}
 									}
-								}
-							]
+								]
+							}
 						}
 					}
 				},

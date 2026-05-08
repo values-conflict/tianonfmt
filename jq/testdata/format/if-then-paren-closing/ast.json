@@ -1,0 +1,38 @@
+{
+	"type": "jq",
+	"query": {
+		"type": "if",
+		"cond": {
+			"type": "field",
+			"name": ".x"
+		},
+		"then": {
+			"type": "paren",
+			"expr": {
+				"type": "pipe",
+				"left": {
+					"type": "field",
+					"name": ".y"
+				},
+				"right": {
+					"type": "field",
+					"name": ".z"
+				}
+			}
+		},
+		"else": {
+			"type": "paren",
+			"expr": {
+				"type": "pipe",
+				"left": {
+					"type": "field",
+					"name": ".a"
+				},
+				"right": {
+					"type": "field",
+					"name": ".b"
+				}
+			}
+		}
+	}
+}

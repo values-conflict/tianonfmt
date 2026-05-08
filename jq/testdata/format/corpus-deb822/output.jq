@@ -7,10 +7,10 @@ def deb822_stream(lines):
 	foreach (
 		lines,
 		"" # inject a synthetic blank line at the end of the input stream to make sure we output everything (because we only output on empty lines, when we know an "entry" is done)
+		# TODO consider splitting this into a separate function, like "filter_inline_pgp_noise" ?
 		| select(
 			# ignore comment lines (optional in the spec, but for documents that should not have them they are invalid syntax anyhow so should be fairly harmless to strip unilaterally)
 			startswith("#")
-			# TODO consider splitting this into a separate function, like "filter_inline_pgp_noise" ?
 			| not
 		)
 	) as $line ({ accum: {} };

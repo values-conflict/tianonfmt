@@ -496,20 +496,36 @@ func (p *parser) parseTerm() (Node, error) {
 		return nil, err
 	}
 
-	// Any new entries in p.pending that were added during parsePrimary are
-	// pre-first-token comments (absorbed by the first peek() before any
-	// non-comment token of the primary was consumed).  Attach them as leading
-	// comments to the primary and remove them from p.pending so they don't
-	// accidentally get picked up as leading comments for the right operand.
+	// New entries in p.pending added during parsePrimary may be:
+	//   (a) Pre-first-token: absorbed by parsePrimary's opening peek() BEFORE
+	//       any real token of the primary was consumed.  These are genuine
+	//       leading comments of the primary and should be attached to it.
+	//   (b) Post-last-token: absorbed by a lookahead AFTER the primary's last
+	//       real token (e.g. parseIdentOrCall's peek-for-args, parseSuffix's
+	//       peek-for-postfix).  These are leading comments for the NEXT token
+	//       in the surrounding expression and must stay in p.pending.
+	//
+	// Distinguish by line number: a comment whose line is > p.lastLine (the
+	// line of the primary's last consumed token) appeared after that token and
+	// is post-last-token.  Comments at or before p.lastLine are pre-first-token.
 	if afterPrimary := len(p.pending); afterPrimary > beforePrimary {
-		prePrimary := make([]*Comment, afterPrimary-beforePrimary)
-		copy(prePrimary, p.pending[beforePrimary:])
-		p.pending = p.pending[:beforePrimary] // restore
+		var prePrimary, postPrimary []*Comment
+		for _, c := range p.pending[beforePrimary:] {
+			if c.Line <= p.lastLine {
+				prePrimary = append(prePrimary, c)
+			} else {
+				postPrimary = append(postPrimary, c)
+			}
+		}
+		// Restore p.pending: original entries + post-last-token entries
+		p.pending = append(p.pending[:beforePrimary:beforePrimary], postPrimary...)
 
-		primary = &CommentedExpr{
-			At:              primary.nodePos(),
-			LeadingComments: prePrimary,
-			Expr:            primary,
+		if len(prePrimary) > 0 {
+			primary = &CommentedExpr{
+				At:              primary.nodePos(),
+				LeadingComments: prePrimary,
+				Expr:            primary,
+			}
 		}
 	}
 

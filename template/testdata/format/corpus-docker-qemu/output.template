@@ -43,7 +43,8 @@ RUN set -eux; \
 		{{ .key }}) apt-get install -y --no-install-recommends {{ .value }} ;; \
 {{
 		)
-	] | add
+	]
+	| add
 -}}
 		*) echo >&2 "warning: architecture '$arch' unknown 😅 (is there a 'QEMU firmware' package that should be installed here? likely candidates: https://packages.debian.org/source/$suite/edk2)" ;; \
 	esac; \
@@ -59,7 +60,8 @@ RUN set -eux; \
 		{{ .value }} \
 {{
 		)
-	] | add
+	]
+	| add
 -}}
 	; \
 {{ ) end -}}
@@ -166,7 +168,11 @@ RUN set -eux; \
 		s390x) targetList='s390x-softmmu' ;; \
 		*) echo >&2 "error: architecture '$arch' unimplemented 😅"; exit 1 ;; \
 	esac; \
-{{ ) else "" end -}}
+{{
+	) else
+		""
+	end
+-}}
 	\
 	./configure --help; \
 	./configure \

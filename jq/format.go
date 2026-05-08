@@ -871,12 +871,18 @@ func (p *printer) binOp(v *BinOp) {
 //		COMPLEX_CONDITION
 //	then
 //
-// When the condition is single-line the compact form is used:
+// When the condition is single-line and short the compact form is used:
 //
 //	if SIMPLE_COND then
+//
+// Using the inline string (from inlineSafe) rather than p.node ensures that
+// when a condition exceeds shortThreshold it is consistently rendered in the
+// multi-line form — avoiding a non-idempotency where pipeChain splits a long
+// condition to multiple lines, which sets MultiLine=true on re-parse and then
+// forces the multi-line form on the next pass.
 func (p *printer) writeIfClause(keyword string, cond Node) {
 	condInline := p.inlineSafe(cond)
-	if condInline == "" || strings.Contains(condInline, "\n") {
+	if condInline == "" || strings.Contains(condInline, "\n") || len(condInline) > shortThreshold {
 		// Multi-line condition: keyword and then on their own lines.
 		p.write(keyword)
 		p.indent()
@@ -886,20 +892,72 @@ func (p *printer) writeIfClause(keyword string, cond Node) {
 		p.newline()
 		p.write("then")
 	} else {
+		// Inline: write the pre-computed inline string directly to avoid
+		// pipeChain potentially re-splitting a long condition.
 		p.write(keyword + " ")
-		p.node(cond)
+		p.write(condInline)
 		p.write(" then")
 	}
 }
 
+// parenBodyHasComments reports whether n is a *Paren that carries an open
+// comment or closing comments, forcing it (and its enclosing if/then/else)
+// to multi-line layout.
+func parenBodyHasComments(n Node) bool {
+	if paren, ok := n.(*Paren); ok {
+		return paren.OpenComment != nil || len(paren.ClosingComments) > 0
+	}
+	return false
+}
+
+// writeCuddledParenBody writes " (", then the paren body indented (including
+// any closing comments), then dedents — but does NOT write the closing ")".
+// The caller writes ")" as part of ") else", ") end", etc.
+func (p *printer) writeCuddledParenBody(paren *Paren) {
+	p.write(" (")
+	if paren.OpenComment != nil {
+		p.write(" ")
+		p.write(paren.OpenComment.Text)
+		p.lastWasTrailing = true
+	}
+	p.indent()
+	p.newline()
+	p.node(paren.Expr)
+	for _, c := range paren.ClosingComments {
+		p.newline()
+		p.write(c.Text)
+	}
+	p.dedent()
+}
+
+// writeBranchBody emits an if/then/else branch body.
+// If the body is a *Paren, it is emitted in cuddled style (" (\n\tbody\n")
+// and true is returned so the caller can write ")" before the next keyword.
+// Otherwise the body is emitted indented on the next line and false is returned.
+func (p *printer) writeBranchBody(body Node) bool {
+	if paren, ok := body.(*Paren); ok {
+		p.writeCuddledParenBody(paren)
+		return true
+	}
+	p.indent()
+	p.newline()
+	p.node(body)
+	p.dedent()
+	return false
+}
+
 // ifExpr formats if/then/else/end.
 // Inline when everything fits; multi-line otherwise.
+// When a branch body is a *Paren, the "(" is cuddled with the preceding
+// keyword ("then (", "else (", ") else (") and ")" is written before the
+// next keyword ("end", "else", "elif").
 // Style refs: dpkg-version.jq:22-29 (multi), :35 (inline); deb822.jq:18-35
 func (p *printer) ifExpr(v *IfExpr) {
-	// Any comment forces multi-line.
-	forcedMulti := hasAnyComment(v.Then) || hasAnyComment(v.Else)
+	// Any comment (or a Paren body with internal comments) forces multi-line.
+	forcedMulti := hasAnyComment(v.Then) || hasAnyComment(v.Else) ||
+		parenBodyHasComments(v.Then) || parenBodyHasComments(v.Else)
 	for _, ei := range v.ElseIfs {
-		if hasAnyComment(ei.Then) {
+		if hasAnyComment(ei.Then) || parenBodyHasComments(ei.Then) {
 			forcedMulti = true
 		}
 	}
@@ -939,42 +997,45 @@ func (p *printer) ifExpr(v *IfExpr) {
 		p.write(p.tab())
 	}
 	p.writeIfClause("if", cond)
-	p.indent()
-	p.newline()
-	p.node(v.Then)
-	p.dedent()
+	// prevCuddled: true when the last-emitted branch used cuddled-paren style
+	// (so the caller must write ")" before the next keyword).
+	prevCuddled := p.writeBranchBody(v.Then)
 
 	for _, ei := range v.ElseIfs {
 		p.newline()
+		if prevCuddled {
+			p.write(") ")
+		}
 		p.writeIfClause("elif", ei.Cond)
-		p.indent()
-		p.newline()
-		p.node(ei.Then)
-		p.dedent()
+		prevCuddled = p.writeBranchBody(ei.Then)
 	}
 
 	if v.Else != nil {
 		p.newline()
+		// Short-else form: only when the then body was not cuddled (no leading ")")
+		// and both bodies are simple single-line expressions with no comments.
 		elseInline := p.shortInline(v.Else)
-		// Short-else form (else VALUE end) only when both the then body and the
-		// else body are each a single visual line with no comments.  If the then
-		// body has any comment (making it span comment-line + value-line), the
-		// else must also be multi-line for visual symmetry.
-		if len(elseInline) <= 30 && !strings.Contains(elseInline, "\n") && !hasAnyComment(v.Else) && !hasAnyComment(v.Then) {
+		if !prevCuddled &&
+			len(elseInline) <= 30 && !strings.Contains(elseInline, "\n") &&
+			!hasAnyComment(v.Else) && !hasAnyComment(v.Then) &&
+			!parenBodyHasComments(v.Else) && !parenBodyHasComments(v.Then) {
 			p.write("else ")
 			p.write(elseInline)
 			p.write(" end")
+			return
+		}
+		if prevCuddled {
+			p.write(") else")
 		} else {
 			p.write("else")
-			p.indent()
-			p.newline()
-			p.node(v.Else)
-			p.dedent()
-			p.newline()
-			p.write("end")
 		}
+		prevCuddled = p.writeBranchBody(v.Else)
+	}
+
+	p.newline()
+	if prevCuddled {
+		p.write(") end")
 	} else {
-		p.newline()
 		p.write("end")
 	}
 }
