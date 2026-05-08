@@ -1375,8 +1375,9 @@ func (p *printer) objectExpr(v *Object) {
 		p.write("{}")
 		return
 	}
-	// Never inline an object that was written multi-line in source.
-	if !v.MultiLine {
+	// Never inline an object that was written multi-line in source, or that
+	// has closing comments (comments between the last field and the closing }).
+	if !v.MultiLine && len(v.ClosingComments) == 0 {
 		inline := p.shortInlineObject(v)
 		if inline != "" && len(inline) <= shortThreshold && !strings.Contains(inline, "\n") {
 			p.write(inline)
@@ -1395,6 +1396,15 @@ func (p *printer) objectExpr(v *Object) {
 		//   key: value, # comment  ← correct
 		//   key: value # comment,  ← wrong (comma inside comment)
 		p.writeAfterPunct(",", tc)
+	}
+	if len(v.ClosingComments) > 0 {
+		if v.BlankBeforeClosingComments {
+			p.nl() // blank line before closing comments, matching source intent
+		}
+		for _, c := range v.ClosingComments {
+			p.newline()
+			p.write(c.Text)
+		}
 	}
 	p.dedent()
 	p.newline()
@@ -1559,6 +1569,9 @@ func anyNodeHasTrailingComment(n Node) bool {
 	case *Array:
 		return anyNodeHasTrailingComment(v.Elem)
 	case *Object:
+		if len(v.ClosingComments) > 0 {
+			return true
+		}
 		for _, f := range v.Fields {
 			_, tc := stripTrailing(f.Value)
 			if tc != nil || anyNodeHasTrailingComment(f.Value) {

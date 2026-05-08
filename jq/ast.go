@@ -308,9 +308,11 @@ func (a *Array) nodePos() Pos { return a.At }
 
 // Object: { field, … }
 type Object struct {
-	At        Pos
-	Fields    []*ObjectField
-	MultiLine bool // first field was on a different line than { in source
+	At                       Pos
+	Fields                   []*ObjectField
+	MultiLine                bool       // first field was on a different line than { in source
+	ClosingComments          []*Comment // leading comments before the closing }
+	BlankBeforeClosingComments bool     // blank line between last field and ClosingComments
 }
 
 func (o *Object) jqNode()      {}

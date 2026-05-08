@@ -474,8 +474,13 @@ func writeBlockExpr(b *strings.Builder, v JQSeg, formatted string) {
 		if strings.TrimSpace(line) == "" {
 			b.WriteByte('\n')
 		} else {
+			// Strip leading spaces (not tabs) before prepending contentIndent.
+			// The template {{ syntax can leave a spurious space before the
+			// first token (e.g. "{{ def …" yields " def …" as the expression).
+			// TrimLeft " " removes only spaces, preserving tab-based relative
+			// indentation within the expression.
 			b.WriteString(contentIndent)
-			b.WriteString(strings.TrimRight(line, " \t"))
+			b.WriteString(strings.TrimRight(strings.TrimLeft(line, " "), " \t"))
 			b.WriteByte('\n')
 		}
 	}

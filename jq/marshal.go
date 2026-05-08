@@ -353,7 +353,11 @@ func (o *Object) MarshalAST() OrderedMap {
 		}
 		fields[i] = fm
 	}
-	return OrderedMap{{"type", "object"}, {"fields", fields}}
+	m := OrderedMap{{"type", "object"}, {"fields", fields}}
+	if len(o.ClosingComments) > 0 {
+		m = append(m, MapEntry{"closingComments", marshalComments(o.ClosingComments)})
+	}
+	return m
 }
 
 func (p *Paren) MarshalAST() OrderedMap {

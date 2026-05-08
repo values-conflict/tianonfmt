@@ -1014,6 +1014,12 @@ func (p *parser) parseObject() (*Object, error) {
 		blankBefore := effectiveNextLine > lastFieldLine+1 && rawNext.Kind != EOF
 		// Now absorb comments and check for closing brace.
 		if p.peek().Kind == RBRACE {
+			// Drain any pending comments — they appeared between the last field
+			// and the closing }, making them closing comments of the object.
+			if closing := p.drainComments(); len(closing) > 0 {
+				obj.ClosingComments = closing
+				obj.BlankBeforeClosingComments = blankBefore
+			}
 			break
 		}
 		field, err := p.parseObjectField()
@@ -1048,6 +1054,13 @@ func (p *parser) parseObject() (*Object, error) {
 				p.attachTrailingToField(field, tc)
 			}
 			lastFieldLine = p.lastLine
+			// Drain any remaining leading comments from p.pending: they appeared
+			// after the last field's value on a different line, making them
+			// closing comments of the object (before the closing }).
+			if closing := p.drainComments(); len(closing) > 0 {
+				obj.ClosingComments = closing
+				obj.BlankBeforeClosingComments = closing[0].Line > lastFieldLine+1
+			}
 			break
 		}
 	}
@@ -1130,7 +1143,13 @@ func (p *parser) parseObjectField() (*ObjectField, error) {
 	if err != nil {
 		return nil, err
 	}
-	val = p.wrapComments(val)
+	// Capture trailing comment on the same line as the value; leave any
+	// NEW-LINE leading comments in p.pending for parseObject to collect as
+	// closing comments (they appeared after this field, before the closing }).
+	tc := p.takePendingTrailing()
+	if tc != nil {
+		val = &CommentedExpr{At: val.nodePos(), Expr: val, TrailingComment: tc}
+	}
 	return &ObjectField{At: at, LeadingComments: leading, BlankAfterComments: blankAfterComments, Key: key, KeyOptional: keyOpt, Value: val}, nil
 }
 
