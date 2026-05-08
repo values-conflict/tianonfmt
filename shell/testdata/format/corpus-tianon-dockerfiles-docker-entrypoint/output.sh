@@ -44,7 +44,7 @@ if [ "${DOCKER_HOST#tcp:}" != "$DOCKER_HOST" ] \
 fi
 
 if [ "$1" = 'dockerd' ]; then
-	cat >&2 <<- 'EOW'
+	cat >&2 <<-'EOW'
 
 		📎 Hey there!  It looks like you're trying to run a Docker daemon.
 

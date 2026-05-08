@@ -5,7 +5,7 @@ jqExpression='.results[].name'
 
 self="$(basename "$0")"
 usage() {
-	cat <<- EOUSAGE
+	cat <<-EOUSAGE
 
 		usage: $self [options] repo [repo ...]
 

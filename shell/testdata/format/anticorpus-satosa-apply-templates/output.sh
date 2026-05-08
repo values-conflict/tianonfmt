@@ -20,7 +20,7 @@ if [ "$#" -eq 0 ]; then
 fi
 
 generated_warning() {
-	cat <<- EOH
+	cat <<-EOH
 		#
 		# NOTE: THIS DOCKERFILE IS GENERATED VIA "apply-templates.sh".
 		#

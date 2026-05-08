@@ -9,7 +9,7 @@ set -o errexit -o nounset -o pipefail
 jq --version > /dev/null
 bashbrew --version > /dev/null
 
-cat <<- 'EOH'
+cat <<-'EOH'
 	Maintainers: Keegan Witt <keeganwitt@gmail.com> (@keeganwitt)
 	GitRepo: https://github.com/groovy/docker-groovy.git
 EOH
@@ -18,7 +18,7 @@ declare -A usedTags=() archesLookupCache=() seenVersions=()
 commit="$(git rev-parse HEAD)"
 branch="$(git rev-parse --abbrev-ref HEAD)"
 common="$(
-	cat <<- EOC
+	cat <<-EOC
 		GitFetch: refs/heads/$branch
 	EOC
 )"
@@ -172,7 +172,7 @@ for dir in "${directories[@]}"; do
 		archesLookupCache["$from"]="$arches"
 	fi
 
-	cat <<- EOE
+	cat <<-EOE
 
 		Tags: $actualTags
 		Architectures: $arches

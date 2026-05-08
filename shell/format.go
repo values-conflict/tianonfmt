@@ -3,6 +3,7 @@ package shell
 import (
 	"bytes"
 	"fmt"
+	"regexp"
 	"strings"
 
 	"mvdan.cc/sh/v3/syntax"
@@ -50,6 +51,7 @@ func FormatWithTidy(src string, lang syntax.LangVariant, jqFmt func(expr string,
 	}
 	applyFormatRewrites(f)
 	ApplyTidy(f)
+	applyTidyHeredocs(f)
 	if jqFmt != nil {
 		formatJQInAST(f, jqFmt)
 	}
@@ -82,12 +84,24 @@ func printShell(f *syntax.File) (string, error) {
 	return s, nil
 }
 
-// fixHereStringSpacing removes the space that SpaceRedirects inserts after <<<.
-// Tianon always cuddles here-strings: <<<"$var" not <<< "$var".
-// SpaceRedirects correctly spaces output redirects (> file) but <<< should
-// never have a space — the content is semantically attached to the operator.
+// reHeredocSpace matches the space SpaceRedirects inserts after <<, <<-, or <<<
+// when followed by a delimiter character (letter, underscore, or quote).
+// The digit-prefix case (e.g. arithmetic << 2) is excluded by requiring the
+// character after the space to be non-digit.
+var reHeredocSpace = regexp.MustCompile(`(<<-?) (['"A-Za-z_])`)
+
+// fixHereStringSpacing removes the space that SpaceRedirects inserts after
+// heredoc and here-string operators so that delimiters are always cuddled:
+//
+//	<<- 'EOH'  →  <<-'EOH'
+//	<<  EOF    →  <<EOF
+//	<<<  "$x"  →  <<<"$x"
+//
+// SpaceRedirects correctly spaces output redirects (> file) but heredoc
+// operators are always written cuddled with their delimiter.
 func fixHereStringSpacing(src string) string {
-	return strings.ReplaceAll(src, "<<< ", "<<<")
+	src = strings.ReplaceAll(src, "<<< ", "<<<")
+	return reHeredocSpace.ReplaceAllString(src, "$1$2")
 }
 
 // joinShiftPairs collapses consecutive assignment + shift lines onto one line
@@ -543,6 +557,88 @@ func endsBlock(line string) bool {
 		}
 	}
 	return false
+}
+
+// ── tidy-level heredoc rewrites ──────────────────────────────────────────────
+
+// applyTidyHeredocs applies two heredoc normalisations in --tidy mode:
+//
+//  1. << → <<- (tab-stripping form): any heredoc whose body has no leading
+//     tab characters on any content line is upgraded.  Lines with leading tabs
+//     are the single exception — those tabs are intentional output content.
+//
+//  2. <<WORD → <<'WORD' (single-quoted form): when a heredoc uses an unquoted
+//     delimiter but the body contains no bash expansions ($, `, \), the body
+//     is literal text and the delimiter is upgraded to single-quoted to make
+//     that explicit.
+func applyTidyHeredocs(f *syntax.File) {
+	syntax.Walk(f, func(n syntax.Node) bool {
+		stmt, ok := n.(*syntax.Stmt)
+		if !ok {
+			return true
+		}
+		for _, redir := range stmt.Redirs {
+			if redir.Hdoc == nil {
+				continue
+			}
+
+			// Upgrade << → <<- when body has no leading tabs.
+			if redir.Op == syntax.Hdoc && !hdocBodyHasLeadingTabs(redir.Hdoc) {
+				redir.Op = syntax.DashHdoc
+			}
+
+			// Upgrade unquoted delimiter to single-quoted when body is literal.
+			if redir.Word != nil && isUnquotedHeredocWord(redir.Word) && !hdocBodyHasExpansions(redir.Hdoc) {
+				lit := wordLit(redir.Word)
+				redir.Word = &syntax.Word{
+					Parts: []syntax.WordPart{
+						&syntax.SglQuoted{Value: lit},
+					},
+				}
+			}
+		}
+		return true
+	})
+}
+
+// hdocBodyHasLeadingTabs reports whether any non-blank line of the heredoc
+// body word starts with a tab.  Such tabs are intentional output content and
+// must be preserved — upgrading to <<- would strip them.
+func hdocBodyHasLeadingTabs(hdoc *syntax.Word) bool {
+	for _, part := range hdoc.Parts {
+		lit, ok := part.(*syntax.Lit)
+		if !ok {
+			continue
+		}
+		for _, line := range strings.Split(lit.Value, "\n") {
+			if len(line) > 0 && line[0] == '\t' {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// hdocBodyHasExpansions reports whether the heredoc body word contains any
+// non-literal parts (variable expansions, command substitutions, etc.).
+// If the body is entirely literal, the delimiter can be safely single-quoted.
+func hdocBodyHasExpansions(hdoc *syntax.Word) bool {
+	for _, part := range hdoc.Parts {
+		if _, ok := part.(*syntax.Lit); !ok {
+			return true
+		}
+	}
+	return false
+}
+
+// isUnquotedHeredocWord reports whether a heredoc delimiter word is a plain
+// unquoted literal (not single-quoted, double-quoted, or otherwise complex).
+func isUnquotedHeredocWord(w *syntax.Word) bool {
+	if len(w.Parts) != 1 {
+		return false
+	}
+	_, isLit := w.Parts[0].(*syntax.Lit)
+	return isLit
 }
 
 // ── format-level AST rewrites ────────────────────────────────────────────────

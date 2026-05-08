@@ -355,19 +355,27 @@ declare -A files=(
 
 ### Here-documents
 
-`<<-` (with tab-stripping) is **always** used in preference to `<<`; `--tidy` flags bare `<<` heredocs.  The `-` variant strips leading tab characters from the body and from the delimiter line, which lets the heredoc content be indented naturally with the surrounding code.  Beyond the immediate indentation benefit, using `<<-` consistently means the heredoc can be freely moved inside a deeper control structure later without having to change the operator.
+**`<<-` is always used** in preference to `<<`; the `-` variant strips leading tab characters from body lines and the delimiter line, allowing heredoc content to be indented naturally with the surrounding code.  The single exception: `<<` is used when the body itself must emit lines with leading tabs (rare).  `--tidy` automatically upgrades `<<` → `<<-` when safe, and flags the remaining cases.
+
+The **delimiter is always cuddled** with the operator — no space: `<<-'EOH'` not `<<- 'EOH'`.  The formatter enforces this.
+
+The delimiter form follows the body's expansion needs:
+- **Single-quoted** (`<<-'EOF'`) when the body is literal (no `$`, `` ` ``, `\`) — the formatter upgrades unquoted delimiters to single-quoted when the body is fully literal.
+- **Unquoted** (`<<-EOF`) when variable or command substitution is needed.
 
 ```bash
 cat <<-EOH
-    #
-    # NOTE: THIS DOCKERFILE IS GENERATED VIA "apply-templates.sh"
-    #
+	#
+	# NOTE: THIS DOCKERFILE IS GENERATED VIA "apply-templates.sh"
+	#
 EOH
 ```
 
-The delimiter is:
-- **Single-quoted** (`<<'EOF'`) when the body should not undergo parameter expansion
-- **Unquoted** when variable interpolation is wanted
+```bash
+cat <<-'EOH'
+	Tags: ${tags[*]}   # literal — no expansion
+EOH
+```
 
 Corpus refs: [`docker-qemu/apply-templates.sh#L20-L28`](https://github.com/tianon/docker-qemu/blob/3ce36843e253ddb7f63a39a6d0a27a7a46762e8b/apply-templates.sh#L20-L28), [`debian-bin/repo/apt-ftparchive-generate-conf.sh`](https://github.com/tianon/debian-bin/blob/d508ea34f15e88b8ac63d71ffb1938fccbc21206/repo/apt-ftparchive-generate-conf.sh).
 

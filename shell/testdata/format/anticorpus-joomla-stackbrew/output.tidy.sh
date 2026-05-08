@@ -77,7 +77,7 @@ getArches 'joomla'
 # get the Joomla maintainers of these docker images
 joomlaMaintainers="$(jq --compact-output --raw-output '. | map(.firstname + " " + .lastname + " <" + .email + "> (@" + .github + ")") | join(",\n             ")' maintainers.json)"
 
-cat <<- EOH
+cat <<-EOH
 	# this file is generated via https://github.com/joomla-docker/docker-joomla/blob/$(fileCommit "$self")/$self
 
 	Maintainers: $joomlaMaintainers
@@ -171,7 +171,7 @@ for version; do
 			done
 
 			echo
-			cat <<- EOE
+			cat <<-EOE
 				Tags: $(join ', ' "${fullAliases[@]}")
 				Architectures: $(join ', ' $variantArches)
 				GitCommit: $commit
