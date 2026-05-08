@@ -74,6 +74,29 @@ The trailing-comma preference (see [universal.md](universal.md)) means that when
 )
 ```
 
+**Automatic expansion of long flat chains.**  When a comma chain has **≥ 6 items** and every item is a simple literal or identifier (string, number, boolean, null, or bare name), the formatter automatically converts it from inline to multi-line and appends `empty`:
+
+```jq
+# input (8 string items):
+env.version | IN("3.0", "3.1", "3.2", "4.0", "4.1", "4.2", "4.3", "4.4")
+
+# formatted output:
+env.version
+| IN(
+	"3.0",
+	"3.1",
+	"3.2",
+	"4.0",
+	"4.1",
+	"4.2",
+	"4.3",
+	"4.4",
+	empty
+)
+```
+
+This rule applies to any comma chain in any context — `IN(...)`, `path(...)`, array literals, bare generators — as long as all items are simple.  Chains with complex items (field accesses, pipelines, calls) are not affected.  Five items or fewer always stay inline.  The expansion is idempotent: re-formatting a chain that already ends with `empty` does not add another one.
+
 **Comma continuation indentation — pipe context.**  When a multi-line comma expression appears as the body of a `| ` pipe step or `as $x |` binding, the continuation elements (second and later) are indented **one extra level** relative to the first element, to distinguish them visually from the next pipe step:
 
 ```jq
@@ -137,7 +160,7 @@ Corpus refs: [`debian-bin/jq/deb822.jq#L7-L39`](https://github.com/tianon/debian
 
 ## `if` / `then` / `elif` / `else` / `end`
 
-**Inline form** when the entire expression (condition + both branches) is short and simple enough to read comfortably on one line.  There is no hard rule — it is vibes-based ("the numbers got too big") — but corpus analysis shows the threshold is approximately 60 characters.  Note that this is not *only* about length: a short expression that is hard to parse at a glance still gets multi-line treatment.  This "short and clear enough to inline" heuristic applies consistently across jq, shell, Dockerfile `RUN` blocks, and everywhere else.
+**Inline form** when the entire expression (condition + both branches) is short and simple enough to read comfortably on one line.  The hard threshold is **60 characters** for the whole expression.  Conditions that exceed 60 characters are always rendered in multi-line form even if the branches are simple, because a long condition in `if LONG_COND then` would reflow differently on re-parse (causing non-idempotency).  Note that this is not *only* about length: a short expression that is hard to parse at a glance still gets multi-line treatment.  This "short and clear enough to inline" heuristic applies consistently across jq, shell, Dockerfile `RUN` blocks, and everywhere else.
 
 ```jq
 if index(":") then . else "0:" + . end
@@ -154,6 +177,31 @@ elif $ltrim != $line then
 else
 	...
 end
+```
+
+**Cuddled-paren branch form.**  When a branch body is an explicit paren expression — `if COND then (EXPR) else ... end` — the opening `(` is written on the same line as the keyword it follows, and the closing `)` appears immediately before the next keyword:
+
+```jq
+if env.variant == "native" then (
+	arch="arm"
+	...
+) else "" end
+
+if env.version != "tip" then (
+	# long then body
+	...
+) else (
+	# long else body
+	...
+) end
+```
+
+The `)` never appears on its own line; it is always written as `) else`, `) elif`, or `) end` on the same line.  When both branches use parens, `then (` and `) else (` are each on their own lines at the `if` indentation level.  The **cuddled short-else** form (`) else VALUE end` on one line) applies when the else value is ≤ 30 characters and has no comments:
+
+```jq
+if env.variant == "native" then (
+	...
+) else "" end
 ```
 
 **Complex condition form**: when the condition itself requires multiple lines (e.g. it contains a generator using the `empty` trailing-comma idiom, or a deeply nested function call that cannot fit on one line), `if` goes on its own line, the condition is indented one tab, and `then` has its own line:

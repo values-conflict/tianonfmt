@@ -1,0 +1,84 @@
+{
+	"type": "jq",
+	"query": {
+		"type": "pipe",
+		"left": {
+			"type": "binOp",
+			"op": "",
+			"left": {
+				"type": "call",
+				"name": "env"
+			},
+			"right": {
+				"type": "field",
+				"name": ".version"
+			}
+		},
+		"right": {
+			"type": "call",
+			"name": "IN",
+			"args": [
+				{
+					"type": "comma",
+					"left": {
+						"type": "comma",
+						"left": {
+							"type": "comma",
+							"left": {
+								"type": "comma",
+								"left": {
+									"type": "comma",
+									"left": {
+										"type": "comma",
+										"left": {
+											"type": "comma",
+											"left": {
+												"type": "comma",
+												"left": {
+													"type": "string",
+													"raw": "\"3.0\""
+												},
+												"right": {
+													"type": "string",
+													"raw": "\"3.1\""
+												}
+											},
+											"right": {
+												"type": "string",
+												"raw": "\"3.2\""
+											}
+										},
+										"right": {
+											"type": "string",
+											"raw": "\"4.0\""
+										}
+									},
+									"right": {
+										"type": "string",
+										"raw": "\"4.1\""
+									}
+								},
+								"right": {
+									"type": "string",
+									"raw": "\"4.2\""
+								}
+							},
+							"right": {
+								"type": "string",
+								"raw": "\"4.3\""
+							}
+						},
+						"right": {
+							"type": "string",
+							"raw": "\"4.4\""
+						}
+					},
+					"right": {
+						"type": "call",
+						"name": "empty"
+					}
+				}
+			]
+		}
+	}
+}

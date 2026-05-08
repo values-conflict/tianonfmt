@@ -1,0 +1,45 @@
+{
+	"type": "jq",
+	"query": {
+		"type": "paren",
+		"expr": {
+			"type": "comma",
+			"left": {
+				"type": "comma",
+				"left": {
+					"type": "comma",
+					"left": {
+						"type": "comma",
+						"left": {
+							"type": "comma",
+							"left": {
+								"type": "string",
+								"raw": "\"a\""
+							},
+							"right": {
+								"type": "string",
+								"raw": "\"b\""
+							}
+						},
+						"right": {
+							"type": "field",
+							"name": ".c"
+						}
+					},
+					"right": {
+						"type": "string",
+						"raw": "\"d\""
+					}
+				},
+				"right": {
+					"type": "string",
+					"raw": "\"e\""
+				}
+			},
+			"right": {
+				"type": "string",
+				"raw": "\"f\""
+			}
+		}
+	}
+}

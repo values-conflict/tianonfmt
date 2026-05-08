@@ -80,7 +80,7 @@ Corpus ref: [`docker-qemu/Dockerfile.template#L21-L28`](https://github.com/tiano
 
 ### Conditional blocks
 
-`if/then/else/end` across template blocks:
+`if/then/else/end` across template blocks uses the **cuddled-paren** style from [jq.md](jq.md): each branch opener (`then (`, `elif COND then (`, `else (`) is on its own `{{ ... -}}` line, and each branch closer appears before the next keyword:
 
 ```dockerfile
 {{ if env.variant == "native" then ( -}}
@@ -91,7 +91,17 @@ Corpus ref: [`docker-qemu/Dockerfile.template#L21-L28`](https://github.com/tiano
 {{ ) end -}}
 ```
 
-Each conditional branch delimiter (`then (`, `) else (`, `) end`) is on its own `{{ ... -}}` line.  The `-}}` suppresses the newline so the Dockerfile content immediately follows.
+The **cuddled short-else** form (`) else VALUE end` on one line, ≤ 30 chars) produces a single block:
+
+```dockerfile
+{{ if env.variant == "native" then ( -}}
+	...
+{{ ) else "" end -}}
+```
+
+**Whole-program assembly.**  The formatter collects consecutive `{{ }}` blocks that together form a single jq expression (detected by tracking bracket depth — a group ends when depth returns to 0), assembles them into one jq program, formats it as a whole, and splits the result back into per-block pieces.  This ensures that fragment blocks like `) else (` and `[\n...\n| (` receive contextually correct indentation rather than being preserved verbatim.
+
+Within a group, blocks that can be formatted as standalone expressions (such as `.key` or `.value` appearing between structural fragments) are still formatted in the same assembled context, so their indentation reflects their actual depth inside the surrounding expression.
 
 Corpus ref: [`docker-qemu/Dockerfile.template#L32-L63`](https://github.com/tianon/docker-qemu/blob/3ce36843e253ddb7f63a39a6d0a27a7a46762e8b/Dockerfile.template#L32-L63).
 

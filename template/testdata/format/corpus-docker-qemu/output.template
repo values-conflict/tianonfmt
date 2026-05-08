@@ -168,11 +168,7 @@ RUN set -eux; \
 		s390x) targetList='s390x-softmmu' ;; \
 		*) echo >&2 "error: architecture '$arch' unimplemented 😅"; exit 1 ;; \
 	esac; \
-{{
-	) else
-		""
-	end
--}}
+{{ ) else "" end -}}
 	\
 	./configure --help; \
 	./configure \

@@ -121,16 +121,22 @@ RUN set -eux; \
 {{
 	if
 		env.version
-		| IN("3.0", "3.1", "3.2", "4.0", "4.1", "4.2", "4.3", "4.4")
+		| IN(
+			"3.0",
+			"3.1",
+			"3.2",
+			"4.0",
+			"4.1",
+			"4.2",
+			"4.3",
+			"4.4",
+			empty
+		)
 	then (
 -}}
 # https://github.com/tianon/docker-bash/pull/45
 	export CFLAGS='-Wno-error=implicit-int -Wno-error=implicit-function-declaration'; \
-{{
-	) else
-		""
-	end
--}}
+{{ ) else "" end -}}
 	./configure \
 		--build="$gnuArch" \
 		--enable-readline \
@@ -179,11 +185,7 @@ RUN set -eux; \
 	\
 	[ "$(which bash)" = '/usr/local/bin/bash' ]; \
 	bash --version; \
-{{
-	if env.version == "devel" then
-		""
-	elif env.version | startswith("3.0") then (
--}}
+{{ if env.version == "devel" then "" elif env.version | startswith("3.0") then ( -}}
 # for some reason, 3.0.xx manifests as 3.00.xx (hence the extra "0" added in the following check)
 	[ "$(bash -c 'echo "${BASH_VERSION%%[^0-9.]*}"')" = "${_BASH_VERSION//.0./.00.}" ]; \
 {{ ) elif env.version | endswith("-rc") then ( -}}

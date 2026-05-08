@@ -593,6 +593,17 @@ func (p *printer) commaExpr(v *Comma) {
 		return
 	}
 
+	// Long flat comma chain: commaChainIsLongFlat detected ≥ 6 simple items
+	// and no existing empty.  Force multi-line and append a trailing `empty`
+	// (the jq trailing-comma idiom — semantic no-op in every context).
+	// Re-formatting is idempotent: the appended `empty` triggers the
+	// commaChainContainsEmpty path above on the next pass.
+	if commaChainIsLongFlat(v) {
+		parts = append(parts, &Ident{Name: "empty"})
+		p.commaExprMultiLine(parts)
+		return
+	}
+
 	inline := p.inlineSafe(v)
 	if inline != "" && len(inline) <= shortThreshold && !strings.Contains(inline, "\n") {
 		p.write(inline)
@@ -1012,17 +1023,25 @@ func (p *printer) ifExpr(v *IfExpr) {
 
 	if v.Else != nil {
 		p.newline()
-		// Short-else form: only when the then body was not cuddled (no leading ")")
-		// and both bodies are simple single-line expressions with no comments.
 		elseInline := p.shortInline(v.Else)
-		if !prevCuddled &&
-			len(elseInline) <= 30 && !strings.Contains(elseInline, "\n") &&
-			!hasAnyComment(v.Else) && !hasAnyComment(v.Then) &&
-			!parenBodyHasComments(v.Else) && !parenBodyHasComments(v.Then) {
-			p.write("else ")
-			p.write(elseInline)
-			p.write(" end")
-			return
+		// Short-else form: both bodies simple, no comments.
+		// Two variants: plain ("else VALUE end") and cuddled (") else VALUE end").
+		if len(elseInline) <= 30 && !strings.Contains(elseInline, "\n") &&
+			!hasAnyComment(v.Else) && !parenBodyHasComments(v.Else) {
+			if !prevCuddled && !hasAnyComment(v.Then) && !parenBodyHasComments(v.Then) {
+				// Plain short-else: only when then was not cuddled (for visual symmetry).
+				p.write("else ")
+				p.write(elseInline)
+				p.write(" end")
+				return
+			}
+			if prevCuddled {
+				// Cuddled short-else: ") else VALUE end" when then was a cuddled paren.
+				p.write(") else ")
+				p.write(elseInline)
+				p.write(" end")
+				return
+			}
 		}
 		if prevCuddled {
 			p.write(") else")
@@ -1514,6 +1533,12 @@ func anyNodeHasTrailingComment(n Node) bool {
 		if v.MultiLine || commaChainHasMultiLine(v) {
 			return true
 		}
+		// Long flat chains (≥ 6 simple items, no existing empty) will be forced
+		// multi-line by commaExpr — report as unsafe-to-inline so that callers
+		// such as callExpr set up proper indentation before the comma chain runs.
+		if commaChainIsLongFlat(v) {
+			return true
+		}
 		return anyNodeHasTrailingComment(v.Left) || anyNodeHasTrailingComment(v.Right)
 	case *BinOp:
 		if v.MultiLine {
@@ -1792,6 +1817,37 @@ func contentHasMultiLine(n Node) bool {
 		return !found
 	})
 	return found
+}
+
+// isSimpleCommaItem reports whether n is a "simple" expression — a literal
+// (string, number, bool, null) or a bare identifier — that can appear as an
+// item in a long flat comma chain eligible for the automatic multi-line +
+// trailing-empty rewrite.
+func isSimpleCommaItem(n Node) bool {
+	switch n.(type) {
+	case *StrLit, *NumberLit, *BoolLit, *NullLit, *Ident:
+		return true
+	}
+	return false
+}
+
+// commaChainIsLongFlat reports whether v is a flat comma chain with ≥ 6
+// simple items and no existing `empty` at the end.  Such chains are
+// automatically reformatted to multi-line with a trailing `empty`.
+func commaChainIsLongFlat(v *Comma) bool {
+	if commaChainContainsEmpty(v) {
+		return false
+	}
+	cparts := flattenCommaParts(v)
+	if len(cparts) < 6 {
+		return false
+	}
+	for _, cp := range cparts {
+		if !isSimpleCommaItem(cp.node) {
+			return false
+		}
+	}
+	return true
 }
 
 // commaChainContainsEmpty reports whether a comma chain has `empty` as any

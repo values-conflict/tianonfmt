@@ -124,10 +124,14 @@ func TokenizeJQ(src string) []string {
 var JQBareKeyRE = regexp.MustCompile(`^[a-zA-Z_][a-zA-Z0-9_]*$`)
 
 // NormalizeJQ produces a canonical token sequence for semantic comparison of
-// jq source.  It applies two mechanical rewrites beyond pure whitespace:
+// jq source.  It applies three mechanical rewrites beyond pure whitespace:
 //  1. Object key unquoting: "foo" → foo when "foo" is a valid identifier and
 //     the next token is ":".
 //  2. Trailing comma removal: "," immediately before "}" → remove.
+//  3. Trailing-empty removal: "," "empty" at the end of a comma chain → remove.
+//     The formatter adds `empty` to chains with ≥ 6 flat items as the
+//     jq trailing-comma idiom; this strip ensures token-level comparison
+//     treats the added `empty` as a whitespace-equivalent transformation.
 func NormalizeJQ(src string) string {
 	toks := TokenizeJQ(src)
 
@@ -151,7 +155,17 @@ func NormalizeJQ(src string) string {
 
 	result := toks[:0]
 	for i, tok := range toks {
+		// Trailing comma before }
 		if tok == "," && i+1 < len(toks) && toks[i+1] == "}" {
+			continue
+		}
+		// Trailing-empty: strip ", empty" at end of comma chain (before ) or ])
+		if tok == "," && i+1 < len(toks) && toks[i+1] == "empty" &&
+			i+2 < len(toks) && (toks[i+2] == ")" || toks[i+2] == "]") {
+			continue
+		}
+		if tok == "empty" && i > 0 && toks[i-1] == "," &&
+			i+1 < len(toks) && (toks[i+1] == ")" || toks[i+1] == "]") {
 			continue
 		}
 		result = append(result, tok)
