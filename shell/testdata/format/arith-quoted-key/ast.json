@@ -58,6 +58,35 @@
 				"echo",
 				"\"$result\""
 			]
+		},
+		{
+			"type": "call",
+			"assigns": [
+				"arr=('hello world' other 'key=val')"
+			],
+			"args": []
+		},
+		{
+			"type": "call",
+			"assigns": [
+				"arr2=(\"key=value\" \"other=item\")"
+			],
+			"args": []
+		},
+		{
+			"type": "stmt",
+			"cmd": {
+				"type": "call",
+				"args": [
+					"cat"
+				]
+			},
+			"redirs": [
+				{
+					"op": "\u003c\u003c",
+					"word": "'EOF_INNER'"
+				}
+			]
 		}
 	]
 }

@@ -42,6 +42,26 @@
 					"type": "field",
 					"name": ".z"
 				}
+			},
+			{
+				"key": {
+					"type": "string",
+					"raw": "\"foo\\\\bar\""
+				},
+				"value": {
+					"type": "field",
+					"name": ".escaped"
+				}
+			},
+			{
+				"key": {
+					"type": "string",
+					"raw": "\"123numeric\""
+				},
+				"value": {
+					"type": "field",
+					"name": ".digit"
+				}
 			}
 		]
 	}

@@ -113,6 +113,50 @@ func TestTidyFile_AndChainReconstructsLines(t *testing.T) {
 	}
 }
 
+func TestTidyFile_NormRUNFirstLine_NoSemicolon(t *testing.T) {
+	// RUN with only a set command (no semicolon) — exercises normRUNFirstLine's
+	// !hasSemi and !lineHasSemi paths.
+	src := "FROM scratch\nRUN set -Eeuo pipefail\n"
+	f, err := dockerfile.Parse(src)
+	if err != nil {
+		t.Fatal(err)
+	}
+	normStub := func(s string) string { return "set -eux" }
+	// tidyRUN returns nil for a single command (no && chain), so normRUNFirstLine runs.
+	dockerfile.TidyFile(f, nil, normStub)
+	for _, instr := range f.Instructions {
+		if instr.Keyword == "RUN" {
+			if !strings.Contains(instr.Args, "set -eux") {
+				t.Errorf("expected set -eux in Args, got %q", instr.Args)
+			}
+		}
+	}
+}
+
+func TestTidyFile_NormRUNFirstLine_WithContinuation(t *testing.T) {
+	// RUN set -Eeuo pipefail \ (with continuation) — exercises the hasCont path.
+	src := "FROM scratch\nRUN set -Eeuo pipefail \\\n\t&& echo hi\n"
+	f, err := dockerfile.Parse(src)
+	if err != nil {
+		t.Fatal(err)
+	}
+	normStub := func(s string) string {
+		if strings.HasPrefix(s, "set -") {
+			return "set -eux"
+		}
+		return s
+	}
+	dockerfile.TidyFile(f, nil, normStub)
+	for _, instr := range f.Instructions {
+		if instr.Keyword == "RUN" {
+			firstLine := instr.Lines[0].Text
+			if !strings.HasSuffix(firstLine, " \\") {
+				t.Errorf("continuation should be preserved: %q", firstLine)
+			}
+		}
+	}
+}
+
 // ── parse ─────────────────────────────────────────────────────────────────────
 
 func TestFormat_RUNShellFmt(t *testing.T) {

@@ -292,9 +292,7 @@ func (p *printer) node(n Node) {
 	case *LabelExpr:
 		p.write("label ")
 		p.write(v.Binding)
-		p.write(" |")
-		p.newline()
-		p.node(v.Body)
+		p.writeBodyAfterPipe(v.Body)
 	case *BinOp:
 		p.binOp(v)
 	case *IfExpr:
@@ -690,21 +688,54 @@ func flattenCommaParts(v *Comma) []commaPart {
 	return parts
 }
 
+// stripBodyLeadingComments extracts leading comments that would be formatted
+// at the very start of node n, so the caller can hoist them before a "| ".
+// Handles two cases:
+//   - CommentedExpr with leading comments (direct wrapping)
+//   - AsExpr whose Expr starts with a CommentedExpr (nested — the inner Expr's
+//     comments would be printed first by asExpr, appearing after the outer "|")
+//
+// Returns (comments, strippedNode) where strippedNode is n with those leading
+// comments removed.  Returns nil/n when no hoisting is needed.
+func stripBodyLeadingComments(n Node) ([]*Comment, Node) {
+	if ce, ok := n.(*CommentedExpr); ok && len(ce.LeadingComments) > 0 {
+		stripped := &CommentedExpr{At: ce.At, Expr: ce.Expr, TrailingComment: ce.TrailingComment}
+		return ce.LeadingComments, stripped
+	}
+	if ae, ok := n.(*AsExpr); ok {
+		if comments, strippedExpr := stripBodyLeadingComments(ae.Expr); len(comments) > 0 {
+			return comments, &AsExpr{At: ae.At, Expr: strippedExpr, Pattern: ae.Pattern, Body: ae.Body}
+		}
+	}
+	return nil, n
+}
+
+// writeBodyAfterPipe emits a "| "-prefixed body, hoisting any leading comments
+// that would otherwise drift inside the expression on re-parse.
+func (p *printer) writeBodyAfterPipe(body Node) {
+	comments, stripped := stripBodyLeadingComments(body)
+	for _, c := range comments {
+		p.newline()
+		p.write(c.Text)
+	}
+	p.newline()
+	p.write("| ")
+	if pipePartIsMultiLineComma(stripped) {
+		p.indent()
+		p.node(stripped)
+		p.dedent()
+	} else {
+		p.node(stripped)
+	}
+}
+
 // asExpr formats: expr as $pat\n| body
 // Style ref: https://github.com/tianon/debian-bin/blob/d508ea34f15e88b8ac63d71ffb1938fccbc21206/jq/deb822.jq#L24
 func (p *printer) asExpr(v *AsExpr) {
 	p.node(v.Expr)
 	p.write(" as ")
 	p.node(v.Pattern)
-	p.newline()
-	p.write("| ")
-	if pipePartIsMultiLineComma(v.Body) {
-		p.indent()
-		p.node(v.Body)
-		p.dedent()
-	} else {
-		p.node(v.Body)
-	}
+	p.writeBodyAfterPipe(v.Body)
 }
 
 // binOp formats a binary expression.

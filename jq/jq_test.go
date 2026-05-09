@@ -605,6 +605,82 @@ func TestFormatTrailingCommentInObject(t *testing.T) {
 	_ = jq.FormatFile(f2) // must not panic
 }
 
+// TestParseErrors_FuncDef exercises parseFuncDef error paths.
+func TestParseErrors_FuncDef(t *testing.T) {
+	cases := []string{
+		"def 123: .;",          // non-ident function name
+		"def f(123): .;",       // non-ident parameter
+		"def f($a 123): .;",    // bad separator in param list
+	}
+	for _, src := range cases {
+		if _, err := jq.ParseFile(src); err == nil {
+			t.Errorf("expected parse error for %q", src)
+		}
+	}
+}
+
+// TestParseErrors_Reduce exercises parseReduce error paths.
+func TestParseErrors_Reduce(t *testing.T) {
+	cases := []string{
+		"reduce !invalid as $x (0; .)",   // bad expr after reduce
+		"reduce .[] as 123 (0; .)",       // bad pattern
+		"reduce .[] as $x 0; .)",         // missing (
+		"reduce .[] as $x (0 .)",         // missing ;
+		"reduce .[] as $x (0; . end",     // missing )
+	}
+	for _, src := range cases {
+		if _, err := jq.ParseFile(src); err == nil {
+			t.Errorf("expected parse error for %q", src)
+		}
+	}
+}
+
+// TestParseErrors_Foreach exercises parseForeach error paths.
+func TestParseErrors_Foreach(t *testing.T) {
+	cases := []string{
+		"foreach !invalid as $x (0; .)",  // bad expr
+		"foreach .[] as 123 (0; .)",      // bad pattern
+		"foreach .[] as $x 0; .)",        // missing (
+	}
+	for _, src := range cases {
+		if _, err := jq.ParseFile(src); err == nil {
+			t.Errorf("expected parse error for %q", src)
+		}
+	}
+}
+
+// TestLexComment_Continuation exercises the backslash line-continuation path
+// inside lexComment (a jq comment ending in \ continues to the next line).
+func TestLexComment_Continuation(t *testing.T) {
+	// A comment with backslash before newline: lexer continues reading.
+	// This is unusual jq but valid per the lexer.
+	src := "# line1\\\n# line2\n.x"
+	toks := jq.Tokens(src)
+	found := false
+	for _, tok := range toks {
+		if tok.Kind == jq.COMMENT && strings.Contains(tok.Text, "line1") {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("expected comment token spanning continuation")
+	}
+}
+
+// TestAttachTrailingToField_ExistingCommentedExpr exercises the
+// attachTrailingToField path where field.Value is already a CommentedExpr.
+func TestAttachTrailingToField_ExistingCommentedExpr(t *testing.T) {
+	// {key: (.val), # trailing} — value is a grouped expression that, after
+	// parsing, becomes a CommentedExpr if it had leading comments.
+	// Use a leading comment on the value to ensure CommentedExpr wrapping.
+	src := "{\n\ta:\n\t\t# inner comment\n\t\t.b # trailing\n}"
+	f, err := jq.ParseFile(src)
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	_ = jq.FormatFile(f) // must not panic
+}
+
 // TestFormatInlineVsMultiline verifies the inline/multiline threshold.
 func TestFormatInlineVsMultiline(t *testing.T) {
 	// Short if: stays on one line (only has trailing newline, no mid-expression newlines).

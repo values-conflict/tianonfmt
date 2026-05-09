@@ -321,6 +321,23 @@ func TestLintJQ_EqTrue(t *testing.T) {
 	}
 }
 
+func TestLintJQ_NeqFalse(t *testing.T) {
+	vs := lintJQ(".x != false")
+	if len(vs) == 0 {
+		t.Error("expected violation for != false")
+	}
+	if !strings.Contains(vs[0].Msg, "!= false") {
+		t.Errorf("unexpected message: %q", vs[0].Msg)
+	}
+}
+
+func TestLintJQ_NeqTrue(t *testing.T) {
+	vs := lintJQ(".x != true")
+	if len(vs) == 0 {
+		t.Error("expected violation for != true")
+	}
+}
+
 func TestLintJQ_Clean(t *testing.T) {
 	vs := lintJQ(".x | not")
 	if len(vs) != 0 {
@@ -704,6 +721,14 @@ func TestMarshalASTJSON(t *testing.T) {
 	// Must end with newline (from json.Encoder)
 	if !strings.HasSuffix(out, "\n") {
 		t.Errorf("output should end with newline")
+	}
+}
+
+func TestMarshalASTJSON_Error(t *testing.T) {
+	// json.Encoder.Encode fails for channels — exercises the error return path.
+	_, err := marshalASTJSON(make(chan int))
+	if err == nil {
+		t.Error("expected error marshalling channel")
 	}
 }
 
@@ -1336,6 +1361,229 @@ func TestE2E_WriteFlag(t *testing.T) {
 	got, _ := os.ReadFile(p)
 	if !strings.Contains(string(got), "foo: .bar") {
 		t.Errorf("file not updated: %q", string(got))
+	}
+}
+
+// ── additional gap-closing tests ─────────────────────────────────────────────
+
+func TestLintShell_HeredocBare(t *testing.T) {
+	// "<<" without "-" is Wrong; "<<-" and "<<<" are fine.
+	vs := lintShell("#!/usr/bin/env bash\nset -Eeuo pipefail\ncat <<EOF\nhello\nEOF\n")
+	found := false
+	for _, v := range vs {
+		if strings.Contains(v.Msg, "heredoc") {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("expected heredoc violation for <<")
+	}
+}
+
+func TestLintShell_HeredocStripOK(t *testing.T) {
+	// "<<-" is the correct form — must not be flagged.
+	vs := lintShell("#!/usr/bin/env bash\nset -Eeuo pipefail\ncat <<-EOF\n\thello\nEOF\n")
+	for _, v := range vs {
+		if strings.Contains(v.Msg, "heredoc") {
+			t.Errorf("unexpected heredoc violation for <<-: %v", v)
+		}
+	}
+}
+
+func TestLintShell_SetEAfterSetEuoOK(t *testing.T) {
+	// set -e that appears AFTER set -Eeuo pipefail must not be flagged.
+	vs := lintShell("#!/usr/bin/env bash\nset -Eeuo pipefail\nset -e\necho hi\n")
+	for _, v := range vs {
+		if strings.Contains(v.Msg, `"set -e"`) {
+			t.Errorf("unexpected set -e violation after set -Eeuo pipefail: %v", v)
+		}
+	}
+}
+
+func TestLintDockerfile_FROMLatest(t *testing.T) {
+	vs := lintDockerfile("FROM debian:latest\nCMD [\"bash\"]\n")
+	found := false
+	for _, v := range vs {
+		if strings.Contains(v.Msg, "latest") {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("expected violation for FROM :latest")
+	}
+}
+
+func TestLintDockerfile_FROMNoTag(t *testing.T) {
+	// FROM scratch has no ":" so no latest-tag violation.
+	vs := lintDockerfile("FROM scratch\nCMD [\"hello\"]\n")
+	for _, v := range vs {
+		if strings.Contains(v.Msg, "latest") {
+			t.Errorf("unexpected latest-tag violation for FROM scratch: %v", v)
+		}
+	}
+}
+
+func TestDockerfileASTPair_ParseError(t *testing.T) {
+	_, _, err := dockerfileASTPair("-", "NOT A DOCKERFILE AT ALL\x00\xff")
+	// Note: dockerfile.Parse is very permissive; this just exercises the path.
+	_ = err // error or nil — both are valid; we just verify no panic
+}
+
+func TestShell_FormatError(t *testing.T) {
+	f := &formatter{tidy: false}
+	_, err := f.shell("$((1.5))\n") // zsh float: not valid bash
+	if err == nil {
+		t.Error("expected error for invalid bash arithmetic")
+	}
+}
+
+func TestShell_TidyFormatError(t *testing.T) {
+	f := &formatter{tidy: true}
+	_, err := f.shell("$((1.5))\n")
+	if err == nil {
+		t.Error("expected error for invalid bash arithmetic in tidy mode")
+	}
+}
+
+func TestDockerfile_ParseError(t *testing.T) {
+	f := &formatter{tidy: false}
+	// dockerfile.Parse is permissive, but at minimum verify no panic
+	_, err := f.dockerfile("FROM debian:bookworm-slim\nRUN echo hi\n")
+	if err != nil {
+		t.Errorf("unexpected error for valid Dockerfile: %v", err)
+	}
+}
+
+func TestMarkdownASTPair_Basic(t *testing.T) {
+	pre, post, err := markdownASTPair("-", "# Title\n\nSome text.\n")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(pre, "markdown") {
+		t.Errorf("pre AST missing markdown: %s", pre)
+	}
+	_ = post
+}
+
+func TestJQFmtFunc_ParseFileFallback(t *testing.T) {
+	// jqFmtFunc falls back to ParseFile for multi-statement jq programs.
+	// "def f: .;" is valid as a file but not as a single expression.
+	out := jqFmtFunc("def f: .; f", false)
+	if out == "" {
+		t.Error("expected non-empty output for def+call jq program")
+	}
+}
+
+func TestRun_TidyDiffLintOnlyStdin(t *testing.T) {
+	// --tidy --diff on STDIN that is already formatted but has lint violations:
+	// exercises the "return lintCode" path after an empty diff (lines 138-139 in run).
+	_, _, code := runCLI(t, ".x == false\n", "--tidy --diff")
+	if code == 0 {
+		t.Error("expected non-zero exit for lint violation")
+	}
+}
+
+func TestRun_ASTStdinError(t *testing.T) {
+	// --ast with malformed stdin — exercises the die() path in the stdin AST branch.
+	_, stderr, code := runCLI(t, "[[[invalid\n", "--ast")
+	if code == 0 {
+		t.Error("expected non-zero exit for malformed jq stdin with --ast")
+	}
+	if !strings.Contains(stderr, "tianonfmt:") {
+		t.Errorf("expected error in stderr: %q", stderr)
+	}
+}
+
+func TestRun_ASTFileError(t *testing.T) {
+	// --ast with a malformed .jq file exercises the astByPath error path.
+	f, err := os.CreateTemp(t.TempDir(), "*.jq")
+	if err != nil {
+		t.Fatal(err)
+	}
+	f.WriteString("[[[invalid\n")
+	f.Close()
+	_, stderr, code := runCLI(t, "", "--ast "+f.Name())
+	if code == 0 {
+		t.Error("expected non-zero exit for malformed jq AST")
+	}
+	if !strings.Contains(stderr, "tianonfmt:") {
+		t.Errorf("expected error in stderr: %q", stderr)
+	}
+}
+
+func TestRun_TidyDiffLintOnly(t *testing.T) {
+	// --tidy --diff on a file that is already formatted but has lint violations:
+	// no diff (format is unchanged) but non-zero exit from lint.
+	f, err := os.CreateTemp(t.TempDir(), "*.jq")
+	if err != nil {
+		t.Fatal(err)
+	}
+	f.WriteString(".x == false\n")
+	f.Close()
+	_, _, code := runCLI(t, "", "--tidy --diff "+f.Name())
+	if code == 0 {
+		t.Error("expected non-zero exit for lint violation with --tidy --diff")
+	}
+}
+
+func TestRun_DockerfileFile(t *testing.T) {
+	f, err := os.CreateTemp(t.TempDir(), "Dockerfile")
+	if err != nil {
+		t.Fatal(err)
+	}
+	f.WriteString("FROM debian:bookworm-slim\nRUN echo hi\n")
+	f.Close()
+	stdout, _, code := runCLI(t, "", f.Name())
+	if code != 0 {
+		t.Fatalf("exit %d", code)
+	}
+	if !strings.Contains(stdout, "FROM") {
+		t.Errorf("unexpected output: %q", stdout)
+	}
+}
+
+func TestRun_ShellFile(t *testing.T) {
+	f, err := os.CreateTemp(t.TempDir(), "*.sh")
+	if err != nil {
+		t.Fatal(err)
+	}
+	f.WriteString("#!/usr/bin/env bash\nset -Eeuo pipefail\necho hi\n")
+	f.Close()
+	_, _, code := runCLI(t, "", f.Name())
+	if code != 0 {
+		t.Fatalf("exit %d", code)
+	}
+}
+
+func TestRun_ASTDockerfile(t *testing.T) {
+	f, err := os.CreateTemp(t.TempDir(), "Dockerfile")
+	if err != nil {
+		t.Fatal(err)
+	}
+	f.WriteString("FROM debian:bookworm-slim\nCMD [\"bash\"]\n")
+	f.Close()
+	stdout, _, code := runCLI(t, "", "--ast "+f.Name())
+	if code != 0 {
+		t.Fatalf("exit %d", code)
+	}
+	if !strings.Contains(stdout, "dockerfile") {
+		t.Errorf("expected dockerfile AST: %q", stdout)
+	}
+}
+
+func TestRun_ASTShell(t *testing.T) {
+	f, err := os.CreateTemp(t.TempDir(), "*.sh")
+	if err != nil {
+		t.Fatal(err)
+	}
+	f.WriteString("#!/usr/bin/env bash\necho hi\n")
+	f.Close()
+	stdout, _, code := runCLI(t, "", "--ast "+f.Name())
+	if code != 0 {
+		t.Fatalf("exit %d", code)
+	}
+	if !strings.Contains(stdout, "shell") {
+		t.Errorf("expected shell AST: %q", stdout)
 	}
 }
 

@@ -11,8 +11,8 @@ def g:
 	h
 ;
 
-label $lbl |
-foreach .[] as $item (0;
+label $lbl
+| foreach .[] as $item (0;
 	. + $item
 ; . * 2)
 | reduce .[] as $x (0;

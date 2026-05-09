@@ -129,5 +129,46 @@
 				}
 			}
 		}
-	]
+	],
+	"query": {
+		"type": "commented",
+		"leadingComments": [
+			"# pipe part with both leading comment AND trailing comment on same step",
+			"# also exercises pipeChainMultiLine's leading+trailing comment path"
+		],
+		"expr": {
+			"type": "pipe",
+			"left": {
+				"type": "field",
+				"name": ".data"
+			},
+			"right": {
+				"type": "commented",
+				"leadingComments": [
+					"# leading: filter to active items"
+				],
+				"expr": {
+					"type": "pipe",
+					"left": {
+						"type": "commented",
+						"expr": {
+							"type": "call",
+							"name": "select",
+							"args": [
+								{
+									"type": "field",
+									"name": ".active"
+								}
+							]
+						},
+						"trailingComment": "# trailing: keep only active"
+					},
+					"right": {
+						"type": "field",
+						"name": ".name"
+					}
+				}
+			}
+		}
+	}
 }

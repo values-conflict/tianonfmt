@@ -1,0 +1,35 @@
+{
+	"type": "shell",
+	"file": "input.sh",
+	"stmts": [
+		{
+			"type": "call",
+			"args": [
+				"set",
+				"-Eeuo",
+				"pipefail"
+			]
+		},
+		{
+			"type": "call",
+			"args": [
+				"eval",
+				"$(printf '%s=%s' \"$key\" \"$val\")"
+			]
+		},
+		{
+			"type": "call",
+			"args": [
+				"eval",
+				"$(printf \"%q=%q\" \"$key\" \"$val\")"
+			]
+		},
+		{
+			"type": "call",
+			"args": [
+				"eval",
+				"$(printf '%s' \"$(basename \"$path\")\")"
+			]
+		}
+	]
+}

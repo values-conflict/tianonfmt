@@ -125,6 +125,30 @@ func TestFlattenAndChain(t *testing.T) {
 	}
 }
 
+func TestFlattenAndChain_RightRedirect(t *testing.T) {
+	// cmd1 && cmd2 > file: right side has redirect — FlattenAndChain returns nil.
+	src := "cmd1 && cmd2 > file"
+	f, err := shell.ParseFile(src, syntax.LangBash)
+	if err != nil || len(f.Stmts) != 1 {
+		t.Skip("parse or stmt issue")
+	}
+	if got := shell.FlattenAndChain(f.Stmts[0]); got != nil {
+		t.Errorf("expected nil when right has redirect, got %d stmts", len(got))
+	}
+}
+
+func TestFlattenAndChain_RootRedirect(t *testing.T) {
+	// (cmd1 && cmd2) > file: BinaryCmd itself has a redirect — nil.
+	src := "{ cmd1 && cmd2; } > file"
+	f, err := shell.ParseFile(src, syntax.LangBash)
+	if err != nil || len(f.Stmts) != 1 {
+		t.Skip("parse or stmt issue")
+	}
+	if got := shell.FlattenAndChain(f.Stmts[0]); got != nil {
+		t.Errorf("expected nil for stmt with redirect, got %d stmts", len(got))
+	}
+}
+
 // ── ApplyTidy ─────────────────────────────────────────────────────────────────
 
 func TestApplyTidy_Backtick(t *testing.T) {
@@ -445,6 +469,19 @@ func TestNormalizeShortFlags_GrepReorderCombined(t *testing.T) {
 	}
 	if !strings.Contains(out, "-qE") {
 		t.Errorf("grep -Eq should be reordered to -qE: %q", out)
+	}
+}
+
+func TestNormalizeShortFlags_GrepReorderFormat(t *testing.T) {
+	// Format mode: Phase 1 merge is skipped, so wrong-order combined groups reach
+	// reorderCombinedGroups directly and fire the sorted!=flags branch.
+	src := "grep -Eq 'pattern' file\n"
+	out, err := shell.Format(src, syntax.LangBash)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out, "-qE") {
+		t.Errorf("grep -Eq should be reordered to -qE in format mode: %q", out)
 	}
 }
 
@@ -834,6 +871,75 @@ func TestFormat_JQ_ReformatsInlineExpression(t *testing.T) {
 	}
 }
 
+
+// ── reformatJQInLine edge cases ──────────────────────────────────────────────
+
+func TestFormatRUN_JQ_NoSingleQuote(t *testing.T) {
+	// jq with no single-quoted expression (e.g. --rawfile) — sq<1 path.
+	lines := []string{"\tjq --null-input"}
+	got := shell.FormatRUN(lines)
+	if len(got) != 1 || got[0] != "\tjq --null-input" {
+		t.Errorf("jq with no quotes should pass through unchanged: %v", got)
+	}
+}
+
+func TestFormatRUN_JQ_OnlyOneQuote(t *testing.T) {
+	// jq 'unclosed — only one quote, firstSQ==sq path.
+	lines := []string{"\tjq 'unclosed"}
+	got := shell.FormatRUN(lines)
+	if len(got) != 1 || got[0] != "\tjq 'unclosed" {
+		t.Errorf("malformed jq should pass through unchanged: %v", got)
+	}
+}
+
+func TestFormatRUN_JQ_NestedQuotes(t *testing.T) {
+	// jq expression containing a literal apostrophe — too complex, pass through.
+	lines := []string{"\tjq 'it'\\''s weird' file"}
+	got := shell.FormatRUN(lines)
+	// nested single quotes: leave unchanged
+	if len(got) != 1 {
+		t.Errorf("nested quotes should produce 1 line: %v", got)
+	}
+}
+
+func TestFormatRUN_JQ_MultilineResult(t *testing.T) {
+	// jq expression that formats to multiline — formatJQExpr returns \n, skip.
+	// A def statement formats as multiline when inline=true fails.
+	lines := []string{"\tjq --null-input 'def f: .; f'"}
+	got := shell.FormatRUN(lines)
+	if len(got) != 1 {
+		t.Errorf("multiline jq result should produce 1 line: %v", got)
+	}
+}
+
+// ── fixArraySpacingLine edge cases ───────────────────────────────────────────
+
+func TestFormatRUN_Array_SingleQuoteSkip(t *testing.T) {
+	// Array assignment with a single-quoted value containing '=' — quote skip path.
+	lines := []string{"\tarr=('key=val' other)"}
+	got := shell.FormatRUN(lines)
+	if len(got) != 1 {
+		t.Errorf("expected 1 line, got %v", got)
+	}
+}
+
+func TestFormatRUN_Array_DoubleQuoteSkip(t *testing.T) {
+	// Array assignment with a double-quoted value containing '=' — dquote skip.
+	lines := []string{"\tarr=(\"key=val\" other)"}
+	got := shell.FormatRUN(lines)
+	if len(got) != 1 {
+		t.Errorf("expected 1 line, got %v", got)
+	}
+}
+
+func TestFormatRUN_Array_CommentSkip(t *testing.T) {
+	// Array assignment followed by a comment — comment skip path.
+	lines := []string{"\tarr=(a b) # comment"}
+	got := shell.FormatRUN(lines)
+	if len(got) != 1 || !strings.Contains(got[0], "# comment") {
+		t.Errorf("comment should be preserved: %v", got)
+	}
+}
 
 // ── token-level format preservation ──────────────────────────────────────────
 

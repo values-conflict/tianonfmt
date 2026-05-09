@@ -16,3 +16,12 @@ echo "count: $(( counts["$label"] ))"
 # Nested parens inside arithmetic — exercises depth tracking (case '(': depth++)
 result=$(( (counts["apples"] + 1) * 2 ))
 echo "$result"
+
+# Array assignments with quoted elements — exercises arrayCloseParen quote-skip paths
+arr=( 'hello world' other 'key=val' )
+arr2=( "key=value" "other=item" )
+
+# Heredoc with single-quoted word — exercises isUnquotedHeredocWord false path
+cat <<'EOF_INNER'
+raw content: $not_expanded
+EOF_INNER

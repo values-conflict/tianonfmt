@@ -1,0 +1,65 @@
+{
+	"type": "jq",
+	"query": {
+		"type": "commented",
+		"leadingComments": [
+			"# pipe chain where a commented step wraps a multi-line comma —",
+			"# exercises pipeChainMultiLine's pipePartIsMultiLineComma indent/dedent path"
+		],
+		"expr": {
+			"type": "pipe",
+			"left": {
+				"type": "index",
+				"expr": {
+					"type": "field",
+					"name": ".items"
+				}
+			},
+			"right": {
+				"type": "commented",
+				"leadingComments": [
+					"# select these fields"
+				],
+				"expr": {
+					"type": "comma",
+					"left": {
+						"type": "comma",
+						"left": {
+							"type": "comma",
+							"left": {
+								"type": "comma",
+								"left": {
+									"type": "comma",
+									"left": {
+										"type": "field",
+										"name": ".name"
+									},
+									"right": {
+										"type": "field",
+										"name": ".version"
+									}
+								},
+								"right": {
+									"type": "field",
+									"name": ".description"
+								}
+							},
+							"right": {
+								"type": "field",
+								"name": ".maintainer"
+							}
+						},
+						"right": {
+							"type": "field",
+							"name": ".url"
+						}
+					},
+					"right": {
+						"type": "call",
+						"name": "empty"
+					}
+				}
+			}
+		}
+	}
+}

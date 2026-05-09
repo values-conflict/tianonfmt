@@ -1,14 +1,21 @@
 {
 	"type": "jq",
+	"imports": [
+		{
+			"type": "import",
+			"include": true,
+			"path": "\"shared\""
+		}
+	],
 	"query": {
-		"type": "commented",
-		"leadingComments": [
-			"# label/break: early-exit from a generator — real idiom from openjdk library generation",
-			"# Ref: https://github.com/docker-library/openjdk/blob/638eb4b1d59af728d31e031168bd4cafc225f097/generate-stackbrew-library.jq"
-		],
+		"type": "as",
 		"expr": {
-			"type": "array",
-			"elem": {
+			"type": "pipe",
+			"left": {
+				"type": "call",
+				"name": "to_entries"
+			},
+			"right": {
 				"type": "pipe",
 				"left": {
 					"type": "index",
@@ -17,33 +24,974 @@
 					}
 				},
 				"right": {
-					"type": "label",
-					"binding": "$out",
-					"body": {
+					"type": "field",
+					"name": ".key"
+				}
+			}
+		},
+		"pattern": {
+			"type": "var",
+			"name": "$major"
+		},
+		"body": {
+			"type": "as",
+			"expr": {
+				"type": "pipe",
+				"left": {
+					"type": "field",
+					"name": ".value"
+				},
+				"right": {
+					"type": "pipe",
+					"left": {
 						"type": "if",
 						"cond": {
-							"type": "binOp",
-							"op": "\u003e",
+							"type": "pipe",
 							"left": {
-								"type": "identity"
+								"type": "binOp",
+								"op": "",
+								"left": {
+									"type": "var",
+									"name": "$ARGS"
+								},
+								"right": {
+									"type": "field",
+									"name": ".positional"
+								}
 							},
 							"right": {
-								"type": "number",
-								"raw": "5"
+								"type": "binOp",
+								"op": "\u003e",
+								"left": {
+									"type": "call",
+									"name": "length"
+								},
+								"right": {
+									"type": "number",
+									"raw": "0"
+								}
 							}
 						},
 						"then": {
-							"type": "comma",
-							"left": {
-								"type": "identity"
-							},
-							"right": {
-								"type": "break",
-								"binding": "$out"
-							}
+							"type": "call",
+							"name": "select",
+							"args": [
+								{
+									"type": "call",
+									"name": "IN",
+									"args": [
+										{
+											"type": "var",
+											"name": "$major"
+										},
+										{
+											"type": "index",
+											"expr": {
+												"type": "binOp",
+												"op": "",
+												"left": {
+													"type": "var",
+													"name": "$ARGS"
+												},
+												"right": {
+													"type": "field",
+													"name": ".positional"
+												}
+											}
+										}
+									]
+								}
+							]
 						},
 						"else": {
 							"type": "identity"
+						}
+					},
+					"right": {
+						"type": "call",
+						"name": "tag_version"
+					}
+				}
+			},
+			"pattern": {
+				"type": "var",
+				"name": "$version"
+			},
+			"body": {
+				"type": "as",
+				"expr": {
+					"type": "commented",
+					"leadingComments": [
+						"# generate a list of \"version tags\", stopping the vector at the first \"-ea\" or \"-rc\" component suffix",
+						"# \"AA-ea-BB.CC\" -\u003e [ \"AA-ea-BB.CC\", \"AA-ea-BB\", \"AA-ea\" ]"
+					],
+					"expr": {
+						"type": "array",
+						"elem": {
+							"type": "pipe",
+							"left": {
+								"type": "var",
+								"name": "$version"
+							},
+							"right": {
+								"type": "pipe",
+								"left": {
+									"type": "commented",
+									"expr": {
+										"type": "array",
+										"elem": {
+											"type": "call",
+											"name": "scan",
+											"args": [
+												{
+													"type": "string",
+													"raw": "\"(?x) ^[0-9a-z]+ | [.-][0-9a-z]+\""
+												}
+											]
+										}
+									},
+									"trailingComment": "# [ \"AA\", \"-ea\", \"-BB\", \".CC\" ]"
+								},
+								"right": {
+									"type": "label",
+									"binding": "$stopEarly",
+									"body": {
+										"type": "pipe",
+										"left": {
+											"type": "commented",
+											"expr": {
+												"type": "slice",
+												"expr": {
+													"type": "identity"
+												},
+												"end": {
+													"type": "call",
+													"name": "length-range",
+													"args": [
+														{
+															"type": "call",
+															"name": "length"
+														}
+													]
+												}
+											},
+											"trailingComment": "# [ \"AA\", \"-ea\", \"-BB\", \".CC\" ], [ \"AA\", \"-ea\", \"-BB\" ], ..."
+										},
+										"right": {
+											"type": "pipe",
+											"left": {
+												"type": "commented",
+												"expr": {
+													"type": "call",
+													"name": "add"
+												},
+												"trailingComment": "# \"AA-ea-BB.CC\", \"AA-ea-BB\", \"AA-ea\", \"AA\""
+											},
+											"right": {
+												"type": "if",
+												"cond": {
+													"type": "binOp",
+													"op": "or",
+													"left": {
+														"type": "call",
+														"name": "endswith",
+														"args": [
+															{
+																"type": "string",
+																"raw": "\"-ea\""
+															}
+														]
+													},
+													"right": {
+														"type": "call",
+														"name": "endswith",
+														"args": [
+															{
+																"type": "string",
+																"raw": "\"-rc\""
+															}
+														]
+													}
+												},
+												"then": {
+													"type": "comma",
+													"left": {
+														"type": "identity"
+													},
+													"right": {
+														"type": "break",
+														"binding": "$stopEarly"
+													}
+												},
+												"else": {
+													"type": "identity"
+												}
+											}
+										}
+									}
+								}
+							}
+						}
+					}
+				},
+				"pattern": {
+					"type": "var",
+					"name": "$versionTags"
+				},
+				"body": {
+					"type": "as",
+					"expr": {
+						"type": "commented",
+						"leadingComments": [
+							"# now inject all the \"-jdk\" variations of those too"
+						],
+						"expr": {
+							"type": "paren",
+							"expr": {
+								"type": "pipe",
+								"left": {
+									"type": "var",
+									"name": "$versionTags"
+								},
+								"right": {
+									"type": "call",
+									"name": "map",
+									"args": [
+										{
+											"type": "comma",
+											"left": {
+												"type": "binOp",
+												"op": "+",
+												"left": {
+													"type": "identity"
+												},
+												"right": {
+													"type": "string",
+													"raw": "\"-jdk\""
+												}
+											},
+											"right": {
+												"type": "identity"
+											}
+										}
+									]
+								}
+							}
+						}
+					},
+					"pattern": {
+						"type": "var",
+						"name": "$versionTags"
+					},
+					"body": {
+						"type": "as",
+						"expr": {
+							"type": "call",
+							"name": "first",
+							"args": [
+								{
+									"type": "pipe",
+									"left": {
+										"type": "index",
+										"expr": {
+											"type": "field",
+											"name": ".variants"
+										}
+									},
+									"right": {
+										"type": "call",
+										"name": "select",
+										"args": [
+											{
+												"type": "call",
+												"name": "startswith",
+												"args": [
+													{
+														"type": "string",
+														"raw": "\"oraclelinux\""
+													}
+												]
+											}
+										]
+									}
+								}
+							]
+						},
+						"pattern": {
+							"type": "var",
+							"name": "$latestOracle"
+						},
+						"body": {
+							"type": "as",
+							"expr": {
+								"type": "call",
+								"name": "first",
+								"args": [
+									{
+										"type": "pipe",
+										"left": {
+											"type": "index",
+											"expr": {
+												"type": "field",
+												"name": ".variants"
+											}
+										},
+										"right": {
+											"type": "call",
+											"name": "select",
+											"args": [
+												{
+													"type": "call",
+													"name": "startswith",
+													"args": [
+														{
+															"type": "string",
+															"raw": "\"slim-\""
+														}
+													]
+												}
+											]
+										}
+									}
+								]
+							},
+							"pattern": {
+								"type": "var",
+								"name": "$latestSlim"
+							},
+							"body": {
+								"type": "as",
+								"expr": {
+									"type": "index",
+									"expr": {
+										"type": "field",
+										"name": ".variants"
+									}
+								},
+								"pattern": {
+									"type": "var",
+									"name": "$variant"
+								},
+								"body": {
+									"type": "as",
+									"expr": {
+										"type": "paren",
+										"expr": {
+											"type": "pipe",
+											"left": {
+												"type": "var",
+												"name": "$variant"
+											},
+											"right": {
+												"type": "index",
+												"expr": {
+													"type": "call",
+													"name": "split",
+													"args": [
+														{
+															"type": "string",
+															"raw": "\"/\""
+														}
+													]
+												},
+												"key": {
+													"type": "binOp",
+													"op": "neg",
+													"left": {
+														"type": "number",
+														"raw": "1"
+													},
+													"right": null
+												}
+											}
+										}
+									},
+									"pattern": {
+										"type": "var",
+										"name": "$variantName"
+									},
+									"body": {
+										"type": "as",
+										"expr": {
+											"type": "array",
+											"elem": {
+												"type": "as",
+												"expr": {
+													"type": "pipe",
+													"left": {
+														"type": "comma",
+														"left": {
+															"type": "comma",
+															"left": {
+																"type": "comma",
+																"left": {
+																	"type": "commented",
+																	"expr": {
+																		"type": "var",
+																		"name": "$variantName"
+																	},
+																	"trailingComment": "# \"windowsservercore-ltsc2025\", etc"
+																},
+																"right": {
+																	"type": "if",
+																	"cond": {
+																		"type": "binOp",
+																		"op": "==",
+																		"left": {
+																			"type": "var",
+																			"name": "$variant"
+																		},
+																		"right": {
+																			"type": "var",
+																			"name": "$latestOracle"
+																		}
+																	},
+																	"then": {
+																		"type": "string",
+																		"raw": "\"oracle\""
+																	},
+																	"else": {
+																		"type": "call",
+																		"name": "empty"
+																	}
+																}
+															},
+															"right": {
+																"type": "if",
+																"cond": {
+																	"type": "binOp",
+																	"op": "==",
+																	"left": {
+																		"type": "var",
+																		"name": "$variant"
+																	},
+																	"right": {
+																		"type": "var",
+																		"name": "$latestSlim"
+																	}
+																},
+																"then": {
+																	"type": "string",
+																	"raw": "\"slim\""
+																},
+																"else": {
+																	"type": "call",
+																	"name": "empty"
+																}
+															}
+														},
+														"right": {
+															"type": "call",
+															"name": "empty"
+														}
+													},
+													"right": {
+														"type": "index",
+														"expr": {
+															"type": "var",
+															"name": "$versionTags"
+														}
+													}
+												},
+												"pattern": {
+													"type": "var",
+													"name": "$versionTag"
+												},
+												"body": {
+													"type": "pipe",
+													"left": {
+														"type": "array",
+														"elem": {
+															"type": "pipe",
+															"left": {
+																"type": "comma",
+																"left": {
+																	"type": "var",
+																	"name": "$versionTag"
+																},
+																"right": {
+																	"type": "identity"
+																}
+															},
+															"right": {
+																"type": "call",
+																"name": "select",
+																"args": [
+																	{
+																		"type": "binOp",
+																		"op": "!=",
+																		"left": {
+																			"type": "identity"
+																		},
+																		"right": {
+																			"type": "string",
+																			"raw": "\"\""
+																		}
+																	}
+																]
+															}
+														}
+													},
+													"right": {
+														"type": "call",
+														"name": "join",
+														"args": [
+															{
+																"type": "string",
+																"raw": "\"-\""
+															}
+														]
+													}
+												}
+											}
+										},
+										"pattern": {
+											"type": "var",
+											"name": "$tags"
+										},
+										"body": {
+											"type": "as",
+											"expr": {
+												"type": "array",
+												"elem": {
+													"type": "as",
+													"expr": {
+														"type": "pipe",
+														"left": {
+															"type": "comma",
+															"left": {
+																"type": "comma",
+																"left": {
+																	"type": "if",
+																	"cond": {
+																		"type": "pipe",
+																		"left": {
+																			"type": "var",
+																			"name": "$variant"
+																		},
+																		"right": {
+																			"type": "call",
+																			"name": "startswith",
+																			"args": [
+																				{
+																					"type": "string",
+																					"raw": "\"windows/\""
+																				}
+																			]
+																		}
+																	},
+																	"then": {
+																		"type": "pipe",
+																		"left": {
+																			"type": "var",
+																			"name": "$variantName"
+																		},
+																		"right": {
+																			"type": "index",
+																			"expr": {
+																				"type": "call",
+																				"name": "split",
+																				"args": [
+																					{
+																						"type": "string",
+																						"raw": "\"-\""
+																					}
+																				]
+																			},
+																			"key": {
+																				"type": "number",
+																				"raw": "0"
+																			}
+																		}
+																	},
+																	"else": {
+																		"type": "call",
+																		"name": "empty"
+																	}
+																},
+																"right": {
+																	"type": "if",
+																	"cond": {
+																		"type": "binOp",
+																		"op": "or",
+																		"left": {
+																			"type": "binOp",
+																			"op": "==",
+																			"left": {
+																				"type": "var",
+																				"name": "$variant"
+																			},
+																			"right": {
+																				"type": "var",
+																				"name": "$latestOracle"
+																			}
+																		},
+																		"right": {
+																			"type": "paren",
+																			"expr": {
+																				"type": "pipe",
+																				"left": {
+																					"type": "var",
+																					"name": "$variant"
+																				},
+																				"right": {
+																					"type": "call",
+																					"name": "startswith",
+																					"args": [
+																						{
+																							"type": "string",
+																							"raw": "\"windows/windowsservercore-\""
+																						}
+																					]
+																				}
+																			}
+																		}
+																	},
+																	"then": {
+																		"type": "string",
+																		"raw": "\"\""
+																	},
+																	"else": {
+																		"type": "call",
+																		"name": "empty"
+																	}
+																}
+															},
+															"right": {
+																"type": "call",
+																"name": "empty"
+															}
+														},
+														"right": {
+															"type": "index",
+															"expr": {
+																"type": "var",
+																"name": "$versionTags"
+															}
+														}
+													},
+													"pattern": {
+														"type": "var",
+														"name": "$versionTag"
+													},
+													"body": {
+														"type": "pipe",
+														"left": {
+															"type": "array",
+															"elem": {
+																"type": "pipe",
+																"left": {
+																	"type": "comma",
+																	"left": {
+																		"type": "var",
+																		"name": "$versionTag"
+																	},
+																	"right": {
+																		"type": "identity"
+																	}
+																},
+																"right": {
+																	"type": "call",
+																	"name": "select",
+																	"args": [
+																		{
+																			"type": "binOp",
+																			"op": "!=",
+																			"left": {
+																				"type": "identity"
+																			},
+																			"right": {
+																				"type": "string",
+																				"raw": "\"\""
+																			}
+																		}
+																	]
+																}
+															}
+														},
+														"right": {
+															"type": "call",
+															"name": "join",
+															"args": [
+																{
+																	"type": "string",
+																	"raw": "\"-\""
+																}
+															]
+														}
+													}
+												}
+											},
+											"pattern": {
+												"type": "var",
+												"name": "$sharedTags"
+											},
+											"body": {
+												"type": "as",
+												"expr": {
+													"type": "paren",
+													"expr": {
+														"type": "pipe",
+														"left": {
+															"type": "field",
+															"name": ".arches"
+														},
+														"right": {
+															"type": "pipe",
+															"left": {
+																"type": "call",
+																"name": "keys_unsorted"
+															},
+															"right": {
+																"type": "call",
+																"name": "map",
+																"args": [
+																	{
+																		"type": "call",
+																		"name": "select",
+																		"args": [
+																			{
+																				"type": "pipe",
+																				"left": {
+																					"type": "call",
+																					"name": "startswith",
+																					"args": [
+																						{
+																							"type": "string",
+																							"raw": "\"windows-\""
+																						}
+																					]
+																				},
+																				"right": {
+																					"type": "if",
+																					"cond": {
+																						"type": "pipe",
+																						"left": {
+																							"type": "var",
+																							"name": "$variant"
+																						},
+																						"right": {
+																							"type": "call",
+																							"name": "startswith",
+																							"args": [
+																								{
+																									"type": "string",
+																									"raw": "\"windows/\""
+																								}
+																							]
+																						}
+																					},
+																					"then": {
+																						"type": "identity"
+																					},
+																					"else": {
+																						"type": "call",
+																						"name": "not"
+																					}
+																				}
+																			}
+																		]
+																	}
+																]
+															}
+														}
+													}
+												},
+												"pattern": {
+													"type": "var",
+													"name": "$arches"
+												},
+												"body": {
+													"type": "paren",
+													"expr": {
+														"type": "comma",
+														"left": {
+															"type": "comma",
+															"left": {
+																"type": "comma",
+																"left": {
+																	"type": "comma",
+																	"left": {
+																		"type": "comma",
+																		"left": {
+																			"type": "comma",
+																			"left": {
+																				"type": "string",
+																				"raw": "\"\""
+																			},
+																			"right": {
+																				"type": "string",
+																				"raw": "\"Tags: \\($tags | join(\", \"))\""
+																			}
+																		},
+																		"right": {
+																			"type": "if",
+																			"cond": {
+																				"type": "binOp",
+																				"op": "!=",
+																				"left": {
+																					"type": "var",
+																					"name": "$sharedTags"
+																				},
+																				"right": {
+																					"type": "array"
+																				}
+																			},
+																			"then": {
+																				"type": "string",
+																				"raw": "\"SharedTags: \\($sharedTags | join(\", \"))\""
+																			},
+																			"else": {
+																				"type": "call",
+																				"name": "empty"
+																			}
+																		}
+																	},
+																	"right": {
+																		"type": "string",
+																		"raw": "\"Directory: \\($major)/\\($variant)\""
+																	}
+																},
+																"right": {
+																	"type": "string",
+																	"raw": "\"Architectures: \\($arches | join(\", \"))\""
+																}
+															},
+															"right": {
+																"type": "if",
+																"cond": {
+																	"type": "pipe",
+																	"left": {
+																		"type": "var",
+																		"name": "$variant"
+																	},
+																	"right": {
+																		"type": "call",
+																		"name": "startswith",
+																		"args": [
+																			{
+																				"type": "string",
+																				"raw": "\"windows/\""
+																			}
+																		]
+																	}
+																},
+																"then": {
+																	"type": "as",
+																	"expr": {
+																		"type": "pipe",
+																		"left": {
+																			"type": "var",
+																			"name": "$variant"
+																		},
+																		"right": {
+																			"type": "call",
+																			"name": "windows_release"
+																		}
+																	},
+																	"pattern": {
+																		"type": "var",
+																		"name": "$winver"
+																	},
+																	"body": {
+																		"type": "pipe",
+																		"left": {
+																			"type": "array",
+																			"elem": {
+																				"type": "comma",
+																				"left": {
+																					"type": "comma",
+																					"left": {
+																						"type": "commented",
+																						"leadingComments": [
+																							"# TODO use windows_variant from shared.jq?"
+																						],
+																						"expr": {
+																							"type": "if",
+																							"cond": {
+																								"type": "call",
+																								"name": "startswith",
+																								"args": [
+																									{
+																										"type": "string",
+																										"raw": "\"windows/nanoserver-\""
+																									}
+																								]
+																							},
+																							"then": {
+																								"type": "binOp",
+																								"op": "+",
+																								"left": {
+																									"type": "string",
+																									"raw": "\"nanoserver-\""
+																								},
+																								"right": {
+																									"type": "var",
+																									"name": "$winver"
+																								}
+																							},
+																							"else": {
+																								"type": "call",
+																								"name": "empty"
+																							}
+																						}
+																					},
+																					"right": {
+																						"type": "binOp",
+																						"op": "+",
+																						"left": {
+																							"type": "string",
+																							"raw": "\"windowsservercore-\""
+																						},
+																						"right": {
+																							"type": "var",
+																							"name": "$winver"
+																						}
+																					}
+																				},
+																				"right": {
+																					"type": "call",
+																					"name": "empty"
+																				}
+																			}
+																		},
+																		"right": {
+																			"type": "binOp",
+																			"op": "+",
+																			"left": {
+																				"type": "string",
+																				"raw": "\"Constraints: \""
+																			},
+																			"right": {
+																				"type": "call",
+																				"name": "join",
+																				"args": [
+																					{
+																						"type": "string",
+																						"raw": "\", \""
+																					}
+																				]
+																			}
+																		}
+																	}
+																},
+																"else": {
+																	"type": "call",
+																	"name": "empty"
+																}
+															}
+														},
+														"right": {
+															"type": "call",
+															"name": "empty"
+														}
+													}
+												}
+											}
+										}
+									}
+								}
+							}
 						}
 					}
 				}

@@ -1,0 +1,13 @@
+# bracketDelta comment path: jq comment inside a multi-line block
+# The # triggers inComment=true; \n resets it — ensuring brackets
+# inside comments are not counted toward depth tracking.
+FROM {{ .base }}
+
+RUN {{
+    # jq comment inside block: brackets here { } should not count
+    .commands
+    | join("; ")
+-}}
+
+# bracketDelta escaped-string path: backslash escape inside double-quoted string
+ENV MSG {{ "hello\\nworld" }}
