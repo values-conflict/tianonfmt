@@ -12,7 +12,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/tianon/fmt/tianonfmt/internal/testutil"
+	"github.com/values-conflict/tianonfmt/internal/testutil"
 )
 
 func TestMain(m *testing.M) {

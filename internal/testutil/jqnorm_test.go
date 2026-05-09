@@ -3,7 +3,7 @@ package testutil_test
 import (
 	"testing"
 
-	"github.com/tianon/fmt/tianonfmt/internal/testutil"
+	"github.com/values-conflict/tianonfmt/internal/testutil"
 )
 
 // TestTokenizeJQ exercises edge cases in the jq tokenizer that the fixture-

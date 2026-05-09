@@ -9,9 +9,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/tianon/fmt/tianonfmt/internal/testutil"
+	"github.com/values-conflict/tianonfmt/internal/testutil"
 
-	"github.com/tianon/fmt/tianonfmt/dockerfile"
+	"github.com/values-conflict/tianonfmt/dockerfile"
 )
 
 

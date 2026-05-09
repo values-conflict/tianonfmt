@@ -7,10 +7,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/tianon/fmt/tianonfmt/internal/testutil"
+	"github.com/values-conflict/tianonfmt/internal/testutil"
 
-	"github.com/tianon/fmt/tianonfmt/jq"
-	"github.com/tianon/fmt/tianonfmt/template"
+	"github.com/values-conflict/tianonfmt/jq"
+	"github.com/values-conflict/tianonfmt/template"
 )
 
 func TestMain(m *testing.M) {

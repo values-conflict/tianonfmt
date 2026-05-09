@@ -1,4 +1,4 @@
-module github.com/tianon/fmt/tianonfmt
+module github.com/values-conflict/tianonfmt
 
 go 1.25.0
 

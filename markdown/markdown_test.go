@@ -10,11 +10,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/tianon/fmt/tianonfmt/dockerfile"
-	"github.com/tianon/fmt/tianonfmt/internal/testutil"
-	"github.com/tianon/fmt/tianonfmt/jq"
-	"github.com/tianon/fmt/tianonfmt/markdown"
-	"github.com/tianon/fmt/tianonfmt/shell"
+	"github.com/values-conflict/tianonfmt/dockerfile"
+	"github.com/values-conflict/tianonfmt/internal/testutil"
+	"github.com/values-conflict/tianonfmt/jq"
+	"github.com/values-conflict/tianonfmt/markdown"
+	"github.com/values-conflict/tianonfmt/shell"
 )
 
 func TestMain(m *testing.M) {
