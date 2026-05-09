@@ -1,5 +1,0 @@
-FROM debian:trixie-slim
-{{
-	.foo |
-}}
-RUN echo done

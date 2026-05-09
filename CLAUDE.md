@@ -19,6 +19,9 @@ go tool cover -func=/tmp/cov.out | tail -1
 - `preMergeFlags` `fs.hasArg` guard in `shell/flags.go` — fires if a hasArg flag is listed in a command's merge group; current configuration never puts hasArg flags in merge groups.
 - `movePriorityFlags` stable-second-pass exit path in `shell/flags.go` — the outer `for changed` loop's second iteration exits immediately when no further moves are needed; the `changed = false` reset is instrumented but the "nothing to do" steady state is indistinguishable from a fully-covered run.
 - `reorderCombinedGroups` `sorted != flags` branch in `shell/flags.go` — fires only when a command has `order` but no `merge` spec; all current commands with `order` also have `merge`, so `preMergeFlags` already sorts during merge and this branch is unreachable with the current configuration.
+- `panic(...)` assertion in `template/template.go`'s `writeBlockExpr` — this is the structural guard that fires if a valid template block somehow arrives with an empty formatted string; it is intentionally unreachable for well-formed templates (if it ever fires, that's a bug to fix, not to test around).
+- `trimPiece` blank-line stripping loops in `template/template.go` — these strip leading/trailing blank lines from assembly pieces; the jq formatter's output for current corpus templates never produces sentinel-adjacent blank lines, so these paths go untriggered.
+- `bracketDelta` comment/escape inner paths in `template/template.go` — the `inComment` reset on `\n` and the `inString` `\\` escape skip only fire when block expressions contain jq comments or escaped strings, which don't appear in any current corpus fragment blocks.
 
 If coverage drops, add tests before moving on.  Rechecking after a refactor is not optional — it has caught real regressions in this codebase.
 
@@ -164,6 +167,21 @@ Any regression in field names, nesting, or ordering produces a readable diff.  P
 - **`string` in, `string` out for formatters**: all language formatters accept source text as `string` and return `string`.  Formatters require the full source in memory (you cannot stream-format a jq expression one token at a time), and source files are small — `io.Reader` would add complexity with no benefit
 - **Single dispatch enum** (`fileKind`) — when the same set of file types is switched on in multiple places, consolidate into one enum and one set of helper functions; parallel switches are a maintenance hazard
 
+## Formatter integrity — no silent pass-through
+
+**A formatter must never silently pass through content it failed to format.**
+
+If `format(x) == x` for some input, it must be because `x` is already in canonical form — not because the formatter gave up.  A verbatim fallback (returning the raw input when formatting fails) is indistinguishable from correct output: the diff is empty, the idempotency check passes, and the bug hides forever.
+
+**Rule: every formatter code path that produces output must have formatted the content.**  Any path where a formatting attempt failed and the raw input is returned verbatim is a bug.
+
+Implementation consequences:
+- Functions that receive a formatted string as input must assert it is non-empty.  Use `panic(...)` as a structural guard rather than silently falling through.  A panic on malformed-formatter output is the correct behavior: it surfaces the bug immediately in tests rather than hiding it in production.
+- Formatters are for **valid** input.  If the formatter cannot handle some input, the fix is either (a) fix the formatter's handling of that valid input, or (b) confirm the input is genuinely invalid and document why the formatter is not responsible for it.  Returning the input unchanged is never the right answer.
+- When adding a new code path, ask: "can this path return the raw input unchanged?"  If yes, replace it with a formatter fix or a panic.
+
+This rule was hard-won from the jq-template formatter, where a verbatim fallback for "unparseable fragment blocks" masked the real bug (the fragments were never assembled together the way `jq-template.awk` does).  Once the fallback was replaced with a `panic`, the real bugs became immediately visible and fixable.
+
 ## Code quality
 
 - **DRY**: proactively look for duplication and dead code; eliminate before adding new code
@@ -209,8 +227,9 @@ A formatter change is not done until **all** of the following are true:
 2. **Corpus/anticorpus fixtures** — the new behaviour is demonstrated by at least one golden fixture sourced from `../corpus/` or `../anticorpus/`.  Contrived fixtures are acceptable only when the corpus contains no relevant example.  No new `func TestXxx` was added when a golden fixture could serve the same purpose.
 3. **Docs updated** — the relevant file in `docs/` documents the new rule/behaviour.  For shell formatter changes: `docs/bash.md`.  For jq formatter changes: `docs/jq.md` and/or `docs/jq-sh.md`.  For Dockerfile changes: `docs/dockerfile.md`.  For markdown changes: `docs/markdown.md`.
 4. **Idempotency** — running the formatter twice on any affected input produces identical output (`Idem: true` in the golden test, or verified manually).
+5. **No verbatim fallback introduced** — the change does not add any code path where the formatter returns raw input unchanged when formatting fails.  See *Formatter integrity — no silent pass-through* above.  If a new code path cannot always produce formatted output, it needs a `panic` assertion, not a silent fallback.
 
-If any of these is missing, the task is not done.  Finish all four before reporting completion.
+If any of these is missing, the task is not done.  Finish all five before reporting completion.
 
 ## LLM guidance
 

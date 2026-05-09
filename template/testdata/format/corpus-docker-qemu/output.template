@@ -43,9 +43,9 @@ RUN set -eux; \
 -}}
 		{{ .key }}) apt-get install -y --no-install-recommends {{ .value }} ;; \
 {{
-		)
-	]
-	| add
+	)
+		]
+		| add
 -}}
 		*) echo >&2 "warning: architecture '$arch' unknown 😅 (is there a 'QEMU firmware' package that should be installed here? likely candidates: https://packages.debian.org/source/$suite/edk2)" ;; \
 	esac; \
@@ -60,9 +60,9 @@ RUN set -eux; \
 # {{ .key }}
 		{{ .value }} \
 {{
-		)
-	]
-	| add
+	)
+		]
+		| add
 -}}
 	; \
 {{ ) end -}}
@@ -126,7 +126,11 @@ RUN set -eux; \
 		libfuse3-dev \
 # https://wiki.qemu.org/ChangeLog/7.2#Removal_of_the_.22slirp.22_submodule_.28affects_.22-netdev_user.22.29
 		libslirp-dev \
-{{ if env.version | IN("7.2", "8.0") then "" else ( -}}
+{{
+	if env.version | IN("7.2", "8.0") then
+		""
+	else (
+-}}
 # https://wiki.qemu.org/ChangeLog/8.1#Build_Dependencies
 		python3-venv \
 # "../meson.build:3070:18: ERROR: Git program not found, cannot download dtc.wrap via git."

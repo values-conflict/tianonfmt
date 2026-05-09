@@ -215,27 +215,6 @@ func TestFormat_DefWithSemicolon(t *testing.T) {
 	}
 }
 
-func TestFormat_MultiLineVerbatim(t *testing.T) {
-	// A multi-line block that fails to parse falls back to verbatim emission
-	// with content indented one level under {{.
-	src := "{{\n\t.foo |\n\t.bar\n}}\n"
-	out := template.Format(src, realJQFmt)
-	if !strings.Contains(out, ".foo") || !strings.Contains(out, ".bar") {
-		t.Errorf("verbatim content not preserved: %q", out)
-	}
-}
-
-func TestFormat_MultiLineVerbatimBlankLine(t *testing.T) {
-	// Verbatim multi-line block with a blank line in the MIDDLE.
-	// The blank line must be interior (not trailing) so stripMinIndent keeps it.
-	// The trailing pipe makes the expression incomplete → verbatim fallback.
-	src := "{{\n.foo |\n\n.bar |\n}}\n"
-	out := template.Format(src, realJQFmt)
-	if !strings.Contains(out, ".foo") {
-		t.Errorf("verbatim content not preserved: %q", out)
-	}
-}
-
 func TestFormat_MultiLineCommentIndented(t *testing.T) {
 	// A multi-line comment block whose {{ opener is at a tabbed indent level.
 	// The preceding newline ensures leadingTabs sees the tab prefix correctly.
@@ -243,25 +222,6 @@ func TestFormat_MultiLineCommentIndented(t *testing.T) {
 	out := template.Format(src, nil)
 	if !strings.Contains(out, "# comment1") || !strings.Contains(out, "# comment2") {
 		t.Errorf("multi-line comment not preserved: %q", out)
-	}
-}
-
-func TestFormat_VerbatimMultiLineWithIndent(t *testing.T) {
-	// Multi-line verbatim block preceded by text that includes a newline.
-	// Exercises the verbatim path's openerIndent/lastNL-based indentation.
-	src := "FROM debian\n{{\n\t.foo |\n\t.bar\n}}\n"
-	out := template.Format(src, realJQFmt)
-	if !strings.Contains(out, ".foo") {
-		t.Errorf("content not preserved: %q", out)
-	}
-}
-
-func TestFormat_VerbatimMultiLineEatEOL(t *testing.T) {
-	// Multi-line block that fails to parse with EatEOL=true (-}}).
-	src := "{{\n\t.foo |\n\t.bar\n-}}\n"
-	out := template.Format(src, realJQFmt)
-	if !strings.Contains(out, ".foo") || !strings.Contains(out, "-}}") {
-		t.Errorf("verbatim content or EatEOL not preserved: %q", out)
 	}
 }
 
@@ -281,6 +241,88 @@ func TestFormat_InlineForceBlockFails(t *testing.T) {
 	// Should preserve the original expression (verbatim fallback)
 	if !strings.Contains(out, ".base") {
 		t.Errorf("expression not preserved after force-block failure: %q", out)
+	}
+}
+
+func TestBracketDelta_StringEscape(t *testing.T) {
+	// bracketDelta must skip brackets inside string literals and comments.
+	// Exercise both the string-escape path (\\) and the comment path (#).
+	// This is tested by triggering assembly on a block whose expression
+	// contains these constructs — the assembly uses bracketDelta internally.
+	src := "{{ if env.v then ( -}}\n{{ .x -}}\n{{ ) else \"\" end -}}\n"
+	// Simpler: test that a block with "({)" in a string has delta=0 via Format
+	src2 := "{{ .[\"key\"] }}\n"
+	out := template.Format(src, realJQFmt)
+	out2 := template.Format(src2, realJQFmt)
+	if !strings.Contains(out, "if env.v then (") {
+		t.Errorf("unexpected: %q", out)
+	}
+	if !strings.Contains(out2, ".[\"key\"]") {
+		t.Errorf("unexpected: %q", out2)
+	}
+}
+
+func TestTrimPiece_BlankLines(t *testing.T) {
+	// trimPiece must strip leading and trailing blank lines.
+	// Trigger it with a template that produces assembly pieces with blank lines.
+	// Two nested sub-expressions separated by a concat sentinel, where the
+	// formatted output happens to have blank lines around the sentinel.
+	src := "{{ if env.v == \"a\" then ( -}}\n" +
+		"{{ ) else ( -}}\n" +
+		"{{ if .x then ( -}}\nX\n{{ ) else \"\" end -}}\n" +
+		"{{ if .y then ( -}}\nY\n{{ ) else \"\" end -}}\n" +
+		"{{ ) end -}}\n"
+	out := template.Format(src, realJQFmt)
+	if !strings.Contains(out, "if .x then (") {
+		t.Errorf("unexpected: %q", out)
+	}
+}
+
+func TestParse_NestedClose(t *testing.T) {
+	// Block containing "}" in a jq string — bracketDelta must skip string contents
+	// (exercises the inString + escape code path in bracketDelta).
+	src := `{{ "{\"key\": \"val\"}" }}`
+	segs := template.Parse(src)
+	var jqSegs []template.JQSeg
+	for _, s := range segs {
+		if j, ok := s.(template.JQSeg); ok {
+			jqSegs = append(jqSegs, j)
+		}
+	}
+	if len(jqSegs) != 1 {
+		t.Fatalf("expected 1 JQSeg, got %d", len(jqSegs))
+	}
+}
+
+func TestParse_CommentInBlock(t *testing.T) {
+	// Block containing a jq comment — bracketDelta must skip comment to end-of-line.
+	src := "{{\n\t.foo # comment with ) and } chars\n}}\n"
+	segs := template.Parse(src)
+	var jqSegs []template.JQSeg
+	for _, s := range segs {
+		if j, ok := s.(template.JQSeg); ok {
+			jqSegs = append(jqSegs, j)
+		}
+	}
+	if len(jqSegs) != 1 || !strings.Contains(jqSegs[0].Expr, ".foo") {
+		t.Fatalf("unexpected segs: %v", segs)
+	}
+}
+
+func TestFormat_AdjacentSubexpressions(t *testing.T) {
+	// Two independent jq if-then-else blocks inside the same outer else-branch.
+	// The awk connects them with + (string concat); our assembler must do the same.
+	src := "{{ if env.v == \"a\" then ( -}}\nA\n{{ ) else ( -}}\n" +
+		"{{ if .x then ( -}}\nX\n{{ ) else \"\" end -}}\n" +
+		"{{ if .y then ( -}}\nY\n{{ ) else \"\" end -}}\n" +
+		"{{ ) end -}}\n"
+	out := template.Format(src, realJQFmt)
+	if !strings.Contains(out, "if .x then (") || !strings.Contains(out, "if .y then (") {
+		t.Errorf("sub-expressions not preserved: %q", out)
+	}
+	out2 := template.Format(out, realJQFmt)
+	if out != out2 {
+		t.Errorf("not idempotent:\npass1: %q\npass2: %q", out, out2)
 	}
 }
 

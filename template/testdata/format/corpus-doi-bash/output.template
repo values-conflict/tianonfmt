@@ -111,7 +111,13 @@ RUN set -eux; \
 	\
 	cd /usr/local/src/bash; \
 	gnuArch="$(dpkg-architecture --query DEB_BUILD_GNU_TYPE)"; \
-{{ if env.version == "devel" or (env.version | split(".") | .[0] | tonumber) >= 5 then "" else ( -}}
+{{
+	if
+		env.version == "devel" or (env.version | split(".") | .[0] | tonumber) >= 5
+	then
+		""
+	else (
+-}}
 # update "config.guess" and "config.sub" to get more aggressively inclusive architecture support
 	for f in config.guess config.sub; do \
 		wget -T2 -O "support/$f" "https://git.savannah.gnu.org/cgit/config.git/plain/$f?id=7d3d27baf8107b630586c962c057e22149653deb" || \
@@ -153,7 +159,13 @@ RUN set -eux; \
 # however, bash40-037 is only relevant on Darwin / OS X, so we can safely use "touch configure" to fool "make" into thinking "configure" is up-to-date instead
 	touch configure; \
 {{ ) else "" end -}}
-{{ if env.version == "devel" or (env.version | rtrimstr("-rc") | tonumber) >= 4.1 then "" else ( -}}
+{{
+	if
+		env.version == "devel" or (env.version | rtrimstr("-rc") | tonumber) >= 4.1
+	then
+		""
+	else (
+-}}
 # parallel jobs workaround borrowed from Alpine :)
 	make y.tab.c; make builtins/libbuiltins.a; \
 {{ ) end -}}
@@ -185,7 +197,11 @@ RUN set -eux; \
 	\
 	[ "$(which bash)" = '/usr/local/bin/bash' ]; \
 	bash --version; \
-{{ if env.version == "devel" then "" elif env.version | startswith("3.0") then ( -}}
+{{
+	if env.version == "devel" then
+		""
+	elif env.version | startswith("3.0") then (
+-}}
 # for some reason, 3.0.xx manifests as 3.00.xx (hence the extra "0" added in the following check)
 	[ "$(bash -c 'echo "${BASH_VERSION%%[^0-9.]*}"')" = "${_BASH_VERSION//.0./.00.}" ]; \
 {{ ) elif env.version | endswith("-rc") then ( -}}

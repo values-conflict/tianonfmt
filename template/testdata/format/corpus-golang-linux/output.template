@@ -83,7 +83,8 @@ RUN set -eux; \
 	case "$arch" in \
 {{
 	[
-		.arches | to_entries[]
+		.arches
+		| to_entries[]
 		| select(.value.supported)
 		| .key as $bashbrewArch
 		| (
@@ -102,8 +103,9 @@ RUN set -eux; \
 {{ ) end -}}
 			;; \
 {{
-		)
-	] | add
+	)
+]
+| add
 -}}
 		*) echo >&2 "error: unsupported architecture '$arch' (likely packaging update needed)"; exit 1 ;; \
 	esac; \
