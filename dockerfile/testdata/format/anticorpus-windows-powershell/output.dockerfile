@@ -21,25 +21,25 @@ SHELL ["powershell", "-Command", "$ErrorActionPreference = 'Stop'; $ProgressPref
 ENV JAVA_VERSION jdk-11.0.12+7_openj9-0.27.0
 
 RUN Write-Host ('Downloading https://github.com/ibmruntimes/semeru11-binaries/releases/download/jdk-11.0.12%2B7_openj9-0.27.0/ibm-semeru-open-jre_x64_windows_11.0.12_7_openj9-0.27.0.msi ...'); \
-[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12 ; Invoke-WebRequest -Uri https://github.com/ibmruntimes/semeru11-binaries/releases/download/jdk-11.0.12%2B7_openj9-0.27.0/ibm-semeru-open-jre_x64_windows_11.0.12_7_openj9-0.27.0.msi -O 'openjdk.msi' ; \
-Write-Host ('Verifying sha256 (51a31929d4745ebbd070d2aa68590e895483b8deef1fd31d0335286edb27a00f) ...'); \
-if ((Get-FileHash openjdk.msi -Algorithm sha256).Hash -ne '51a31929d4745ebbd070d2aa68590e895483b8deef1fd31d0335286edb27a00f') { \
-Write-Host 'FAILED!'; \
-exit 1; \
-}; \
+	[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12 ; Invoke-WebRequest -Uri https://github.com/ibmruntimes/semeru11-binaries/releases/download/jdk-11.0.12%2B7_openj9-0.27.0/ibm-semeru-open-jre_x64_windows_11.0.12_7_openj9-0.27.0.msi -O 'openjdk.msi' ; \
+	Write-Host ('Verifying sha256 (51a31929d4745ebbd070d2aa68590e895483b8deef1fd31d0335286edb27a00f) ...'); \
+	if ((Get-FileHash openjdk.msi -Algorithm sha256).Hash -ne '51a31929d4745ebbd070d2aa68590e895483b8deef1fd31d0335286edb27a00f') { \
+	Write-Host 'FAILED!'; \
+	exit 1; \
+	}; \
 \
-New-Item -ItemType Directory -Path C:\temp | Out-Null; \
+	New-Item -ItemType Directory -Path C:\temp | Out-Null; \
 \
-Write-Host 'Installing using MSI ...'; \
-$proc = Start-Process -FilePath "msiexec.exe" -ArgumentList '/i', 'openjdk.msi', '/L*V', 'C:\temp\OpenJDK.log', \
-'/quiet', 'ADDLOCAL=FeatureEnvironment,FeatureJarFileRunWith,FeatureJavaHome', 'INSTALLDIR=C:\openjdk-11' -Wait -Passthru; \
-$proc.WaitForExit() ; \
-if ($proc.ExitCode -ne 0) { \
-Write-Host 'FAILED installing MSI!' ; \
-exit 1; \
-}; \
+	Write-Host 'Installing using MSI ...'; \
+	$proc = Start-Process -FilePath "msiexec.exe" -ArgumentList '/i', 'openjdk.msi', '/L*V', 'C:\temp\OpenJDK.log', \
+	'/quiet', 'ADDLOCAL=FeatureEnvironment,FeatureJarFileRunWith,FeatureJavaHome', 'INSTALLDIR=C:\openjdk-11' -Wait -Passthru; \
+	$proc.WaitForExit() ; \
+	if ($proc.ExitCode -ne 0) { \
+	Write-Host 'FAILED installing MSI!' ; \
+	exit 1; \
+	}; \
 \
-Remove-Item -Path C:\temp -Recurse | Out-Null; \
-Write-Host 'Removing openjdk.msi ...'; \
-Remove-Item openjdk.msi -Force
+	Remove-Item -Path C:\temp -Recurse | Out-Null; \
+	Write-Host 'Removing openjdk.msi ...'; \
+	Remove-Item openjdk.msi -Force
 ENV JAVA_TOOL_OPTIONS -XX:+IgnoreUnrecognizedVMOptions -XX:+PortableSharedCache -XX:+IdleTuningGcOnIdle -Xshareclasses:name=openj9_system_scc,cacheDir=/opt/java/.scc,readonly,nonFatal

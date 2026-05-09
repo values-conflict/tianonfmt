@@ -25,8 +25,8 @@ common="$(
 
 mapfile -t directories < <(
 	git ls-tree -r --name-only "$commit" | jq --raw-input --null-input --raw-output '
-		# convert "git ls-tree" output to a list of directories that contain a Dockerfile
 		[
+			# convert "git ls-tree" output to a list of directories that contain a Dockerfile
 			inputs
 			| select(endswith("/Dockerfile"))
 			| rtrimstr("/Dockerfile")
@@ -52,25 +52,22 @@ mapfile -t directories < <(
 			) as $jdk
 			| [
 				(-$groovy),
+
 				# LTS JDK versions above non-LTS
-				(
-					if $jdk | IN(21, 17, 11, 8) then 0
-					else 1 end
-				),
+				(if $jdk | IN(21, 17, 11, 8) then 0 else 1 end),
+
 				# JDK versions in descending version order
 				(
 					-$jdk # negative so they sort in reverse order
 				),
+
 				# plain vs alpine
-				(
-					if contains("alpine") then 1
-					else 0 end
-				),
+				(if contains("alpine") then 1 else 0 end),
+
 				# ubuntu versions in descending order
 				(
 					# if unspecified, we assume "latest" (currently "noble")
-					if contains("jammy") then -1
-					else -2 end
+					if contains("jammy") then -1 else -2 end
 				),
 				. # if all else fails, sort lexicographically
 			]

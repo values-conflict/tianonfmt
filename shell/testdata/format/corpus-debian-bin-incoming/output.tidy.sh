@@ -56,7 +56,7 @@ for p in "${process[@]}"; do
 		files="$(jq <<<"$json" --raw-output '
 			keys
 			| map(env.dir + "/" + . | @sh)
-			| join (" ")
+			| join(" ")
 		')"
 		eval "files=( $files )"
 		files+=( "$changes" )

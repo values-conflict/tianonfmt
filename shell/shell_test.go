@@ -11,28 +11,9 @@ import (
 
 	"github.com/values-conflict/tianonfmt/internal/testutil"
 
-	"github.com/values-conflict/tianonfmt/jq"
 	"github.com/values-conflict/tianonfmt/shell"
 	"mvdan.cc/sh/v3/syntax"
 )
-
-// realJQFmt mirrors jqFmtFunc from cmd/tianonfmt: parse and re-format jq
-// expressions found embedded in shell scripts.
-func realJQFmt(expr string, inline bool) string {
-	node, err := jq.ParseExpr(strings.TrimSpace(expr))
-	if err != nil {
-		f, ferr := jq.ParseFile(strings.TrimSpace(expr))
-		if ferr != nil {
-			return ""
-		}
-		return jq.FormatFile(f)
-	}
-	if inline {
-		return jq.FormatNodeInline(node)
-	}
-	return jq.FormatNode(node)
-}
-
 
 func TestMain(m *testing.M) {
 	flag.Parse()
@@ -44,16 +25,10 @@ func TestMain(m *testing.M) {
 func TestFormat(t *testing.T) {
 	testutil.Golden(t, "testdata/format", "input.sh", []testutil.Case{
 		{Out: "output.sh", Fn: func(src string) (string, error) {
-			return shell.Format(src, shell.DetectLang(src), nil)
+			return shell.Format(src, shell.DetectLang(src))
 		}, Idem: true},
 		{Out: "output.tidy.sh", Fn: func(src string) (string, error) {
-			return shell.FormatWithTidy(src, shell.DetectLang(src), nil)
-		}, Idem: true},
-		{Out: "output.format-jq.sh", Fn: func(src string) (string, error) {
-			return shell.Format(src, shell.DetectLang(src), realJQFmt)
-		}, Idem: true},
-		{Out: "output.tidy-jq.sh", Fn: func(src string) (string, error) {
-			return shell.FormatWithTidy(src, shell.DetectLang(src), realJQFmt)
+			return shell.FormatWithTidy(src, shell.DetectLang(src))
 		}, Idem: true},
 		{Out: "ast.json", Fn: func(src string) (string, error) {
 			f, err := shell.ParseFile(src, shell.DetectLang(src))
@@ -217,7 +192,7 @@ func TestApplyTidy_WhichWithFlags_Unchanged(t *testing.T) {
 func TestFormatRUN_BasicIndent(t *testing.T) {
 	// Continuation lines at depth 0 get 1 tab.
 	lines := []string{"\tapt-get update; \\", "\tapt-get install -y curl"}
-	got := shell.FormatRUN(lines, nil)
+	got := shell.FormatRUN(lines)
 	for _, l := range got {
 		trimmed := strings.TrimRight(l, " \\")
 		if !strings.HasPrefix(trimmed, "\t") {
@@ -233,7 +208,7 @@ func TestFormatRUN_IfBlock(t *testing.T) {
 		"\t\techo ok; \\",
 		"\tfi",
 	}
-	got := shell.FormatRUN(lines, nil)
+	got := shell.FormatRUN(lines)
 	if len(got) < 3 {
 		t.Fatalf("expected 3 lines, got %d", len(got))
 	}
@@ -253,7 +228,7 @@ func TestFormatRUN_IfBlock(t *testing.T) {
 
 func TestFormatRUN_CommentAtColumnZero(t *testing.T) {
 	lines := []string{"\tapt-get update; \\", "# a comment", "\tapt-get install -y curl"}
-	got := shell.FormatRUN(lines, nil)
+	got := shell.FormatRUN(lines)
 	for _, l := range got {
 		if strings.HasPrefix(l, "#") {
 			// Comment lines must be at column 0 (no tab prefix).
@@ -264,7 +239,7 @@ func TestFormatRUN_CommentAtColumnZero(t *testing.T) {
 }
 
 func TestFormatRUN_Empty(t *testing.T) {
-	got := shell.FormatRUN(nil, nil)
+	got := shell.FormatRUN(nil)
 	if got != nil {
 		t.Errorf("empty input should return nil, got %v", got)
 	}
@@ -272,8 +247,8 @@ func TestFormatRUN_Empty(t *testing.T) {
 
 func TestFormatRUN_Idempotent(t *testing.T) {
 	lines := []string{"\tapt-get update; \\", "# comment", "\tapt-get install -y curl"}
-	first := shell.FormatRUN(lines, nil)
-	second := shell.FormatRUN(first, nil)
+	first := shell.FormatRUN(lines)
+	second := shell.FormatRUN(first)
 	if fmt.Sprint(first) != fmt.Sprint(second) {
 		t.Errorf("FormatRUN not idempotent\nfirst:  %v\nsecond: %v", first, second)
 	}
@@ -322,7 +297,7 @@ func TestNormalizeSetFlags_POSIX(t *testing.T) {
 
 func TestFormatWithTidy_SetNormalization(t *testing.T) {
 	src := "#!/usr/bin/env bash\nset -e\necho hi\n"
-	out, err := shell.FormatWithTidy(src, syntax.LangBash, nil)
+	out, err := shell.FormatWithTidy(src, syntax.LangBash)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -333,7 +308,7 @@ func TestFormatWithTidy_SetNormalization(t *testing.T) {
 
 func TestFormatWithTidy_SetAlreadyCanonical(t *testing.T) {
 	src := "#!/usr/bin/env bash\nset -Eeuo pipefail\necho hi\n"
-	out, err := shell.FormatWithTidy(src, syntax.LangBash, nil)
+	out, err := shell.FormatWithTidy(src, syntax.LangBash)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -347,7 +322,7 @@ func TestFormatWithTidy_SetAlreadyCanonical(t *testing.T) {
 func TestQuoteEvalArgs_BareCmdSubst(t *testing.T) {
 	// eval $(...) → eval "$(...)": bare CmdSubst gets double-quoted.
 	src := "eval $(jq -r .foo versions.json)\n"
-	out, err := shell.Format(src, syntax.LangBash, nil)
+	out, err := shell.Format(src, syntax.LangBash)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -359,7 +334,7 @@ func TestQuoteEvalArgs_BareCmdSubst(t *testing.T) {
 func TestQuoteEvalArgs_AlreadyQuoted(t *testing.T) {
 	// eval "$(...)": already double-quoted → unchanged.
 	src := "eval \"$(jq -r .foo versions.json)\"\n"
-	out, err := shell.Format(src, syntax.LangBash, nil)
+	out, err := shell.Format(src, syntax.LangBash)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -371,7 +346,7 @@ func TestQuoteEvalArgs_AlreadyQuoted(t *testing.T) {
 func TestQuoteEvalArgs_StringArg(t *testing.T) {
 	// eval "string $var": plain string arg (not a bare CmdSubst) → unchanged.
 	src := "eval \"set -- $versions\"\n"
-	out, err := shell.Format(src, syntax.LangBash, nil)
+	out, err := shell.Format(src, syntax.LangBash)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -388,7 +363,7 @@ func TestQuoteEvalArgs_StringArg(t *testing.T) {
 func TestNormalizeShortFlags_CanonicalSubsetPreserved(t *testing.T) {
 	// curl -fL: both canonical, no pairWith → keep.
 	src := "curl -fL https://example.com\n"
-	out, err := shell.FormatWithTidy(src, syntax.LangBash, nil)
+	out, err := shell.FormatWithTidy(src, syntax.LangBash)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -401,7 +376,7 @@ func TestNormalizeShortFlags_PairWithUnsatisfied(t *testing.T) {
 	// curl -sL: missing -f and -S → tidy injects -f, adds -S via longPairs,
 	// and preMergeLong folds everything into the full canonical idiom -fsSL.
 	src := "curl -sL https://example.com\n"
-	out, err := shell.FormatWithTidy(src, syntax.LangBash, nil)
+	out, err := shell.FormatWithTidy(src, syntax.LangBash)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -415,7 +390,7 @@ func TestNormalizeShortFlags_PairWithUnsatisfied(t *testing.T) {
 func TestNormalizeShortFlags_ReorderCombined(t *testing.T) {
 	// curl -Lf: combined but wrong order → reorder to -fL.
 	src := "curl -Lf https://example.com\n"
-	out, err := shell.FormatWithTidy(src, syntax.LangBash, nil)
+	out, err := shell.FormatWithTidy(src, syntax.LangBash)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -427,7 +402,7 @@ func TestNormalizeShortFlags_ReorderCombined(t *testing.T) {
 func TestNormalizeShortFlags_ReorderFullMnemonic(t *testing.T) {
 	// curl -LSsf: combined wrong order → -fsSL.
 	src := "curl -LSsf https://example.com\n"
-	out, err := shell.FormatWithTidy(src, syntax.LangBash, nil)
+	out, err := shell.FormatWithTidy(src, syntax.LangBash)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -439,7 +414,7 @@ func TestNormalizeShortFlags_ReorderFullMnemonic(t *testing.T) {
 func TestNormalizeShortFlags_MergeSeparate(t *testing.T) {
 	// curl -f -s -S -L: four separate flags → merged to -fsSL.
 	src := "curl -f -s -S -L https://example.com\n"
-	out, err := shell.FormatWithTidy(src, syntax.LangBash, nil)
+	out, err := shell.FormatWithTidy(src, syntax.LangBash)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -451,7 +426,7 @@ func TestNormalizeShortFlags_MergeSeparate(t *testing.T) {
 func TestNormalizeShortFlags_MergeSeparateSubset(t *testing.T) {
 	// curl -f -L: two separate canonical flags → merged to -fL.
 	src := "curl -f -L https://example.com\n"
-	out, err := shell.FormatWithTidy(src, syntax.LangBash, nil)
+	out, err := shell.FormatWithTidy(src, syntax.LangBash)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -464,7 +439,7 @@ func TestNormalizeShortFlags_GrepReorderCombined(t *testing.T) {
 	// grep -Eq: v>q>o>E in canonical order, so -qE → -qE (q before E, already correct).
 	// But -Eq → -qE (E was before q, now reordered).
 	src := "grep -Eq 'pattern' file\n"
-	out, err := shell.FormatWithTidy(src, syntax.LangBash, nil)
+	out, err := shell.FormatWithTidy(src, syntax.LangBash)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -476,7 +451,7 @@ func TestNormalizeShortFlags_GrepReorderCombined(t *testing.T) {
 func TestNormalizeShortFlags_GrepMergeSeparate(t *testing.T) {
 	// grep -q -E: separate canonical flags → merged to -qE.
 	src := "grep -q -E 'pattern' file\n"
-	out, err := shell.FormatWithTidy(src, syntax.LangBash, nil)
+	out, err := shell.FormatWithTidy(src, syntax.LangBash)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -488,7 +463,7 @@ func TestNormalizeShortFlags_GrepMergeSeparate(t *testing.T) {
 func TestNormalizeShortFlags_GrepMergeFromCombined(t *testing.T) {
 	// grep -oE -v: -v is separate, -oE is combined; all canonical → merge to -voE.
 	src := "grep -oE -v 'pattern' file\n"
-	out, err := shell.FormatWithTidy(src, syntax.LangBash, nil)
+	out, err := shell.FormatWithTidy(src, syntax.LangBash)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -503,7 +478,7 @@ func TestNormalizeShortFlags_GrepMergeFromCombined(t *testing.T) {
 func TestNormalizeShortFlags_GrepPriorityBeforeLong(t *testing.T) {
 	// grep --extended-regexp -v: priority -v should move before --extended-regexp.
 	src := "grep --extended-regexp -v 'pattern' file\n"
-	out, err := shell.FormatWithTidy(src, syntax.LangBash, nil)
+	out, err := shell.FormatWithTidy(src, syntax.LangBash)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -517,7 +492,7 @@ func TestNormalizeShortFlags_GrepPriorityBeforeLong(t *testing.T) {
 func TestNormalizeShortFlags_SeparateNonCanonicalNotMerged(t *testing.T) {
 	// curl -s -L: tidy injects -f, adds -S via longPairs, folds to -fsSL.
 	src := "curl -s -L https://example.com\n"
-	out, err := shell.FormatWithTidy(src, syntax.LangBash, nil)
+	out, err := shell.FormatWithTidy(src, syntax.LangBash)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -530,7 +505,7 @@ func TestNormalizeShortFlags_MergeResidualChars(t *testing.T) {
 	// curl -Lfo output url: -L and -f are in the merge group; -o is not.
 	// -L and -f should be extracted and merged to -fL; -o stays as a separate arg.
 	src := "curl -Lfo output https://example.com\n"
-	out, err := shell.FormatWithTidy(src, syntax.LangBash, nil)
+	out, err := shell.FormatWithTidy(src, syntax.LangBash)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -545,7 +520,7 @@ func TestNormalizeShortFlags_MergeResidualChars(t *testing.T) {
 func TestNormalizeShortFlags_MergeStopsAtEndOfFlags(t *testing.T) {
 	// -- stops pre-merge scanning; -s -S after it are not merged.
 	src := "curl -f -L -- -s -S https://example.com\n"
-	out, err := shell.FormatWithTidy(src, syntax.LangBash, nil)
+	out, err := shell.FormatWithTidy(src, syntax.LangBash)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -562,7 +537,7 @@ func TestNormalizeShortFlags_PriorityNoPrecedingLongFlag(t *testing.T) {
 	// grep -P -v: -P is not canonical (→ --perl-regexp), leaving -v with no long
 	// flag before it → priority movement is a no-op for that position.
 	src := "grep -P -v 'pattern' file\n"
-	out, err := shell.FormatWithTidy(src, syntax.LangBash, nil)
+	out, err := shell.FormatWithTidy(src, syntax.LangBash)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -582,7 +557,7 @@ func TestNormalizeShortFlags_PartialMnemonic(t *testing.T) {
 	// -fsS is the corpus idiom for curl without --location (e.g. --head calls).
 	// It stays merged because pairWith is satisfied.
 	src := "curl -fsS https://example.com\n"
-	out, err := shell.FormatWithTidy(src, syntax.LangBash, nil)
+	out, err := shell.FormatWithTidy(src, syntax.LangBash)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -594,7 +569,7 @@ func TestNormalizeShortFlags_PartialMnemonic(t *testing.T) {
 func TestNormalizeShortFlags_PairWithSingleFlag(t *testing.T) {
 	// curl -s alone: tidy injects -f (required) and -S (via longPairs) → -fsS.
 	src := "curl -s https://example.com\n"
-	out, err := shell.FormatWithTidy(src, syntax.LangBash, nil)
+	out, err := shell.FormatWithTidy(src, syntax.LangBash)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -607,7 +582,7 @@ func TestNormalizeShortFlags_PairWithSingleFlag(t *testing.T) {
 func TestNormalizeShortFlags_NonCanonicalExpanded(t *testing.T) {
 	// grep -n: not canonical → expand to --line-number.
 	src := "grep -n 'pattern' file\n"
-	out, err := shell.FormatWithTidy(src, syntax.LangBash, nil)
+	out, err := shell.FormatWithTidy(src, syntax.LangBash)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -619,7 +594,7 @@ func TestNormalizeShortFlags_NonCanonicalExpanded(t *testing.T) {
 func TestNormalizeShortFlags_MixedGroupExpanded(t *testing.T) {
 	// grep -vn: -v canonical but -n is not → whole group expands.
 	src := "grep -vn 'pattern' file\n"
-	out, err := shell.FormatWithTidy(src, syntax.LangBash, nil)
+	out, err := shell.FormatWithTidy(src, syntax.LangBash)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -634,7 +609,7 @@ func TestNormalizeShortFlags_MixedGroupExpanded(t *testing.T) {
 func TestNormalizeShortFlags_AptGetReverseNorm(t *testing.T) {
 	// apt-get --yes → -y (reverse normalization).
 	src := "apt-get install --yes curl\n"
-	out, err := shell.FormatWithTidy(src, syntax.LangBash, nil)
+	out, err := shell.FormatWithTidy(src, syntax.LangBash)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -649,7 +624,7 @@ func TestNormalizeShortFlags_AptGetReverseNorm(t *testing.T) {
 func TestNormalizeShortFlags_AptGetShortPreserved(t *testing.T) {
 	// apt-get -y: canonical → keep short.
 	src := "apt-get install -y curl\n"
-	out, err := shell.FormatWithTidy(src, syntax.LangBash, nil)
+	out, err := shell.FormatWithTidy(src, syntax.LangBash)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -661,7 +636,7 @@ func TestNormalizeShortFlags_AptGetShortPreserved(t *testing.T) {
 func TestNormalizeShortFlags_AptGetNonCanonicalExpanded(t *testing.T) {
 	// apt-get -q: not canonical → expand to --quiet.
 	src := "apt-get -q update\n"
-	out, err := shell.FormatWithTidy(src, syntax.LangBash, nil)
+	out, err := shell.FormatWithTidy(src, syntax.LangBash)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -675,7 +650,7 @@ func TestNormalizeShortFlags_AptGetNonCanonicalExpanded(t *testing.T) {
 func TestNormalizeShortFlags_GpgBatchMovedFirst(t *testing.T) {
 	// gpg with --batch not first → moved to position 1.
 	src := "gpg --verify sig.asc --batch file\n"
-	out, err := shell.FormatWithTidy(src, syntax.LangBash, nil)
+	out, err := shell.FormatWithTidy(src, syntax.LangBash)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -690,7 +665,7 @@ func TestNormalizeShortFlags_CurlShowErrorGetsPeer(t *testing.T) {
 	// curl --show-error: preMergeLong converts → -S; longPairs adds -s;
 	// required injects -f; second preMerge merges all to -fsS.
 	src := "curl --show-error https://example.com\n"
-	out, err := shell.FormatWithTidy(src, syntax.LangBash, nil)
+	out, err := shell.FormatWithTidy(src, syntax.LangBash)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -704,7 +679,7 @@ func TestNormalizeShortFlags_CurlShowErrorGetsPeer(t *testing.T) {
 func TestNormalizeShortFlags_EndOfFlags(t *testing.T) {
 	// -- stops flag processing; args after it are left verbatim.
 	src := "jq -r . -- -file\n"
-	out, err := shell.FormatWithTidy(src, syntax.LangBash, nil)
+	out, err := shell.FormatWithTidy(src, syntax.LangBash)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -719,7 +694,7 @@ func TestNormalizeShortFlags_EndOfFlags(t *testing.T) {
 func TestNormalizeShortFlags_UnknownSingleFlag(t *testing.T) {
 	// jq -Z is not in the table — leave it unchanged.
 	src := "jq -Z '.x'\n"
-	out, err := shell.FormatWithTidy(src, syntax.LangBash, nil)
+	out, err := shell.FormatWithTidy(src, syntax.LangBash)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -731,7 +706,7 @@ func TestNormalizeShortFlags_UnknownSingleFlag(t *testing.T) {
 func TestNormalizeShortFlags_UnknownFlagInGroup(t *testing.T) {
 	// -rZ where Z is not in jq's table — leave the combined flag unchanged.
 	src := "jq -rZ '.x'\n"
-	out, err := shell.FormatWithTidy(src, syntax.LangBash, nil)
+	out, err := shell.FormatWithTidy(src, syntax.LangBash)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -743,7 +718,7 @@ func TestNormalizeShortFlags_UnknownFlagInGroup(t *testing.T) {
 func TestNormalizeShortFlags_HasArgInMiddle(t *testing.T) {
 	// -ef where -e (--regexp, hasArg) is not last — ambiguous, do not expand.
 	src := "grep -ef pattern file\n"
-	out, err := shell.FormatWithTidy(src, syntax.LangBash, nil)
+	out, err := shell.FormatWithTidy(src, syntax.LangBash)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -754,37 +729,29 @@ func TestNormalizeShortFlags_HasArgInMiddle(t *testing.T) {
 
 // ── FormatRUN with jq callback ────────────────────────────────────────────────
 
-// jqFmtPassthrough returns the expression unchanged — used when we only care
-// that detection fired (or didn't fire), not the rewrite itself.
-func jqFmtPassthrough(expr string, _ bool) string { return expr }
-
-// jqFmtUpperDot replaces `.foo` with `.FOO` so we can verify the callback ran.
-func jqFmtUpperDot(expr string, _ bool) string {
-	return strings.ReplaceAll(expr, ".foo", ".FOO")
-}
-
 func TestFormatRUN_JQ_StartOfLine(t *testing.T) {
-	// Plain `jq '...'` at the start of a continuation line.
-	lines := []string{"\tjq '.foo' /data.json"}
-	got := shell.FormatRUN(lines, jqFmtUpperDot)
-	if len(got) != 1 || !strings.Contains(got[0], ".FOO") {
+	// Plain `jq '...'` at the start of a continuation line — detection fires,
+	// real jq formats {"a":1} → { a: 1 }.
+	lines := []string{`	jq '{"a":1}' /data.json`}
+	got := shell.FormatRUN(lines)
+	if len(got) != 1 || !strings.Contains(got[0], "{ a: 1 }") {
 		t.Errorf("jq at start of line not reformatted: %v", got)
 	}
 }
 
 func TestFormatRUN_JQ_DollarParenPattern(t *testing.T) {
-	// `$(jq '...')` — tests the hasJQ detection fix for subshell pattern.
-	lines := []string{"\tresult=$(jq '.foo' /data.json)"}
-	got := shell.FormatRUN(lines, jqFmtUpperDot)
-	if len(got) != 1 || !strings.Contains(got[0], ".FOO") {
+	// `$(jq '...')` — tests hasJQ detection for subshell pattern.
+	lines := []string{`	result=$(jq '{"a":1}' /data.json)`}
+	got := shell.FormatRUN(lines)
+	if len(got) != 1 || !strings.Contains(got[0], "{ a: 1 }") {
 		t.Errorf("$(jq '...') not reformatted: %v", got)
 	}
 }
 
 func TestFormatRUN_JQ_PreservesArgsAfterQuote(t *testing.T) {
 	// Filename arg after the closing quote must survive reformatting.
-	lines := []string{"\tjq '.foo' /input.json > /output.json"}
-	got := shell.FormatRUN(lines, jqFmtPassthrough)
+	lines := []string{`	jq '{"a":1}' /input.json > /output.json`}
+	got := shell.FormatRUN(lines)
 	if len(got) != 1 || !strings.Contains(got[0], "/output.json") {
 		t.Errorf("args after closing quote dropped: %v", got)
 	}
@@ -792,8 +759,8 @@ func TestFormatRUN_JQ_PreservesArgsAfterQuote(t *testing.T) {
 
 func TestFormatRUN_JQ_PreservesHereString(t *testing.T) {
 	// `<<<\"$var\"` after the closing quote must survive reformatting.
-	lines := []string{`	jq '.foo' <<<"$var"`}
-	got := shell.FormatRUN(lines, jqFmtPassthrough)
+	lines := []string{`	jq '{"a":1}' <<<"$var"`}
+	got := shell.FormatRUN(lines)
 	if len(got) != 1 || !strings.Contains(got[0], `<<<"$var"`) {
 		t.Errorf("here-string after closing quote dropped: %v", got)
 	}
@@ -801,9 +768,9 @@ func TestFormatRUN_JQ_PreservesHereString(t *testing.T) {
 
 func TestFormatRUN_JQ_InPipeline(t *testing.T) {
 	// `... | jq '...'` — jq appears mid-line after a pipe.
-	lines := []string{"\tcat /data.json | jq '.foo'"}
-	got := shell.FormatRUN(lines, jqFmtUpperDot)
-	if len(got) != 1 || !strings.Contains(got[0], ".FOO") {
+	lines := []string{`	cat /data.json | jq '{"a":1}'`}
+	got := shell.FormatRUN(lines)
+	if len(got) != 1 || !strings.Contains(got[0], "{ a: 1 }") {
 		t.Errorf("jq in pipeline not reformatted: %v", got)
 	}
 }
@@ -811,36 +778,30 @@ func TestFormatRUN_JQ_InPipeline(t *testing.T) {
 func TestFormatRUN_JQ_NonJQSingleQuote_NotTouched(t *testing.T) {
 	// A single-quoted string in a non-jq command must not be touched.
 	lines := []string{"\techo 'hello world'"}
-	got := shell.FormatRUN(lines, jqFmtUpperDot)
+	got := shell.FormatRUN(lines)
 	if len(got) != 1 || got[0] != "\techo 'hello world'" {
 		t.Errorf("non-jq single-quoted string was modified: %v", got)
 	}
 }
 
-// ── Format with jq callback ───────────────────────────────────────────────────
+// ── Format with embedded jq ───────────────────────────────────────────────────
 
-func TestFormatWithJQCallback_NoChange(t *testing.T) {
-	// When jqFmt returns the same expression (already canonical), reformatSglQuoted
-	// must leave the value unchanged — exercises the "formatted == expr" no-op path.
+func TestFormat_JQ_AlreadyCanonical(t *testing.T) {
+	// .foo is already canonical — reformatSglQuoted must leave it unchanged.
 	src := "#!/usr/bin/env bash\nresult=$(jq '.foo' <<<\"$input\")\n"
-	jqFmt := func(expr string, inline bool) string {
-		return expr // passthrough — always returns the same value
-	}
-	out, err := shell.Format(src, syntax.LangBash, jqFmt)
+	out, err := shell.Format(src, syntax.LangBash)
 	if err != nil {
 		t.Fatal(err)
 	}
-	// The jq expression should be unchanged in the output.
 	if !strings.Contains(out, "'.foo'") {
 		t.Errorf("expression changed unexpectedly: %q", out)
 	}
 }
 
-func TestFormatWithJQCallback_Empty(t *testing.T) {
-	// Empty single-quoted jq expression: jq '' — triggers the empty-string early return
+func TestFormat_JQ_EmptyExpression(t *testing.T) {
+	// jq '' — empty string triggers the early return in reformatSglQuoted.
 	src := "#!/usr/bin/env bash\nresult=$(jq '' <<<\"$input\")\n"
-	jqFmt := func(expr string, inline bool) string { return expr }
-	out, err := shell.Format(src, syntax.LangBash, jqFmt)
+	out, err := shell.Format(src, syntax.LangBash)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -849,39 +810,27 @@ func TestFormatWithJQCallback_Empty(t *testing.T) {
 	}
 }
 
-func TestFormatWithJQCallback_Multiline(t *testing.T) {
-	// A multi-line single-quoted jq expression triggers reformatSglQuoted's
-	// multi-line path (the one that strips and re-adds indentation).
+func TestFormat_JQ_Multiline(t *testing.T) {
+	// Multi-line jq expression triggers reformatSglQuoted's indent-strip/re-add path.
 	src := "#!/usr/bin/env bash\nresult=$(jq '\n\t.foo\n\t| .bar\n' <<<\"$input\")\n"
-	jqFmt := func(expr string, inline bool) string {
-		if inline {
-			return strings.TrimSpace(expr)
-		}
-		return expr // passthrough for multi-line
-	}
-	out, err := shell.Format(src, syntax.LangBash, jqFmt)
+	out, err := shell.Format(src, syntax.LangBash)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(out, ".foo") {
+	if !strings.Contains(out, ".foo") || !strings.Contains(out, ".bar") {
 		t.Errorf("jq expr not in output: %q", out)
 	}
 }
 
-func TestFormatWithJQCallback(t *testing.T) {
-	src := "#!/usr/bin/env bash\nresult=$(jq -r '.foo' <<<\"$input\")\n"
-	jqFmt := func(expr string, inline bool) string {
-		if expr == ".foo" {
-			return ".foo" // passthrough
-		}
-		return ""
-	}
-	out, err := shell.Format(src, syntax.LangBash, jqFmt)
+func TestFormat_JQ_ReformatsInlineExpression(t *testing.T) {
+	// {"a":1} is not canonical — real jq formats it as { a: 1 }.
+	src := "#!/usr/bin/env bash\nresult=$(jq '{\"a\":1}' <<<\"$input\")\n"
+	out, err := shell.Format(src, syntax.LangBash)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(out, ".foo") {
-		t.Errorf("jq expr not preserved: %q", out)
+	if !strings.Contains(out, "{ a: 1 }") {
+		t.Errorf("inline jq expression not reformatted: %q", out)
 	}
 }
 
@@ -1269,11 +1218,7 @@ func shExpandSubshells(tok string) []string {
 				i++
 			}
 			shellCode := tok[contentStart : i-1]
-			for _, t := range tokenizeShell(shellCode) {
-				if t != `\` {
-					parts = append(parts, t)
-				}
-			}
+			parts = append(parts, strings.Fields(normalizeShell(shellCode))...)
 			litStart = i
 			continue
 		}
@@ -1299,15 +1244,64 @@ func shExpandSubshells(tok string) []string {
 //  5. <<- strip-tabs marker emitted as a separate "-" token by tokenizeShell
 //     so that "<<-WORD" and "<<- WORD" (SpaceRedirects adds the space) are
 //     always identical in the token stream.
+//  6. The single-quoted expression argument of `jq` calls is jq-normalized
+//     (NormalizeJQ) so that the formatter's whitespace and style rewrites inside
+//     jq expressions do not show up as token differences.  Flag arguments and
+//     non-jq single-quoted strings (sed patterns, etc.) are left untouched.
+// jqValueFlags maps jq flags to the number of extra non-flag tokens they consume.
+// Used by normalizeShell to skip past flag arguments when seeking the jq expression.
+var jqValueFlags = map[string]int{
+	"--arg": 2, "--argjson": 2, "--slurpfile": 2, "--rawfile": 2,
+	"--from-file": 1, "-f": 1, "--library-path": 1, "-L": 1,
+	"--indent": 1,
+}
+
 func normalizeShell(src string) string {
 	toks := tokenizeShell(src)
 	var result []string
+	inJQ := false // true after "jq", until the expression arg is consumed
+	skipN := 0   // remaining non-flag tokens to skip (flag argument values)
 	for _, tok := range toks {
 		if tok == `\` {
 			continue // backslash line-continuation artifact
 		}
 		tok = shNormalizeArith(tok)
-		result = append(result, shExpandSubshells(tok)...)
+
+		if inJQ {
+			if skipN > 0 {
+				skipN--
+				result = append(result, shExpandSubshells(tok)...)
+				continue
+			}
+			if strings.HasPrefix(tok, "-") {
+				if n, ok := jqValueFlags[tok]; ok {
+					skipN = n
+				}
+				result = append(result, shExpandSubshells(tok)...)
+				continue
+			}
+			// Redirection operators (<<<, <<, <, >, >>, >&) and their operand
+			// are transparent in jq mode — skip past them to find the expression.
+			switch tok {
+			case "<<<", "<<", "<", ">", ">>", ">&", "<&":
+				skipN = 1 // skip the operand (heredoc word, file, or here-string)
+				result = append(result, shExpandSubshells(tok)...)
+				continue
+			}
+			// First non-flag, non-redirect token in jq mode: the expression.
+			if strings.HasPrefix(tok, "'") && strings.HasSuffix(tok, "'") && len(tok) >= 2 {
+				inner := tok[1 : len(tok)-1]
+				tok = "'" + testutil.NormalizeJQ(inner) + "'"
+			}
+			inJQ = false
+		}
+
+		expanded := shExpandSubshells(tok)
+		if len(expanded) == 1 && expanded[0] == "jq" {
+			inJQ = true
+			skipN = 0
+		}
+		result = append(result, expanded...)
 	}
 	return strings.Join(result, " ")
 }
@@ -1331,7 +1325,7 @@ func TestFormatPreservesTokens(t *testing.T) {
 				t.Skip("no input.sh")
 				return
 			}
-			formatted, err := shell.Format(string(src), shell.DetectLang(string(src)), nil)
+			formatted, err := shell.Format(string(src), shell.DetectLang(string(src)))
 			if err != nil {
 				t.Skipf("format error: %v", err)
 				return

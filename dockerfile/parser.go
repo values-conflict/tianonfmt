@@ -178,10 +178,14 @@ func (p *parser) parseInstruction() (*Instruction, error) {
 			instr.Lines = append(instr.Lines, Line{Text: stripped, Kind: lineKind})
 		}
 
-		continues := strings.HasSuffix(stripped, escape)
+		// Trim trailing whitespace before checking for the escape char so that
+		// "\ " (backslash + trailing space) is treated as a continuation, matching
+		// the behaviour of the Docker daemon itself.
+		strippedTrimmed := strings.TrimRight(stripped, " \t")
+		continues := strings.HasSuffix(strippedTrimmed, escape)
 		if continues {
 			// Strip the trailing escape char and accumulate without it.
-			logicalParts = append(logicalParts, strings.TrimRight(stripped[:len(stripped)-len(escape)], " \t"))
+			logicalParts = append(logicalParts, strings.TrimRight(strippedTrimmed[:len(strippedTrimmed)-len(escape)], " \t"))
 			p.pos++
 		} else {
 			logicalParts = append(logicalParts, stripped)

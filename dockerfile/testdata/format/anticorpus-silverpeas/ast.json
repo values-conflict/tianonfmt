@@ -271,7 +271,7 @@
 		{
 			"type": "RUN",
 			"form": "shell",
-			"args": "apt-get update   \u0026\u0026 apt-get install -y --no-install-recommends tzdata \\",
+			"args": "apt-get update   \u0026\u0026 apt-get install -y --no-install-recommends tzdata   \u0026\u0026 apt-get install -y --no-install-recommends     apt-utils     iputils-ping     curl     wget     vim     locales     language-pack-en     language-pack-fr     procps     net-tools     zip     unzip     openjdk-11-jdk     ffmpeg     imagemagick     ghostscript     libreoffice     ure     gpgv   \u0026\u0026 rm -rf /var/lib/apt/lists/*   \u0026\u0026 update-ca-certificates -f",
 			"lines": [
 				{
 					"kind": "instruction",
@@ -280,17 +280,9 @@
 				{
 					"kind": "continuation",
 					"text": "  \u0026\u0026 apt-get install -y --no-install-recommends tzdata \\ "
-				}
-			],
-			"startLine": 24,
-			"endLine": 25
-		},
-		{
-			"type": "\u0026\u0026",
-			"args": "apt-get install -y --no-install-recommends     apt-utils     iputils-ping     curl     wget     vim     locales     language-pack-en     language-pack-fr     procps     net-tools     zip     unzip     openjdk-11-jdk     ffmpeg     imagemagick     ghostscript     libreoffice     ure     gpgv   \u0026\u0026 rm -rf /var/lib/apt/lists/*   \u0026\u0026 update-ca-certificates -f",
-			"lines": [
+				},
 				{
-					"kind": "instruction",
+					"kind": "continuation",
 					"text": "  \u0026\u0026 apt-get install -y --no-install-recommends \\"
 				},
 				{
@@ -378,7 +370,7 @@
 					"text": "  \u0026\u0026 update-ca-certificates -f"
 				}
 			],
-			"startLine": 26,
+			"startLine": 24,
 			"endLine": 47
 		},
 		{

@@ -23,29 +23,10 @@ ENV TERM xterm
 # the dependencies required to run SWFTools and PDF2JSON
 RUN set -eux; \
 	apt-get update; \
-	apt-get install -y --no-install-recommends tzdata \
-&& apt-get install -y --no-install-recommends \
-apt-utils \
-iputils-ping \
-curl \
-wget \
-vim \
-locales \
-language-pack-en \
-language-pack-fr \
-procps \
-net-tools \
-zip \
-unzip \
-openjdk-11-jdk \
-ffmpeg \
-imagemagick \
-ghostscript \
-libreoffice \
-ure \
-gpgv \
-&& rm -rf /var/lib/apt/lists/* \
-&& update-ca-certificates -f
+	apt-get install -y --no-install-recommends tzdata; \
+	apt-get install -y --no-install-recommends     apt-utils     iputils-ping     curl     wget     vim     locales     language-pack-en     language-pack-fr     procps     net-tools     zip     unzip     openjdk-11-jdk     ffmpeg     imagemagick     ghostscript     libreoffice     ure     gpgv; \
+	rm -rf /var/lib/apt/lists/*; \
+	update-ca-certificates -f
 
 # Fetch and install SWFTools
 RUN set -eux; \
@@ -92,10 +73,10 @@ ENV PING_ON 1
 # add a simple script that can auto-detect the appropriate JAVA_HOME value
 # based on whether the JDK or only the JRE is installed
 RUN { \
-		echo '#!/bin/sh'; \
-		echo 'set -e'; \
-		echo; \
-		echo 'dirname "$(dirname "$(readlink -f "$(which javac || which java)")")"'; \
+	echo '#!/bin/sh'; \
+	echo 'set -e'; \
+	echo; \
+	echo 'dirname "$(dirname "$(readlink -f "$(which javac || which java)")")"'; \
 	} > /usr/local/bin/docker-java-home \
 	&& chmod +x /usr/local/bin/docker-java-home
 

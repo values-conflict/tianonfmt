@@ -5,7 +5,7 @@
 // project's daemon/builder/dockerfile package; edge-case behaviour was cross-checked
 // against the jq-based reference parser at fmt/dockerfile-parser/dockerfile.jq.
 //
-// Formatting: [Format] and [FormatWith] apply canonical style rules backed by
+// Formatting: [Format] applies canonical style rules backed by
 // corpus samples:
 //
 //   - Instruction keywords are uppercased

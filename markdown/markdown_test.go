@@ -41,7 +41,7 @@ func testFenceFmt(lang string, _ int, content string) string {
 		}
 		return jq.FormatFile(f)
 	case "bash", "sh", "shell":
-		out, err := shell.FormatWithTidy(content, shell.DetectLang(content), nil)
+		out, err := shell.FormatWithTidy(content, shell.DetectLang(content))
 		if err != nil {
 			return ""
 		}

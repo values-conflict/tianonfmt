@@ -2,41 +2,20 @@ package dockerfile
 
 import (
 	"strings"
+
+	"github.com/values-conflict/tianonfmt/shell"
 )
 
-// Formatter holds optional callbacks for embedded-language formatting.
-type Formatter struct {
-	// JQFmt, if set, is called to reformat jq expressions found in
-	// jq '...' invocations within RUN blocks.
-	JQFmt func(expr string, inline bool) string
-
-	// RUNShellFmt, if set, is called with the continuation lines of each RUN
-	// instruction to normalise their shell formatting.  It receives a slice of
-	// raw lines (with ` \` continuation markers) and returns a replacement slice.
-	RUNShellFmt func(lines []string, jqFmt func(expr string, inline bool) string) []string
-}
-
-// Format formats a parsed Dockerfile back to canonical source using the
-// default formatter (no embedded-language rewriting).
+// Format formats a parsed Dockerfile back to canonical source.
+// RUN continuation lines are normalised using the shell formatter.
 func Format(f *File) string {
-	return (&Formatter{}).FormatFile(f)
-}
-
-// FormatWith formats with the provided embedded-language formatters.
-func FormatWith(f *File, fmt *Formatter) string {
-	return fmt.FormatFile(f)
-}
-
-// FormatFile is the method form of Format.
-func (fmtr *Formatter) FormatFile(f *File) string {
-	w := &writer{fmtr: fmtr}
+	w := &writer{}
 	w.file(f)
 	return w.out.String()
 }
 
 type writer struct {
-	out  strings.Builder
-	fmtr *Formatter
+	out strings.Builder
 }
 
 func (w *writer) writeln(s string) { w.out.WriteString(s); w.out.WriteByte('\n') }
@@ -72,13 +51,10 @@ func (w *writer) instruction(instr *Instruction) {
 	if len(instr.Lines) == 0 {
 		return
 	}
-
-	// For RUN instructions, optionally normalise the continuation-line shell.
-	if instr.Keyword == "RUN" && w.fmtr != nil && w.fmtr.RUNShellFmt != nil {
+	if instr.Keyword == "RUN" {
 		w.runInstruction(instr)
 		return
 	}
-
 	w.plainInstruction(instr)
 }
 
@@ -134,7 +110,7 @@ func (w *writer) runInstruction(instr *Instruction) {
 		contLines = append(contLines, line.Text)
 	}
 
-	normalised := w.fmtr.RUNShellFmt(contLines, w.fmtr.JQFmt)
+	normalised := shell.FormatRUN(contLines)
 	for _, line := range normalised {
 		w.writeln(line)
 	}

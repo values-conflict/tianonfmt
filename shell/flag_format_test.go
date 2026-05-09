@@ -17,7 +17,7 @@ func TestFormatFlagNormalization(t *testing.T) {
 		{"curl -sS https://example.com\n", "curl -sS https://example.com\n"},
 	}
 	for _, c := range cases {
-		out, err := shell.Format(c.in, syntax.LangBash, nil)
+		out, err := shell.Format(c.in, syntax.LangBash)
 		if err != nil { t.Fatalf("err: %v", err) }
 		if !strings.Contains(out, strings.TrimSuffix(c.want, "\n")) {
 			t.Errorf("Format(%q) = %q, want contains %q", c.in, out, c.want)

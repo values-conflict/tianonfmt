@@ -22,41 +22,41 @@ ENV TERM xterm
 # Installation of LibreOffice, ImageMagick, Ghostscript, and then
 # the dependencies required to run SWFTools and PDF2JSON
 RUN apt-get update \
-&& apt-get install -y --no-install-recommends tzdata \ 
-&& apt-get install -y --no-install-recommends \
-apt-utils \
-iputils-ping \
-curl \
-wget \
-vim \
-locales \
-language-pack-en \
-language-pack-fr \
-procps \
-net-tools \
-zip \
-unzip \
-openjdk-11-jdk \
-ffmpeg \
-imagemagick \
-ghostscript \
-libreoffice \
-ure \
-gpgv \
-&& rm -rf /var/lib/apt/lists/* \
-&& update-ca-certificates -f
+	&& apt-get install -y --no-install-recommends tzdata \
+	&& apt-get install -y --no-install-recommends \
+	apt-utils \
+	iputils-ping \
+	curl \
+	wget \
+	vim \
+	locales \
+	language-pack-en \
+	language-pack-fr \
+	procps \
+	net-tools \
+	zip \
+	unzip \
+	openjdk-11-jdk \
+	ffmpeg \
+	imagemagick \
+	ghostscript \
+	libreoffice \
+	ure \
+	gpgv \
+	&& rm -rf /var/lib/apt/lists/* \
+	&& update-ca-certificates -f
 
 # Fetch and install SWFTools
 RUN wget -nc https://www.silverpeas.org/files/swftools-bin-0.9.2.zip \
-&& echo 'd40bd091c84bde2872f2733a3c767b3a686c8e8477a3af3a96ef347cf05c5e43 swftools-bin-0.9.2.zip' | sha256sum -c --status - \
-&& unzip swftools-bin-0.9.2.zip -d / \
-&& rm swftools-bin-0.9.2.zip
+	&& echo 'd40bd091c84bde2872f2733a3c767b3a686c8e8477a3af3a96ef347cf05c5e43 swftools-bin-0.9.2.zip' | sha256sum -c --status - \
+	&& unzip swftools-bin-0.9.2.zip -d / \
+	&& rm swftools-bin-0.9.2.zip
 
 # Fetch and install PDF2JSON
 RUN wget -nc https://www.silverpeas.org/files/pdf2json-bin-0.68.zip \
-&& echo 'eec849cdd75224f9d44c0999ed1fbe8764a773d8ab0cf7fff4bf922ab81c9f84 pdf2json-bin-0.68.zip' | sha256sum -c --status - \
-&& unzip pdf2json-bin-0.68.zip -d / \
-&& rm pdf2json-bin-0.68.zip
+	&& echo 'eec849cdd75224f9d44c0999ed1fbe8764a773d8ab0cf7fff4bf922ab81c9f84 pdf2json-bin-0.68.zip' | sha256sum -c --status - \
+	&& unzip pdf2json-bin-0.68.zip -d / \
+	&& rm pdf2json-bin-0.68.zip
 
 #
 # Set up environment to install and to run Silverpeas
@@ -67,10 +67,10 @@ ARG DEFAULT_LOCALE=en_US.UTF-8
 
 # Generate locales and set the default one
 RUN echo "en_US.UTF-8 UTF-8" >> /etc/locale.gen \
-&& echo "fr_FR.UTF-8 UTF-8" >> /etc/locale.gen \
-&& echo "de_DE.UTF-8 UTF-8" >> /etc/locale.gen \
-&& locale-gen \
-&& update-locale LANG=${DEFAULT_LOCALE} LANGUAGE=${DEFAULT_LOCALE} LC_ALL=${DEFAULT_LOCALE}
+	&& echo "fr_FR.UTF-8 UTF-8" >> /etc/locale.gen \
+	&& echo "de_DE.UTF-8 UTF-8" >> /etc/locale.gen \
+	&& locale-gen \
+	&& update-locale LANG=${DEFAULT_LOCALE} LANGUAGE=${DEFAULT_LOCALE} LC_ALL=${DEFAULT_LOCALE}
 
 ENV LANG ${DEFAULT_LOCALE}
 ENV LANGUAGE ${DEFAULT_LOCALE}
@@ -88,10 +88,10 @@ ENV PING_ON 1
 # add a simple script that can auto-detect the appropriate JAVA_HOME value
 # based on whether the JDK or only the JRE is installed
 RUN { \
-		echo '#!/bin/sh'; \
-		echo 'set -e'; \
-		echo; \
-		echo 'dirname "$(dirname "$(readlink -f "$(which javac || which java)")")"'; \
+	echo '#!/bin/sh'; \
+	echo 'set -e'; \
+	echo; \
+	echo 'dirname "$(dirname "$(readlink -f "$(which javac || which java)")")"'; \
 	} > /usr/local/bin/docker-java-home \
 	&& chmod +x /usr/local/bin/docker-java-home
 
@@ -108,21 +108,21 @@ ENV WILDFLY_VERSION 26.1.3
 
 # Fetch both Silverpeas, Wildfly, and the JCR migration script and unpack them into /opt
 RUN wget -nc https://www.silverpeas.org/files/silverpeas-${SILVERPEAS_VERSION}-wildfly${WILDFLY_VERSION%.?.?}.zip \
-&& wget -nc https://www.silverpeas.org/files/silverpeas-${SILVERPEAS_VERSION}-wildfly${WILDFLY_VERSION%.?.?}.zip.asc \
-&& gpg --keyserver keys.openpgp.org --recv-keys 3F4657EF9C591F2FEA458FEBC19391EB3DF442B6 \
-&& gpg --batch --verify silverpeas-${SILVERPEAS_VERSION}-wildfly${WILDFLY_VERSION%.?.?}.zip.asc silverpeas-${SILVERPEAS_VERSION}-wildfly${WILDFLY_VERSION%.?.?}.zip \
-&& wget -nc https://www.silverpeas.org/files/wildfly-${WILDFLY_VERSION}.Final.zip \
-&& unzip silverpeas-${SILVERPEAS_VERSION}-wildfly${WILDFLY_VERSION%.?.?}.zip -d /opt \
-&& unzip wildfly-${WILDFLY_VERSION}.Final.zip -d /opt \
-&& mv /opt/silverpeas-${SILVERPEAS_VERSION}-wildfly${WILDFLY_VERSION%.?.?} /opt/silverpeas \
-&& mv /opt/wildfly-${WILDFLY_VERSION}.Final /opt/wildfly \
-&& wget -nc https://www.silverpeas.org/files/oak-migrate.zip \
-&& echo '87009e55520e74b5d2a386f4ebc843ee43cd1f25ca5138f342a94a31add3cfbd oak-migrate.zip' | sha256sum -c --status - \
-&& mkdir -p /opt/oak-migration \
-&& unzip oak-migrate.zip -d /opt/oak-migration/ \
-&& chmod +x /opt/oak-migration/oak-migrate.sh \
-&& rm *.zip \
-&& mkdir -p /root/.m2
+	&& wget -nc https://www.silverpeas.org/files/silverpeas-${SILVERPEAS_VERSION}-wildfly${WILDFLY_VERSION%.?.?}.zip.asc \
+	&& gpg --keyserver keys.openpgp.org --recv-keys 3F4657EF9C591F2FEA458FEBC19391EB3DF442B6 \
+	&& gpg --batch --verify silverpeas-${SILVERPEAS_VERSION}-wildfly${WILDFLY_VERSION%.?.?}.zip.asc silverpeas-${SILVERPEAS_VERSION}-wildfly${WILDFLY_VERSION%.?.?}.zip \
+	&& wget -nc https://www.silverpeas.org/files/wildfly-${WILDFLY_VERSION}.Final.zip \
+	&& unzip silverpeas-${SILVERPEAS_VERSION}-wildfly${WILDFLY_VERSION%.?.?}.zip -d /opt \
+	&& unzip wildfly-${WILDFLY_VERSION}.Final.zip -d /opt \
+	&& mv /opt/silverpeas-${SILVERPEAS_VERSION}-wildfly${WILDFLY_VERSION%.?.?} /opt/silverpeas \
+	&& mv /opt/wildfly-${WILDFLY_VERSION}.Final /opt/wildfly \
+	&& wget -nc https://www.silverpeas.org/files/oak-migrate.zip \
+	&& echo '87009e55520e74b5d2a386f4ebc843ee43cd1f25ca5138f342a94a31add3cfbd oak-migrate.zip' | sha256sum -c --status - \
+	&& mkdir -p /opt/oak-migration \
+	&& unzip oak-migrate.zip -d /opt/oak-migration/ \
+	&& chmod +x /opt/oak-migration/oak-migrate.sh \
+	&& rm *.zip \
+	&& mkdir -p /root/.m2
 
 # Copy the Maven settings.xml required to install Silverpeas by fetching the software bundles from
 # the Silverpeas Nexus Repository
@@ -140,11 +140,11 @@ COPY src/converter.groovy ${SILVERPEAS_HOME}/configuration/silverpeas/
 
 # Assemble Silverpeas
 RUN set -eux; \
-sed -i -e "s/SILVERPEAS_VERSION/${SILVERPEAS_VERSION}/g" ${SILVERPEAS_HOME}/bin/silverpeas.gradle; \
-echo "Construct Silverpeas ${SILVERPEAS_VERSION}"; \
-./silverpeas assemble || (cat ../log/build-* && exit 1); \
-rm ../log/build-*; \
-touch .install;
+	sed -i -e "s/SILVERPEAS_VERSION/${SILVERPEAS_VERSION}/g" ${SILVERPEAS_HOME}/bin/silverpeas.gradle; \
+	echo "Construct Silverpeas ${SILVERPEAS_VERSION}"; \
+	./silverpeas assemble || (cat ../log/build-* && exit 1); \
+	rm ../log/build-*; \
+	touch .install;
 
 #
 # Expose image entries. By default, when running, the container will set up Silverpeas and Wildfly

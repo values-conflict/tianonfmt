@@ -259,11 +259,7 @@ func (f *formatter) dockerfile(src string) (string, error) {
 		dockerfile.TidyFile(parsed, tidyRUN, normalizeSetFlags)
 		dockerfile.TidyCmdEntrypoint(parsed)
 	}
-	dfFmt := &dockerfile.Formatter{
-		JQFmt:       jqFmtFunc,
-		RUNShellFmt: shell.FormatRUN,
-	}
-	return dockerfile.FormatWith(parsed, dfFmt), nil
+	return dockerfile.Format(parsed), nil
 }
 
 func (f *formatter) md(name, src string) (string, error) {
@@ -325,9 +321,9 @@ func (f *formatter) shell(src string) (string, error) {
 	var out string
 	var err error
 	if f.tidy {
-		out, err = shell.FormatWithTidy(src, lang, jqFmtFunc)
+		out, err = shell.FormatWithTidy(src, lang)
 	} else {
-		out, err = shell.Format(src, lang, jqFmtFunc)
+		out, err = shell.Format(src, lang)
 	}
 	if err != nil {
 		return "", fmt.Errorf("shell format: %w", err)
@@ -816,7 +812,7 @@ func shellASTPair(name, src string) (pre, post string, err error) {
 	if err != nil {
 		return "", "", err
 	}
-	formatted, err := shell.Format(src, lang, jqFmtFunc)
+	formatted, err := shell.Format(src, lang)
 	if err != nil {
 		return "", "", fmt.Errorf("shell format: %w", err)
 	}
@@ -839,8 +835,7 @@ func dockerfileASTPair(name, src string) (pre, post string, err error) {
 	if err != nil {
 		return "", "", err
 	}
-	fmtr := &dockerfile.Formatter{JQFmt: jqFmtFunc, RUNShellFmt: shell.FormatRUN}
-	formatted := dockerfile.FormatWith(f, fmtr)
+	formatted := dockerfile.Format(f)
 	g, err := dockerfile.Parse(formatted)
 	if err != nil {
 		return "", "", fmt.Errorf("dockerfile re-parse after format: %w", err)

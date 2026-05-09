@@ -35,9 +35,7 @@ for suite in \
 		json="$(jq <<<"$json" --compact-output --arg suite "$suite" --arg binpkg "$binpkg" --argjson cjson "$cjson" '
 			if $suite == "bookworm" then
 				.["bookworm"][$binpkg] = $cjson
-			else
-				.[$binpkg] = $cjson
-			end
+			else .[$binpkg] = $cjson end
 		')"
 	done
 done
@@ -45,15 +43,8 @@ done
 dind="$(github-file-commit 'docker/docker' 'HEAD' 'hack/dind')"
 
 jq <<<"$json" --argjson dind "$dind" '
-	def upstream_version:
-		if index(":") then
-			split(":")[1]
-		else . end
-		| split("-")[0]
-	;
-	def v(v):
-		v | split(".")
-	;
+	def upstream_version: if index(":") then split(":")[1] else . end | split("-")[0];
+	def v(v): v | split(".");
 	.dind = $dind
 	| (.engine.version | upstream_version) as $eng
 	| (.cli.version | upstream_version) as $cli

@@ -115,21 +115,16 @@ func TestTidyFile_AndChainReconstructsLines(t *testing.T) {
 
 // ── parse ─────────────────────────────────────────────────────────────────────
 
-func TestFormatWith_RUNShellFmt(t *testing.T) {
-	// FormatWith with RUNShellFmt exercises runInstruction (currently 0% in package tests).
+func TestFormat_RUNShellFmt(t *testing.T) {
+	// Format exercises runInstruction via the shell formatter.
 	src := "FROM scratch\nRUN cmd1; \\\n\tcmd2\n"
 	f, err := dockerfile.Parse(src)
 	if err != nil {
 		t.Fatal(err)
 	}
-	fmtr := &dockerfile.Formatter{
-		RUNShellFmt: func(lines []string, _ func(string, bool) string) []string {
-			return lines // passthrough
-		},
-	}
-	out := dockerfile.FormatWith(f, fmtr)
+	out := dockerfile.Format(f)
 	if !strings.Contains(out, "cmd1") {
-		t.Errorf("FormatWith output missing cmd1: %q", out)
+		t.Errorf("Format output missing cmd1: %q", out)
 	}
 }
 
@@ -208,17 +203,11 @@ func TestTidyCmdEntrypoint_AlreadyExec(t *testing.T) {
 	}
 }
 
-func TestFormatWith_WritePath(t *testing.T) {
-	// Exercises the write() method (currently 0%) via runInstruction emitting
-	// a non-continuation first line followed by RUNShellFmt processing.
+func TestFormat_SingleLineRUN(t *testing.T) {
+	// Single-line RUN hits the early-return path in runInstruction.
 	src := "FROM scratch\nRUN set -eux\n"
 	f, _ := dockerfile.Parse(src)
-	fmtr := &dockerfile.Formatter{
-		RUNShellFmt: func(lines []string, _ func(string, bool) string) []string {
-			return lines
-		},
-	}
-	out := dockerfile.FormatWith(f, fmtr)
+	out := dockerfile.Format(f)
 	if !strings.Contains(out, "FROM scratch") {
 		t.Errorf("unexpected output: %q", out)
 	}
@@ -377,7 +366,7 @@ func tokenizeDockerfile(src string) []string {
 }
 
 // normalizeDockerfile returns a canonical token sequence for comparison.
-// It applies two known mechanical rewrites beyond pure whitespace:
+// It applies three known mechanical rewrites beyond pure whitespace:
 //
 //  1. ENV KEY=VALUE → ENV KEY VALUE (space-separated form).
 //     WORD=VALUE tokens are split at the first '=', discarding the '='.
@@ -391,8 +380,12 @@ func tokenizeDockerfile(src string) []string {
 //         changes but the word content stays the same after whitespace is
 //         collapsed.
 //
-// Both rewrites are applied universally and symmetrically — they are the same
-// on both sides of the comparison — so they cannot mask genuine content bugs.
+//  3. Standalone '\' tokens (backslash line-continuation artifacts in RUN
+//     blocks) are discarded.  The shell formatter restructures continuation
+//     lines and may remove or reposition them; they carry no semantic content.
+//
+// All rewrites are applied universally and symmetrically so they cannot mask
+// genuine content bugs.
 func normalizeDockerfile(src string) string {
 	toks := tokenizeDockerfile(src)
 	var result []string
@@ -410,6 +403,9 @@ func normalizeDockerfile(src string) string {
 		}
 	}
 	for _, tok := range toks {
+		if tok == `\` {
+			continue // backslash line-continuation artifact
+		}
 		if strings.HasPrefix(tok, `"`) && len(tok) >= 2 {
 			// Unquote: strip surrounding quotes, split at whitespace, then at '='.
 			// Standalone '\' words (backslash line-continuation) are discarded.
