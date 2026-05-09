@@ -1,0 +1,69 @@
+{
+	"type": "shell",
+	"file": "input.sh",
+	"stmts": [
+		{
+			"type": "call",
+			"args": [
+				"set",
+				"-Eeuo",
+				"pipefail"
+			]
+		},
+		{
+			"type": "call",
+			"args": [
+				"yum",
+				"install",
+				"-y",
+				"curl"
+			]
+		},
+		{
+			"type": "call",
+			"args": [
+				"dnf",
+				"install",
+				"-y",
+				"curl"
+			]
+		},
+		{
+			"type": "call",
+			"args": [
+				"microdnf",
+				"install",
+				"-y",
+				"curl"
+			]
+		},
+		{
+			"type": "call",
+			"args": [
+				"tinydnf",
+				"install",
+				"-y",
+				"curl"
+			]
+		},
+		{
+			"type": "call",
+			"args": [
+				"yum",
+				"install",
+				"--assumeyes",
+				"curl"
+			]
+		},
+		{
+			"type": "call",
+			"args": [
+				"yum",
+				"install",
+				"-q",
+				"-y",
+				"curl"
+			]
+		}
+	]
+}

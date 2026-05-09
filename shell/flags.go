@@ -213,6 +213,14 @@ var cmdFlagTables = map[string]map[string]shortFlagSpec{
 		"y": {long: "--yes", canonical: true},
 		"q": {long: "--quiet"},
 	},
+
+	// yum/dnf/microdnf/tinydnf: -y (--assumeyes) is the universal canonical idiom.
+	// These tools share the same interface for our purposes; dnf/microdnf/tinydnf
+	// are registered as aliases of yum via cmdAliases below.
+	"yum": {
+		"y": {long: "--assumeyes", canonical: true},
+		"q": {long: "--quiet"},
+	},
 }
 
 // cmdCanonicalSpecs defines per-command ordering, merging, and invariant rules.
@@ -263,13 +271,27 @@ var longToShortTables = map[string]map[string]string{
 		"--yes":        "-y",
 		"--assume-yes": "-y",
 	},
+	"yum": {
+		"--assumeyes": "-y",
+	},
 }
 
-func init() {
-	cmdFlagTables["gpg1"] = cmdFlagTables["gpg"]
-	cmdFlagTables["gpg2"] = cmdFlagTables["gpg"]
-	cmdCanonicalSpecs["gpg1"] = cmdCanonicalSpecs["gpg"]
-	cmdCanonicalSpecs["gpg2"] = cmdCanonicalSpecs["gpg"]
+// cmdAliases maps alternative command names to their canonical entry in the
+// tables above.  A single entry here covers all three lookup maps.
+var cmdAliases = map[string]string{
+	"gpg1":     "gpg",
+	"gpg2":     "gpg",
+	"dnf":      "yum",
+	"microdnf": "yum",
+	"tinydnf":  "yum",
+}
+
+// resolveCmd returns the canonical command name for table lookups.
+func resolveCmd(cmd string) string {
+	if canonical, ok := cmdAliases[cmd]; ok {
+		return canonical
+	}
+	return cmd
 }
 
 // normalizeShortFlags rewrites CLI flags in call according to the per-command
@@ -288,7 +310,7 @@ func normalizeShortFlags(call *syntax.CallExpr, strict, tidy bool) {
 	if len(call.Args) == 0 {
 		return
 	}
-	cmd := wordLit(call.Args[0])
+	cmd := resolveCmd(wordLit(call.Args[0]))
 	table, ok := cmdFlagTables[cmd]
 	if !ok {
 		return
