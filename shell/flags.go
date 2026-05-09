@@ -37,11 +37,35 @@ type cmdCanonicalSpec struct {
 	// inserted; if present but not first it is moved.  e.g. --batch for gpg.
 	longFirst []string
 
-	// longPairs maps each long flag to the peer that must also be present
-	// whenever that flag is used.  If a flag is found but its peer is absent,
-	// the peer is inserted immediately after the flag.
-	// e.g. curl --silent requires --show-error and vice versa.
+	// longPairs maps each long flag to the peer that must also be present.
+	// Applied in both format and tidy mode.
+	// e.g. curl --show-error requires --silent (almost always a typo without it).
 	longPairs map[string]string
+
+	// longPairsTidy is like longPairs but applied only in tidy mode.
+	// Used for pairings that represent larger semantic changes.
+	// e.g. curl --silent → add --show-error (tidy adds stderr output, format doesn't).
+	longPairsTidy map[string]string
+
+	// required lists short-char flags that must always be present.  They are
+	// injected as separate args BEFORE the pre-merge phase so the merge step
+	// can fold them into canonical combined groups (e.g. adding "f" to a call
+	// that has "-sSL" produces "-fsSL" after merge).
+	required string
+
+	// preMergeLong maps long-form flag strings to their canonical short char.
+	// Runs in phase 3c (AFTER longPairs) so enforceLongPairs can still find
+	// flags by long name for insertion-position lookup.  A second preMerge
+	// pass (phase 3d) then folds the results into the canonical combined group.
+	//
+	// preMergeLongFormat applies in both format and tidy mode — these are
+	// correctness-level normalizations (e.g. --silent↔--show-error always
+	// paired and always short).
+	//
+	// preMergeLongTidy applies only in tidy mode — these are opinionated
+	// style choices (e.g. --fail → -f, --location → -L).
+	preMergeLongFormat map[string]string
+	preMergeLongTidy   map[string]string
 }
 
 // cmdFlagTables maps command names to their short→long flag tables.
@@ -76,8 +100,8 @@ var cmdFlagTables = map[string]map[string]shortFlagSpec{
 		"f": {long: "--fail", canonical: true},
 		"L": {long: "--location", canonical: true},
 		"o": {long: "--output", hasArg: true, canonical: true},
-		"s": {long: "--silent", canonical: true, pairWith: "SfL"}, // canonical only in -fsSL
-		"S": {long: "--show-error", canonical: true, pairWith: "sfL"}, // canonical only in -fsSL
+		"s": {long: "--silent", canonical: true, pairWith: "S"}, // canonical when -S is present
+		"S": {long: "--show-error", canonical: true, pairWith: "s"}, // canonical when -s is present
 		"O": {long: "--remote-name"},
 		"v": {long: "--verbose"},
 		"k": {long: "--insecure"},
@@ -193,14 +217,34 @@ var cmdFlagTables = map[string]map[string]shortFlagSpec{
 
 // cmdCanonicalSpecs defines per-command ordering, merging, and invariant rules.
 var cmdCanonicalSpecs = map[string]cmdCanonicalSpec{
-	// curl: canonical order f,s,S,L; mnemonic flags merged; -s and --silent
-	// always require the presence of -S / --show-error and vice versa.
+	// curl: canonical order f,s,S,L,o; canonical flags merged.
+	//
+	// Format-mode (correctness): --silent and --show-error are always paired
+	// and always short; using --silent without --show-error silently hides
+	// errors, which is dangerous.
+	//
+	// Tidy-mode (idiomatic): -f (--fail) is always added; --fail, --location,
+	// and --output are normalised to their short forms and folded in.
 	"curl": {
-		order: "fsSLo",
-		merge: "fsSL",
+		order:    "fsSLo",
+		merge:    "fsSL",
+		required: "f",
+		// Format: -S without -s is almost always a typo; add -s.
 		longPairs: map[string]string{
-			"--silent":     "--show-error",
 			"--show-error": "--silent",
+		},
+		// Tidy: -s without -S adds stderr noise; add -S (larger semantic change).
+		longPairsTidy: map[string]string{
+			"--silent": "--show-error",
+		},
+		preMergeLongFormat: map[string]string{
+			"--silent":     "s",
+			"--show-error": "S",
+		},
+		preMergeLongTidy: map[string]string{
+			"--fail":     "f",
+			"--location": "L",
+			"--output":   "o",
 		},
 	},
 
@@ -222,7 +266,9 @@ var longToShortTables = map[string]map[string]string{
 }
 
 func init() {
+	cmdFlagTables["gpg1"] = cmdFlagTables["gpg"]
 	cmdFlagTables["gpg2"] = cmdFlagTables["gpg"]
+	cmdCanonicalSpecs["gpg1"] = cmdCanonicalSpecs["gpg"]
 	cmdCanonicalSpecs["gpg2"] = cmdCanonicalSpecs["gpg"]
 }
 
@@ -238,7 +284,7 @@ func init() {
 //
 // In strict mode only phase 2 runs (no merging or reordering).
 // Processing stops at a bare "--".
-func normalizeShortFlags(call *syntax.CallExpr, strict bool) {
+func normalizeShortFlags(call *syntax.CallExpr, strict, tidy bool) {
 	if len(call.Args) == 0 {
 		return
 	}
@@ -251,63 +297,84 @@ func normalizeShortFlags(call *syntax.CallExpr, strict bool) {
 
 	spec := cmdCanonicalSpecs[cmd] // zero value if not present
 
-	// Phase 1: merge separate canonical boolean flags into combined form.
-	if !strict && spec.merge != "" {
+	// Phase 0 (tidy-only): inject required short-char flags before the merge
+	// phase so they are folded into canonical combined groups.
+	// e.g. "f" for curl: a call missing -f gets it added here, then
+	// preMergeFlags folds it into -fsSL if the other merge chars are present.
+	if tidy && !strict && spec.required != "" {
+		for i := 0; i < len(spec.required); i++ {
+			char := string(spec.required[i])
+			entry := table[char]
+			if !longFlagPresent(call.Args, entry.long, char) {
+				call.Args = append(call.Args[:1],
+					append([]*syntax.Word{makeLitWord("-" + char)}, call.Args[1:]...)...)
+			}
+		}
+	}
+
+	// Phase 1: merge separate canonical boolean flags into combined form (tidy only).
+	// In format mode, only the second merge pass (Phase 3d) runs, folding flags
+	// newly inserted/shortened by the longPairs + preMergeLong phases.  Phase 1
+	// is suppressed in format mode to avoid merging flags the user wrote as
+	// separate args (e.g. grep -v -E), which is a layout-level change.
+	if tidy && !strict && spec.merge != "" {
 		preMergeFlags(call, table, spec)
 	}
 
-	// Phase 2: per-arg normalization.
-	newArgs := make([]*syntax.Word, 0, len(call.Args)+4)
-	newArgs = append(newArgs, call.Args[0])
+	// Phase 2: per-arg normalization (tidy only — format mode preserves short flags).
+	if tidy {
+		newArgs := make([]*syntax.Word, 0, len(call.Args)+4)
+		newArgs = append(newArgs, call.Args[0])
 
-	for i := 1; i < len(call.Args); i++ {
-		word := call.Args[i]
-		val := wordLit(word)
+		for i := 1; i < len(call.Args); i++ {
+			word := call.Args[i]
+			val := wordLit(word)
 
-		if val == "--" {
-			newArgs = append(newArgs, call.Args[i:]...)
-			break
-		}
+			if val == "--" {
+				newArgs = append(newArgs, call.Args[i:]...)
+				break
+			}
 
-		// Reverse normalization: long → preferred short (non-strict only).
-		if !strict && longTable != nil {
-			if preferred, ok := longTable[val]; ok {
-				word.Parts[0].(*syntax.Lit).Value = preferred
+			// Reverse normalization: long → preferred short (non-strict only).
+			if !strict && longTable != nil {
+				if preferred, ok := longTable[val]; ok {
+					word.Parts[0].(*syntax.Lit).Value = preferred
+					newArgs = append(newArgs, word)
+					continue
+				}
+			}
+
+			if !isShortFlag(val) {
 				newArgs = append(newArgs, word)
 				continue
 			}
-		}
 
-		if !isShortFlag(val) {
-			newArgs = append(newArgs, word)
-			continue
-		}
+			flags := val[1:]
 
-		flags := val[1:]
-
-		if len(flags) == 1 {
-			spec2, ok := table[flags]
-			if !ok {
+			if len(flags) == 1 {
+				spec2, ok := table[flags]
+				if !ok {
+					newArgs = append(newArgs, word)
+					continue
+				}
+				if !strict && spec2.canonical && spec2.pairWith == "" {
+					newArgs = append(newArgs, word)
+					continue
+				}
+				word.Parts[0].(*syntax.Lit).Value = spec2.long
 				newArgs = append(newArgs, word)
 				continue
 			}
-			if !strict && spec2.canonical && spec2.pairWith == "" {
+
+			expanded := expandCombinedFlags(flags, table, strict)
+			if expanded == nil {
 				newArgs = append(newArgs, word)
 				continue
 			}
-			word.Parts[0].(*syntax.Lit).Value = spec2.long
-			newArgs = append(newArgs, word)
-			continue
+			newArgs = append(newArgs, expanded...)
 		}
-
-		expanded := expandCombinedFlags(flags, table, strict)
-		if expanded == nil {
-			newArgs = append(newArgs, word)
-			continue
-		}
-		newArgs = append(newArgs, expanded...)
+		call.Args = newArgs
 	}
-	call.Args = newArgs
 
 	// Phase 3: reorder within combined groups + invariant enforcement.
 	if !strict {
@@ -317,11 +384,42 @@ func normalizeShortFlags(call *syntax.CallExpr, strict bool) {
 		if spec.priority != "" {
 			movePriorityFlags(call, spec)
 		}
-		if len(spec.longFirst) > 0 {
+		if tidy && len(spec.longFirst) > 0 {
 			ensureLongFirstFlags(call, spec)
 		}
 		if len(spec.longPairs) > 0 {
 			enforceLongPairs(call, table, spec)
+		}
+		if tidy && len(spec.longPairsTidy) > 0 {
+			enforceLongPairs(call, table, cmdCanonicalSpec{longPairs: spec.longPairsTidy})
+		}
+		// Phase 3c: convert canonical long flags to short form, including any
+		// long-form peers inserted by longPairs.  Runs after longPairs so that
+		// enforceLongPairs can still locate flags by their long name.
+		for val, shortChar := range spec.preMergeLongFormat {
+			for i := 1; i < len(call.Args); i++ {
+				if wordLit(call.Args[i]) == val {
+					call.Args[i].Parts[0].(*syntax.Lit).Value = "-" + shortChar
+				}
+			}
+		}
+		if tidy {
+			for val, shortChar := range spec.preMergeLongTidy {
+				for i := 1; i < len(call.Args); i++ {
+					if wordLit(call.Args[i]) == val {
+						call.Args[i].Parts[0].(*syntax.Lit).Value = "-" + shortChar
+					}
+				}
+			}
+		}
+		// Phase 3d: second pre-merge — fold newly-shortened flags (from phase 3c)
+		// into the canonical combined group.  At this point longPairs have been
+		// enforced so pairWith constraints are expected to be satisfied.
+		// In format mode, only run when preMergeLongFormat is non-empty — otherwise
+		// there is nothing to fold and the merge would combine flags the user wrote
+		// as separate args (e.g. grep -v -E → grep -vE is a tidy-only change).
+		if spec.merge != "" && (tidy || len(spec.preMergeLongFormat) > 0) {
+			preMergeFlags(call, table, spec)
 		}
 	}
 }
@@ -537,9 +635,13 @@ func enforceLongPairs(call *syntax.CallExpr, table map[string]shortFlagSpec, spe
 		if longFlagPresent(call.Args, peer, longToShort[peer]) {
 			continue
 		}
-		// Insert peer after the flag.
+		// Insert peer after the flag.  The flag may appear as its long form or
+		// as a short char within a combined group (in format mode, Phase 2 does
+		// not run, so short forms are not yet expanded to long).
+		shortChar := longToShort[flag]
 		for j := 1; j < len(call.Args); j++ {
-			if wordLit(call.Args[j]) == flag {
+			val := wordLit(call.Args[j])
+			if val == flag || (shortChar != "" && isShortFlag(val) && strings.ContainsRune(val[1:], rune(shortChar[0]))) {
 				call.Args = append(call.Args[:j+1], append([]*syntax.Word{makeLitWord(peer)}, call.Args[j+1:]...)...)
 				break
 			}
@@ -586,6 +688,7 @@ func isCombinedGroupCanonical(flags string, table map[string]shortFlagSpec) bool
 	}
 	return true
 }
+
 
 // sortFlagsByOrder returns flags sorted by their position in order.
 // Flags not in order are appended at the end in their original relative order.

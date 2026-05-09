@@ -29,6 +29,7 @@ func Format(src string, lang syntax.LangVariant, jqFmt func(expr string, inline 
 		return "", err
 	}
 	applyFormatRewrites(f)
+	normalizeAllShortFlags(f, false)
 	if jqFmt != nil {
 		formatJQInAST(f, jqFmt)
 	}
@@ -838,6 +839,18 @@ func isUnquotedHeredocWord(w *syntax.Word) bool {
 // Note: eval $(...) → eval "$(...)​" quoting is done as a text-level
 // post-process (fixEvalQuoting) to avoid AST position issues with
 // zero-position nodes that cause comment misplacement.
+// normalizeAllShortFlags walks every CallExpr in the file and applies
+// normalizeShortFlags.  tidy=false for the format pass, tidy=true for tidy.
+// Called unconditionally (unlike formatJQInAST which is jqFmt-gated).
+func normalizeAllShortFlags(f *syntax.File, tidy bool) {
+	syntax.Walk(f, func(n syntax.Node) bool {
+		if ce, ok := n.(*syntax.CallExpr); ok {
+			normalizeShortFlags(ce, false, tidy)
+		}
+		return true
+	})
+}
+
 func applyFormatRewrites(_ *syntax.File) {
 }
 

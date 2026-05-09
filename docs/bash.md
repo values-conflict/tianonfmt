@@ -576,6 +576,10 @@ Things Tianon **never** does in standalone shell scripts:
 - Arithmetic with `let` or `$((var = expr))` assignment — use `$((...))` or `var=$((expr))`; `--tidy` flags `let`
 - `declare -i` for integer-type variables — use untyped variables; `--tidy` flags this
 - `&&` or `||` at the *end* of a continuation line (always at the start of the next line) — the formatter enforces this automatically via `BinaryNextLine` mode
+- `curl` without `--fail` / `-f` — every `curl` call must have `-f` so that HTTP errors (4xx/5xx) are treated as failures; `--tidy` adds it automatically and folds it into the canonical combined idiom (`-f` + `-sSL` → `-fsSL`; `-f` + `-sS` → `-fsS` when not following redirects)
+- `curl --show-error` / `-S` without `--silent` / `-s` — `--show-error` without `--silent` is a no-op (stderr output is already shown by default); both format and tidy add the missing `-s` automatically.  Conversely, `--silent` alone suppresses stderr with no way to see curl errors; `--tidy` adds the missing `-S` (this is a larger semantic change, so only `--tidy` does it).  Both are normalised to their short combined form (`-sS`) in either mode.
+- `curl --fail`, `curl --silent`, `curl --show-error`, `curl --location`, `curl --output` in long form — `--tidy` normalises all four to their short canonical equivalents and merges them into the combined idiom (`--fail --silent --location` → `-fsSL`)
+- `gpg` without `--batch` — every `gpg`/`gpg2` call must have `--batch` as its first argument to suppress interactive prompts; `--tidy` adds and positions it automatically
 
 **Things that appear less often than you might expect:**
 

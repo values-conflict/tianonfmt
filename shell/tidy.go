@@ -102,7 +102,7 @@ func ApplyTidy(f *syntax.File) {
 			}
 
 		case *syntax.CallExpr:
-			normalizeShortFlags(v, false)
+			normalizeShortFlags(v, false, true)
 			if len(v.Args) == 0 {
 				return true
 			}

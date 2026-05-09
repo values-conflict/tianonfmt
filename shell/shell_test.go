@@ -398,17 +398,15 @@ func TestNormalizeShortFlags_CanonicalSubsetPreserved(t *testing.T) {
 }
 
 func TestNormalizeShortFlags_PairWithUnsatisfied(t *testing.T) {
-	// curl -sL: -s needs {S,f,L} but S and f are absent → expand.
+	// curl -sL: missing -f and -S → tidy injects -f, adds -S via longPairs,
+	// and preMergeLong folds everything into the full canonical idiom -fsSL.
 	src := "curl -sL https://example.com\n"
 	out, err := shell.FormatWithTidy(src, syntax.LangBash, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if strings.Contains(out, "-sL") {
-		t.Errorf("curl -sL (s without S and f) should be expanded: %q", out)
-	}
-	if !strings.Contains(out, "--silent") {
-		t.Errorf("expected --silent in output: %q", out)
+	if !strings.Contains(out, "-fsSL") {
+		t.Errorf("curl -sL should become -fsSL after required+pairs+merge: %q", out)
 	}
 }
 
@@ -517,18 +515,14 @@ func TestNormalizeShortFlags_GrepPriorityBeforeLong(t *testing.T) {
 }
 
 func TestNormalizeShortFlags_SeparateNonCanonicalNotMerged(t *testing.T) {
-	// curl -s -L: collected {s,L} but s's pairWith {S,f,L} is incomplete (missing S,f)
-	// → no merge, -s expands to --silent.
+	// curl -s -L: tidy injects -f, adds -S via longPairs, folds to -fsSL.
 	src := "curl -s -L https://example.com\n"
 	out, err := shell.FormatWithTidy(src, syntax.LangBash, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if strings.Contains(out, "-sL") || strings.Contains(out, "-Ls") {
-		t.Errorf("incomplete mnemonic should not be merged: %q", out)
-	}
-	if !strings.Contains(out, "--silent") {
-		t.Errorf("unpaired -s should expand to --silent: %q", out)
+	if !strings.Contains(out, "-fsSL") {
+		t.Errorf("curl -s -L should become -fsSL after tidy: %q", out)
 	}
 }
 
@@ -584,29 +578,28 @@ func TestNormalizeShortFlags_PriorityNoPrecedingLongFlag(t *testing.T) {
 }
 
 func TestNormalizeShortFlags_PartialMnemonic(t *testing.T) {
-	// curl -fsS: has f, s, S but missing L → not the full -fsSL mnemonic → expand.
+	// curl -fsS: pairWith for -s is now "Sf" (S+f, no L required).
+	// -fsS is the corpus idiom for curl without --location (e.g. --head calls).
+	// It stays merged because pairWith is satisfied.
 	src := "curl -fsS https://example.com\n"
 	out, err := shell.FormatWithTidy(src, syntax.LangBash, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if strings.Contains(out, "-fsS") {
-		t.Errorf("curl -fsS (missing -L) should be expanded: %q", out)
-	}
-	if !strings.Contains(out, "--silent") {
-		t.Errorf("expected --silent in expanded output: %q", out)
+	if !strings.Contains(out, "-fsS") {
+		t.Errorf("curl -fsS should stay merged (pairWith Sf satisfied): %q", out)
 	}
 }
 
 func TestNormalizeShortFlags_PairWithSingleFlag(t *testing.T) {
-	// curl -s alone: pairWith:S unsatisfied → expand to --silent.
+	// curl -s alone: tidy injects -f (required) and -S (via longPairs) → -fsS.
 	src := "curl -s https://example.com\n"
 	out, err := shell.FormatWithTidy(src, syntax.LangBash, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(out, "--silent") {
-		t.Errorf("lone curl -s should expand to --silent: %q", out)
+	if !strings.Contains(out, "-fsS") {
+		t.Errorf("curl -s should become -fsS after required+pairs+merge: %q", out)
 	}
 }
 
@@ -694,14 +687,15 @@ func TestNormalizeShortFlags_GpgBatchMovedFirst(t *testing.T) {
 }
 
 func TestNormalizeShortFlags_CurlShowErrorGetsPeer(t *testing.T) {
-	// curl --show-error without --silent → --silent added.
+	// curl --show-error: preMergeLong converts → -S; longPairs adds -s;
+	// required injects -f; second preMerge merges all to -fsS.
 	src := "curl --show-error https://example.com\n"
 	out, err := shell.FormatWithTidy(src, syntax.LangBash, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(out, "--silent") {
-		t.Errorf("--silent should be added when --show-error is present: %q", out)
+	if !strings.Contains(out, "-fsS") {
+		t.Errorf("curl --show-error should become -fsS: %q", out)
 	}
 }
 

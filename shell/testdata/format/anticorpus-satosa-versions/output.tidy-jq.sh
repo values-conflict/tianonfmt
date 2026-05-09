@@ -18,7 +18,7 @@ versions=( "${versions[@]%/}" )
 
 # determine latest Python container version and supported variants
 eval "$(
-	curl --silent --show-error https://raw.githubusercontent.com/docker-library/python/master/versions.json \
+	curl -fsS https://raw.githubusercontent.com/docker-library/python/master/versions.json \
 		| jq --raw-output '
 			. as $versions
 			| [ $versions | keys[] | select(contains("-rc") | not) ]
