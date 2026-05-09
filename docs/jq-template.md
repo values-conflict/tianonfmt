@@ -101,7 +101,9 @@ The **cuddled short-else** form (`) else VALUE end` on one line, ≤ 30 chars) p
 
 **Whole-program assembly.**  The formatter collects consecutive `{{ }}` blocks that together form a single jq expression (detected by tracking bracket depth — a group ends when depth returns to 0), assembles them into one jq program, formats it as a whole, and splits the result back into per-block pieces.  This ensures that fragment blocks like `) else (` and `[\n...\n| (` receive contextually correct indentation rather than being preserved verbatim.
 
-Within a group, blocks that can be formatted as standalone expressions (such as `.key` or `.value` appearing between structural fragments) are still formatted in the same assembled context, so their indentation reflects their actual depth inside the surrounding expression.
+Within a group, blocks that can be formatted as **standalone jq expressions** (such as `.key` or `.value` appearing at depth > 0 between structural fragments) are formatted *individually* — they are not included in the assembled program.  Their output is a single-line `{{ expr }}` block, with the depth-context leading tabs stripped.
+
+Some groups contain **multiple independent jq expressions** inside the same bracket context — for example, two separate `if-then-else` blocks both inside the same outer `else (...)`.  This mirrors how `jq-template.awk` works: its `append()` function (line 43) uses `\n+ ` (string concatenation) to join adjacent sub-expressions at the same depth level.  The formatter does the same: it inserts `+ "SENTINEL" +` between the sub-expressions so the assembled program is valid jq and the sub-expressions produce their outputs concatenated.
 
 Corpus ref: [`docker-qemu/Dockerfile.template#L32-L63`](https://github.com/tianon/docker-qemu/blob/3ce36843e253ddb7f63a39a6d0a27a7a46762e8b/Dockerfile.template#L32-L63).
 

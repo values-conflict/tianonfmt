@@ -490,6 +490,25 @@ gsub(
 )
 ```
 
+**Comments before a closing `}` are preserved as closing-delimiter comments.**  A comment on its own line immediately after the last object field (before the closing `}`) is kept there in the output, at the same indentation as the fields.  An optional blank line between the last field and the comment is preserved:
+
+```jq
+# correct:
+{
+	amd64: "ovmf",
+	arm64: "qemu-efi-aarch64",
+
+	# TODO add more arches?
+}
+
+# wrong — comment before last field or moved outside:
+{
+	amd64: "ovmf",
+	arm64: "qemu-efi-aarch64",
+}
+# TODO add more arches?
+```
+
 **Comments before a closing `)` are preserved as closing-delimiter comments.**  A comment on its own line immediately before `)` is kept there in the output, not moved inside the body:
 
 ```jq
