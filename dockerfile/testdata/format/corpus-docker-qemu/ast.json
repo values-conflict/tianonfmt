@@ -1,0 +1,1095 @@
+{
+	"type": "dockerfile",
+	"file": "input.dockerfile",
+	"instructions": [
+		{
+			"type": "COMMENT",
+			"args": "#",
+			"lines": [
+				{
+					"kind": "comment",
+					"text": "#"
+				}
+			],
+			"startLine": 1,
+			"endLine": 1
+		},
+		{
+			"type": "COMMENT",
+			"args": "# NOTE: THIS DOCKERFILE IS GENERATED VIA \"apply-templates.sh\"",
+			"lines": [
+				{
+					"kind": "comment",
+					"text": "# NOTE: THIS DOCKERFILE IS GENERATED VIA \"apply-templates.sh\""
+				}
+			],
+			"startLine": 2,
+			"endLine": 2
+		},
+		{
+			"type": "COMMENT",
+			"args": "#",
+			"lines": [
+				{
+					"kind": "comment",
+					"text": "#"
+				}
+			],
+			"startLine": 3,
+			"endLine": 3
+		},
+		{
+			"type": "COMMENT",
+			"args": "# PLEASE DO NOT EDIT IT DIRECTLY.",
+			"lines": [
+				{
+					"kind": "comment",
+					"text": "# PLEASE DO NOT EDIT IT DIRECTLY."
+				}
+			],
+			"startLine": 4,
+			"endLine": 4
+		},
+		{
+			"type": "COMMENT",
+			"args": "#",
+			"lines": [
+				{
+					"kind": "comment",
+					"text": "#"
+				}
+			],
+			"startLine": 5,
+			"endLine": 5
+		},
+		{
+			"type": "blank",
+			"lines": [
+				{
+					"kind": "blank"
+				}
+			],
+			"startLine": 6,
+			"endLine": 6
+		},
+		{
+			"type": "FROM",
+			"ref": "debian:trixie-slim",
+			"lines": [
+				{
+					"kind": "instruction",
+					"text": "FROM debian:trixie-slim"
+				}
+			],
+			"startLine": 7,
+			"endLine": 7
+		},
+		{
+			"type": "blank",
+			"lines": [
+				{
+					"kind": "blank"
+				}
+			],
+			"startLine": 8,
+			"endLine": 8
+		},
+		{
+			"type": "RUN",
+			"form": "shell",
+			"args": "set -eux; \tif grep backports /etc/apt/sources.list.d/debian.sources; then exit 1; fi; \tsed -ri -e 's/([[:space:]])([^[:space:]]+)-updates($|[[:space:]])/\\0\\1\\2-backports\\3/' /etc/apt/sources.list.d/debian.sources; \tgrep backports /etc/apt/sources.list.d/debian.sources; \t{ \t\techo 'Package: src:edk2'; \t\techo 'Pin: release a=*-backports'; \t\techo 'Pin-Priority: 600'; \t\techo; \t\techo 'Package: src:qemu'; \t\techo 'Pin: version *'; \t\techo 'Pin-Priority: -10'; \t} \u003e /etc/apt/preferences.d/qemu.pref; \tapt-get update; \tapt-get install -y --no-install-recommends ca-certificates; \tapt-get install -y --no-install-recommends swtpm; \tapt-get install -y --no-install-recommends \t\tovmf \t\tqemu-efi-aarch64 \t\tqemu-efi-arm \t\tovmf-ia32 \t\topensbi u-boot-qemu \t; \tapt-get dist-clean",
+			"lines": [
+				{
+					"kind": "instruction",
+					"text": "RUN set -eux; \\"
+				},
+				{
+					"kind": "comment",
+					"text": "# add backports for (potentially) newer QEMU firmware packages"
+				},
+				{
+					"kind": "continuation",
+					"text": "\tif grep backports /etc/apt/sources.list.d/debian.sources; then exit 1; fi; \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "\tsed -ri -e 's/([[:space:]])([^[:space:]]+)-updates($|[[:space:]])/\\0\\1\\2-backports\\3/' /etc/apt/sources.list.d/debian.sources; \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "\tgrep backports /etc/apt/sources.list.d/debian.sources; \\"
+				},
+				{
+					"kind": "comment",
+					"text": "# and add APT pinning to ensure we don't accidentally get QEMU from Debian"
+				},
+				{
+					"kind": "continuation",
+					"text": "\t{ \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "\t\techo 'Package: src:edk2'; \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "\t\techo 'Pin: release a=*-backports'; \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "\t\techo 'Pin-Priority: 600'; \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "\t\techo; \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "\t\techo 'Package: src:qemu'; \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "\t\techo 'Pin: version *'; \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "\t\techo 'Pin-Priority: -10'; \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "\t} \u003e /etc/apt/preferences.d/qemu.pref; \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "\tapt-get update; \\"
+				},
+				{
+					"kind": "comment",
+					"text": "# https://github.com/tianon/docker-qemu/issues/30"
+				},
+				{
+					"kind": "continuation",
+					"text": "\tapt-get install -y --no-install-recommends ca-certificates; \\"
+				},
+				{
+					"kind": "comment",
+					"text": "# include \"swtpm\" for TPM emulation -- not automatically launched, but small and useful for running a TPM sidecar container (https://qemu-project.gitlab.io/qemu/specs/tpm.html#the-qemu-tpm-emulator-device)"
+				},
+				{
+					"kind": "continuation",
+					"text": "\tapt-get install -y --no-install-recommends swtpm; \\"
+				},
+				{
+					"kind": "comment",
+					"text": "# install \"firmware\" packages (easier UEFI, etc)"
+				},
+				{
+					"kind": "continuation",
+					"text": "\tapt-get install -y --no-install-recommends \\"
+				},
+				{
+					"kind": "comment",
+					"text": "# amd64"
+				},
+				{
+					"kind": "continuation",
+					"text": "\t\tovmf \\"
+				},
+				{
+					"kind": "comment",
+					"text": "# arm64"
+				},
+				{
+					"kind": "continuation",
+					"text": "\t\tqemu-efi-aarch64 \\"
+				},
+				{
+					"kind": "comment",
+					"text": "# armel | armhf"
+				},
+				{
+					"kind": "continuation",
+					"text": "\t\tqemu-efi-arm \\"
+				},
+				{
+					"kind": "comment",
+					"text": "# i386"
+				},
+				{
+					"kind": "continuation",
+					"text": "\t\tovmf-ia32 \\"
+				},
+				{
+					"kind": "comment",
+					"text": "# riscv64"
+				},
+				{
+					"kind": "continuation",
+					"text": "\t\topensbi u-boot-qemu \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "\t; \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "\tapt-get dist-clean"
+				}
+			],
+			"startLine": 9,
+			"endLine": 42
+		},
+		{
+			"type": "blank",
+			"lines": [
+				{
+					"kind": "blank"
+				}
+			],
+			"startLine": 43,
+			"endLine": 43
+		},
+		{
+			"type": "COPY",
+			"form": "plain",
+			"paths": "*.patch /qemu-patches/",
+			"lines": [
+				{
+					"kind": "instruction",
+					"text": "COPY *.patch /qemu-patches/"
+				}
+			],
+			"startLine": 44,
+			"endLine": 44
+		},
+		{
+			"type": "blank",
+			"lines": [
+				{
+					"kind": "blank"
+				}
+			],
+			"startLine": 45,
+			"endLine": 45
+		},
+		{
+			"type": "COMMENT",
+			"args": "# https://wiki.qemu.org/SecurityProcess",
+			"lines": [
+				{
+					"kind": "comment",
+					"text": "# https://wiki.qemu.org/SecurityProcess"
+				}
+			],
+			"startLine": 46,
+			"endLine": 46
+		},
+		{
+			"type": "ENV",
+			"args": "QEMU_KEYS \t\tCEACC9E15534EBABB82D3FA03353C9CEF108B584",
+			"lines": [
+				{
+					"kind": "instruction",
+					"text": "ENV QEMU_KEYS \\"
+				},
+				{
+					"kind": "comment",
+					"text": "# Michael Roth"
+				},
+				{
+					"kind": "continuation",
+					"text": "\t\tCEACC9E15534EBABB82D3FA03353C9CEF108B584"
+				}
+			],
+			"startLine": 47,
+			"endLine": 49
+		},
+		{
+			"type": "COMMENT",
+			"args": "# https://wiki.qemu.org/Planning/ReleaseProcess#Sign_the_resulting_tarball_with_GPG: (they get signed by whoever is making the release)",
+			"lines": [
+				{
+					"kind": "comment",
+					"text": "# https://wiki.qemu.org/Planning/ReleaseProcess#Sign_the_resulting_tarball_with_GPG: (they get signed by whoever is making the release)"
+				}
+			],
+			"startLine": 50,
+			"endLine": 50
+		},
+		{
+			"type": "blank",
+			"lines": [
+				{
+					"kind": "blank"
+				}
+			],
+			"startLine": 51,
+			"endLine": 51
+		},
+		{
+			"type": "COMMENT",
+			"args": "# https://www.qemu.org/download/#source",
+			"lines": [
+				{
+					"kind": "comment",
+					"text": "# https://www.qemu.org/download/#source"
+				}
+			],
+			"startLine": 52,
+			"endLine": 52
+		},
+		{
+			"type": "COMMENT",
+			"args": "# https://download.qemu.org/?C=M;O=D",
+			"lines": [
+				{
+					"kind": "comment",
+					"text": "# https://download.qemu.org/?C=M;O=D"
+				}
+			],
+			"startLine": 53,
+			"endLine": 53
+		},
+		{
+			"type": "ENV",
+			"args": "QEMU_VERSION 10.1.5",
+			"lines": [
+				{
+					"kind": "instruction",
+					"text": "ENV QEMU_VERSION 10.1.5"
+				}
+			],
+			"startLine": 54,
+			"endLine": 54
+		},
+		{
+			"type": "ENV",
+			"args": "QEMU_URL https://download.qemu.org/qemu-10.1.5.tar.xz",
+			"lines": [
+				{
+					"kind": "instruction",
+					"text": "ENV QEMU_URL https://download.qemu.org/qemu-10.1.5.tar.xz"
+				}
+			],
+			"startLine": 55,
+			"endLine": 55
+		},
+		{
+			"type": "blank",
+			"lines": [
+				{
+					"kind": "blank"
+				}
+			],
+			"startLine": 56,
+			"endLine": 56
+		},
+		{
+			"type": "RUN",
+			"form": "shell",
+			"args": "set -eux;  \tsavedAptMark=\"$(apt-mark showmanual)\";  \tapt-get install --update -y --no-install-recommends \t\tgnupg \t\twget \t\txz-utils  \t\tpatch  \t\tbzip2 \t\tgcc \t\tgnutls-dev \t\tlibaio-dev \t\tlibbz2-dev \t\tlibc-dev \t\tlibcap-dev \t\tlibcap-ng-dev \t\tlibcurl4-gnutls-dev \t\tlibglib2.0-dev \t\tlibiscsi-dev \t\tlibjpeg-dev \t\tlibncursesw5-dev \t\tlibnfs-dev \t\tlibnuma-dev \t\tlibpixman-1-dev \t\tlibpng-dev \t\tlibrbd-dev \t\tlibseccomp-dev \t\tlibssh-dev \t\tlibusb-1.0-0-dev \t\tlibusbredirparser-dev \t\tlibxen-dev \t\tmake \t\tpkg-config \t\tpython3 \t\tzlib1g-dev \t\tninja-build \t\tpython3-setuptools \t\tlibfuse3-dev \t\tlibslirp-dev \t\tpython3-venv \t\tgit \t;  \ttarball=\"$(basename \"$QEMU_URL\")\"; \twget -O \"$tarball.sig\" \"$QEMU_URL.sig\"; \twget -O \"$tarball\" \"$QEMU_URL\" --progress=dot:giga;  \texport GNUPGHOME=\"$(mktemp -d)\"; \tfor key in $QEMU_KEYS; do \t\tgpg --batch --keyserver keyserver.ubuntu.com --recv-keys \"$key\"; \tdone; \tgpg --batch --verify \"$tarball.sig\" \"$tarball\"; \tgpgconf --kill all; \trm -rf \"$GNUPGHOME\";  \tmkdir /usr/src/qemu; \ttar -xf \"$tarball\" -C /usr/src/qemu --strip-components=1; \trm \"$tarball\" \"$tarball.sig\";  \tcd /usr/src/qemu;  \tfor p in /qemu-patches/*.patch; do \t\tpatch --strip 1 --input \"$p\"; \tdone; \trm -rf /qemu-patches;  \t./configure --help; \t./configure \t\t--with-pkgversion='https://github.com/tianon/docker-qemu' \t\t--target-list=' \t\t\ti386-softmmu x86_64-softmmu aarch64-softmmu arm-softmmu m68k-softmmu \t\t\tmips64-softmmu mips64el-softmmu ppc64-softmmu riscv64-softmmu \t\t\tsparc64-softmmu s390x-softmmu \t\t' \t\t--firmwarepath=/usr/share/qemu:/usr/share/seabios:/usr/lib/ipxe/qemu \t\t--disable-docs \t\t--disable-gtk --disable-vte \t\t--disable-sdl \t\t--enable-attr \t\t--enable-bzip2 \t\t--enable-cap-ng \t\t--enable-curl \t\t--enable-curses \t\t--enable-fdt \t\t--enable-gnutls \t\t--enable-kvm \t\t--enable-libiscsi \t\t--enable-libnfs \t\t--enable-libssh \t\t--enable-libusb \t\t--enable-linux-aio \t\t--enable-modules \t\t--enable-numa \t\t--enable-rbd \t\t--enable-seccomp \t\t--enable-strip \t\t--enable-tools \t\t--enable-usb-redir \t\t--enable-vhost-net \t\t--enable-vhost-user \t\t--enable-vhost-vdpa \t\t--enable-virtfs \t\t--enable-vnc \t\t--enable-vnc-jpeg \t\t--enable-xen \t\t--enable-fuse \t\t--enable-slirp \t; \tmake -j \"$(nproc)\"; \tmake install;  \tcd /; \trm -rf /usr/src/qemu;  \tapt-mark auto '.*' \u003e /dev/null; \t[ -z \"$savedAptMark\" ] || apt-mark manual $savedAptMark \u003e /dev/null; \tfind /usr/local \t\t-type f \t\t\\( -executable -o -name '*.so' \\) \t\t-not -name 'block-rbd.so' \t\t-exec ldd '{}' ';' \t\t| awk '/=\u003e/ { so = $(NF-1); if (index(so, \"/usr/local/\") == 1) { next }; gsub(\"^/(usr/)?\", \"\", so); printf \"*%s\\n\", so }' \t\t| sort -u \t\t| xargs -r dpkg-query --search \t\t| cut -d: -f1 \t\t| sort -u \t\t| xargs -r apt-mark manual \t; \tapt-get purge -y --auto-remove -o APT::AutoRemove::RecommendsImportant=false; \tapt-get dist-clean;  \tqemu-img --version",
+			"lines": [
+				{
+					"kind": "instruction",
+					"text": "RUN set -eux; \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "\t\\"
+				},
+				{
+					"kind": "continuation",
+					"text": "\tsavedAptMark=\"$(apt-mark showmanual)\"; \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "\t\\"
+				},
+				{
+					"kind": "continuation",
+					"text": "\tapt-get install --update -y --no-install-recommends \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "\t\tgnupg \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "\t\twget \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "\t\txz-utils \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "\t\t\\"
+				},
+				{
+					"kind": "continuation",
+					"text": "\t\tpatch \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "\t\t\\"
+				},
+				{
+					"kind": "continuation",
+					"text": "\t\tbzip2 \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "\t\tgcc \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "\t\tgnutls-dev \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "\t\tlibaio-dev \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "\t\tlibbz2-dev \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "\t\tlibc-dev \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "\t\tlibcap-dev \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "\t\tlibcap-ng-dev \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "\t\tlibcurl4-gnutls-dev \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "\t\tlibglib2.0-dev \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "\t\tlibiscsi-dev \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "\t\tlibjpeg-dev \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "\t\tlibncursesw5-dev \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "\t\tlibnfs-dev \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "\t\tlibnuma-dev \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "\t\tlibpixman-1-dev \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "\t\tlibpng-dev \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "\t\tlibrbd-dev \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "\t\tlibseccomp-dev \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "\t\tlibssh-dev \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "\t\tlibusb-1.0-0-dev \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "\t\tlibusbredirparser-dev \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "\t\tlibxen-dev \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "\t\tmake \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "\t\tpkg-config \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "\t\tpython3 \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "\t\tzlib1g-dev \\"
+				},
+				{
+					"kind": "comment",
+					"text": "# https://wiki.qemu.org/ChangeLog/5.2#Build_Information"
+				},
+				{
+					"kind": "continuation",
+					"text": "\t\tninja-build \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "\t\tpython3-setuptools \\"
+				},
+				{
+					"kind": "comment",
+					"text": "# https://www.qemu.org/2021/08/22/fuse-blkexport/"
+				},
+				{
+					"kind": "continuation",
+					"text": "\t\tlibfuse3-dev \\"
+				},
+				{
+					"kind": "comment",
+					"text": "# https://wiki.qemu.org/ChangeLog/7.2#Removal_of_the_.22slirp.22_submodule_.28affects_.22-netdev_user.22.29"
+				},
+				{
+					"kind": "continuation",
+					"text": "\t\tlibslirp-dev \\"
+				},
+				{
+					"kind": "comment",
+					"text": "# https://wiki.qemu.org/ChangeLog/8.1#Build_Dependencies"
+				},
+				{
+					"kind": "continuation",
+					"text": "\t\tpython3-venv \\"
+				},
+				{
+					"kind": "comment",
+					"text": "# \"../meson.build:3070:18: ERROR: Git program not found, cannot download dtc.wrap via git.\""
+				},
+				{
+					"kind": "continuation",
+					"text": "\t\tgit \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "\t; \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "\t\\"
+				},
+				{
+					"kind": "continuation",
+					"text": "\ttarball=\"$(basename \"$QEMU_URL\")\"; \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "\twget -O \"$tarball.sig\" \"$QEMU_URL.sig\"; \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "\twget -O \"$tarball\" \"$QEMU_URL\" --progress=dot:giga; \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "\t\\"
+				},
+				{
+					"kind": "continuation",
+					"text": "\texport GNUPGHOME=\"$(mktemp -d)\"; \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "\tfor key in $QEMU_KEYS; do \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "\t\tgpg --batch --keyserver keyserver.ubuntu.com --recv-keys \"$key\"; \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "\tdone; \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "\tgpg --batch --verify \"$tarball.sig\" \"$tarball\"; \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "\tgpgconf --kill all; \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "\trm -rf \"$GNUPGHOME\"; \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "\t\\"
+				},
+				{
+					"kind": "continuation",
+					"text": "\tmkdir /usr/src/qemu; \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "\ttar -xf \"$tarball\" -C /usr/src/qemu --strip-components=1; \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "\trm \"$tarball\" \"$tarball.sig\"; \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "\t\\"
+				},
+				{
+					"kind": "continuation",
+					"text": "\tcd /usr/src/qemu; \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "\t\\"
+				},
+				{
+					"kind": "continuation",
+					"text": "\tfor p in /qemu-patches/*.patch; do \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "\t\tpatch --strip 1 --input \"$p\"; \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "\tdone; \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "\trm -rf /qemu-patches; \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "\t\\"
+				},
+				{
+					"kind": "continuation",
+					"text": "\t./configure --help; \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "\t./configure \\"
+				},
+				{
+					"kind": "comment",
+					"text": "# let's add a link to our source code in the output of \"--version\" in case our users end up filing bugs against the QEMU project O:)"
+				},
+				{
+					"kind": "continuation",
+					"text": "\t\t--with-pkgversion='https://github.com/tianon/docker-qemu' \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "\t\t--target-list=' \\"
+				},
+				{
+					"kind": "comment",
+					"text": "# system targets"
+				},
+				{
+					"kind": "comment",
+					"text": "# (https://sources.debian.org/src/qemu/buster/debian/rules/#L59-L63, slimmed)"
+				},
+				{
+					"kind": "continuation",
+					"text": "\t\t\ti386-softmmu x86_64-softmmu aarch64-softmmu arm-softmmu m68k-softmmu \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "\t\t\tmips64-softmmu mips64el-softmmu ppc64-softmmu riscv64-softmmu \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "\t\t\tsparc64-softmmu s390x-softmmu \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "\t\t' \\"
+				},
+				{
+					"kind": "comment",
+					"text": "# let's point \"firmware path\" to Debian's value so we get access to \"OVMF.fd\" and friends more easily"
+				},
+				{
+					"kind": "continuation",
+					"text": "\t\t--firmwarepath=/usr/share/qemu:/usr/share/seabios:/usr/lib/ipxe/qemu \\"
+				},
+				{
+					"kind": "comment",
+					"text": "# https://salsa.debian.org/qemu-team/qemu/-/blob/058ab4ec8623766b50055c8c56d0d5448d52fb0a/debian/rules#L38"
+				},
+				{
+					"kind": "continuation",
+					"text": "\t\t--disable-docs \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "\t\t--disable-gtk --disable-vte \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "\t\t--disable-sdl \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "\t\t--enable-attr \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "\t\t--enable-bzip2 \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "\t\t--enable-cap-ng \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "\t\t--enable-curl \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "\t\t--enable-curses \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "\t\t--enable-fdt \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "\t\t--enable-gnutls \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "\t\t--enable-kvm \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "\t\t--enable-libiscsi \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "\t\t--enable-libnfs \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "\t\t--enable-libssh \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "\t\t--enable-libusb \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "\t\t--enable-linux-aio \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "\t\t--enable-modules \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "\t\t--enable-numa \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "\t\t--enable-rbd \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "\t\t--enable-seccomp \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "\t\t--enable-strip \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "\t\t--enable-tools \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "\t\t--enable-usb-redir \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "\t\t--enable-vhost-net \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "\t\t--enable-vhost-user \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "\t\t--enable-vhost-vdpa \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "\t\t--enable-virtfs \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "\t\t--enable-vnc \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "\t\t--enable-vnc-jpeg \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "\t\t--enable-xen \\"
+				},
+				{
+					"kind": "comment",
+					"text": "# rbd support is enabled, but \"librbd1\" is not included since it adds ~60MB and is version-sensitive (https://github.com/tianon/docker-qemu/pull/11#issuecomment-689816553)"
+				},
+				{
+					"kind": "comment",
+					"text": "#\t\t--enable-vde \\"
+				},
+				{
+					"kind": "comment",
+					"text": "# https://www.qemu.org/2021/08/22/fuse-blkexport/"
+				},
+				{
+					"kind": "continuation",
+					"text": "\t\t--enable-fuse \\"
+				},
+				{
+					"kind": "comment",
+					"text": "# https://wiki.qemu.org/ChangeLog/7.2#Removal_of_the_.22slirp.22_submodule_.28affects_.22-netdev_user.22.29"
+				},
+				{
+					"kind": "continuation",
+					"text": "\t\t--enable-slirp \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "\t; \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "\tmake -j \"$(nproc)\"; \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "\tmake install; \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "\t\\"
+				},
+				{
+					"kind": "continuation",
+					"text": "\tcd /; \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "\trm -rf /usr/src/qemu; \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "\t\\"
+				},
+				{
+					"kind": "continuation",
+					"text": "\tapt-mark auto '.*' \u003e /dev/null; \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "\t[ -z \"$savedAptMark\" ] || apt-mark manual $savedAptMark \u003e /dev/null; \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "\tfind /usr/local \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "\t\t-type f \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "\t\t\\( -executable -o -name '*.so' \\) \\"
+				},
+				{
+					"kind": "comment",
+					"text": "# rbd support is enabled, but \"librbd1\" is not included since it adds ~60MB and is version-sensitive (https://github.com/tianon/docker-qemu/pull/11#issuecomment-689816553)"
+				},
+				{
+					"kind": "continuation",
+					"text": "\t\t-not -name 'block-rbd.so' \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "\t\t-exec ldd '{}' ';' \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "\t\t| awk '/=\u003e/ { so = $(NF-1); if (index(so, \"/usr/local/\") == 1) { next }; gsub(\"^/(usr/)?\", \"\", so); printf \"*%s\\n\", so }' \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "\t\t| sort -u \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "\t\t| xargs -r dpkg-query --search \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "\t\t| cut -d: -f1 \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "\t\t| sort -u \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "\t\t| xargs -r apt-mark manual \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "\t; \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "\tapt-get purge -y --auto-remove -o APT::AutoRemove::RecommendsImportant=false; \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "\tapt-get dist-clean; \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "\t\\"
+				},
+				{
+					"kind": "comment",
+					"text": "# basic smoke test"
+				},
+				{
+					"kind": "continuation",
+					"text": "\tqemu-img --version"
+				}
+			],
+			"startLine": 57,
+			"endLine": 207
+		},
+		{
+			"type": "blank",
+			"lines": [
+				{
+					"kind": "blank"
+				}
+			],
+			"startLine": 208,
+			"endLine": 208
+		},
+		{
+			"type": "STOPSIGNAL",
+			"args": "SIGHUP",
+			"lines": [
+				{
+					"kind": "instruction",
+					"text": "STOPSIGNAL SIGHUP"
+				}
+			],
+			"startLine": 209,
+			"endLine": 209
+		},
+		{
+			"type": "blank",
+			"lines": [
+				{
+					"kind": "blank"
+				}
+			],
+			"startLine": 210,
+			"endLine": 210
+		},
+		{
+			"type": "EXPOSE",
+			"args": "22",
+			"lines": [
+				{
+					"kind": "instruction",
+					"text": "EXPOSE 22"
+				}
+			],
+			"startLine": 211,
+			"endLine": 211
+		},
+		{
+			"type": "EXPOSE",
+			"args": "5900",
+			"lines": [
+				{
+					"kind": "instruction",
+					"text": "EXPOSE 5900"
+				}
+			],
+			"startLine": 212,
+			"endLine": 212
+		},
+		{
+			"type": "blank",
+			"lines": [
+				{
+					"kind": "blank"
+				}
+			],
+			"startLine": 213,
+			"endLine": 213
+		},
+		{
+			"type": "COPY",
+			"form": "plain",
+			"paths": "start-qemu /usr/local/bin/",
+			"lines": [
+				{
+					"kind": "instruction",
+					"text": "COPY start-qemu /usr/local/bin/"
+				}
+			],
+			"startLine": 214,
+			"endLine": 214
+		},
+		{
+			"type": "CMD",
+			"form": "exec",
+			"args": [
+				"start-qemu"
+			],
+			"lines": [
+				{
+					"kind": "instruction",
+					"text": "CMD [\"start-qemu\"]"
+				}
+			],
+			"startLine": 215,
+			"endLine": 215
+		}
+	]
+}

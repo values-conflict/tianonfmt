@@ -1,0 +1,63 @@
+{
+	"type": "shell",
+	"file": "input.sh",
+	"stmts": [
+		{
+			"type": "call",
+			"args": [
+				"set",
+				"-Eeuo",
+				"pipefail"
+			]
+		},
+		{
+			"args": [
+				"-A",
+				"counts=([\"apples\"]=3 ['oranges']=7)"
+			],
+			"type": "declare"
+		},
+		{
+			"type": "call",
+			"assigns": [
+				"total=$((counts[\"apples\"] + counts['oranges']))"
+			],
+			"args": []
+		},
+		{
+			"type": "call",
+			"args": [
+				"echo",
+				"\"total: $total\""
+			]
+		},
+		{
+			"type": "call",
+			"assigns": [
+				"label=\"apples\""
+			],
+			"args": []
+		},
+		{
+			"type": "call",
+			"args": [
+				"echo",
+				"\"count: $((counts[\"$label\"]))\""
+			]
+		},
+		{
+			"type": "call",
+			"assigns": [
+				"result=$(((counts[\"apples\"] + 1) * 2))"
+			],
+			"args": []
+		},
+		{
+			"type": "call",
+			"args": [
+				"echo",
+				"\"$result\""
+			]
+		}
+	]
+}

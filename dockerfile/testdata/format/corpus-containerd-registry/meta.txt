@@ -1,0 +1,2 @@
+Source: https://github.com/tianon/containerd-registry/blob/65463993ccf7bdd65c9fb82518260b30742a6201/Dockerfile
+License: **WARNING:** UNKNOWN

@@ -1166,10 +1166,6 @@ func reformatJQInLine(line string) string {
 	return line[:firstSQ+1] + formatted + "'" + line[sq+1:]
 }
 
-// isAllSpaces reports whether s consists entirely of space characters (no tabs).
-func isAllSpaces(s string) bool {
-	return len(s) > 0 && strings.TrimLeft(s, " ") == ""
-}
 
 // leadingWhitespace returns the leading whitespace (tabs and spaces) of s.
 func leadingWhitespace(s string) string {

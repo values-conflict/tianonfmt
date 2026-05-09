@@ -891,6 +891,18 @@ func TestRun_StdinFormat(t *testing.T) {
 	}
 }
 
+func TestRun_ShortFlags(t *testing.T) {
+	// Exercises the setShort() path in internal/flags: short flags (-t, -d)
+	// must be accepted and behave identically to their long equivalents.
+	stdout, _, code := runCLI(t, ".foo | .bar", "-t --diff")
+	if code == 0 {
+		t.Fatalf("expected non-zero exit (stdin differs from tidy output)")
+	}
+	if !strings.Contains(stdout, ".foo") {
+		t.Errorf("unexpected stdout: %q", stdout)
+	}
+}
+
 func TestRun_FlagErrors(t *testing.T) {
 	cases := []string{
 		"--write --diff",

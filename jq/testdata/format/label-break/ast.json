@@ -1,0 +1,53 @@
+{
+	"type": "jq",
+	"query": {
+		"type": "commented",
+		"leadingComments": [
+			"# label/break: early-exit from a generator — real idiom from openjdk library generation",
+			"# Ref: https://github.com/docker-library/openjdk/blob/638eb4b1d59af728d31e031168bd4cafc225f097/generate-stackbrew-library.jq"
+		],
+		"expr": {
+			"type": "array",
+			"elem": {
+				"type": "pipe",
+				"left": {
+					"type": "index",
+					"expr": {
+						"type": "identity"
+					}
+				},
+				"right": {
+					"type": "label",
+					"binding": "$out",
+					"body": {
+						"type": "if",
+						"cond": {
+							"type": "binOp",
+							"op": "\u003e",
+							"left": {
+								"type": "identity"
+							},
+							"right": {
+								"type": "number",
+								"raw": "5"
+							}
+						},
+						"then": {
+							"type": "comma",
+							"left": {
+								"type": "identity"
+							},
+							"right": {
+								"type": "break",
+								"binding": "$out"
+							}
+						},
+						"else": {
+							"type": "identity"
+						}
+					}
+				}
+			}
+		}
+	}
+}

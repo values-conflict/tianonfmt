@@ -22,8 +22,13 @@ go tool cover -func=/tmp/cov.out | tail -1
 - `panic(...)` assertion in `template/template.go`'s `writeBlockExpr` — this is the structural guard that fires if a valid template block somehow arrives with an empty formatted string; it is intentionally unreachable for well-formed templates (if it ever fires, that's a bug to fix, not to test around).
 - `trimPiece` blank-line stripping loops in `template/template.go` — these strip leading/trailing blank lines from assembly pieces; the jq formatter's output for current corpus templates never produces sentinel-adjacent blank lines, so these paths go untriggered.
 - `bracketDelta` comment/escape inner paths in `template/template.go` — the `inComment` reset on `\n` and the `inString` `\\` escape skip only fire when block expressions contain jq comments or escaped strings, which don't appear in any current corpus fragment blocks.
+- `applyFormatRewrites` in `shell/format.go` — empty `{}` body; no statements to instrument.  The function is a placeholder for future format-pass AST rewrites.
+- `arithCloseParen` `return -1` paths in `shell/format.go` — fire when the closing `))` of an arithmetic expression is missing entirely (end-of-string) or when a `)` at depth 0 is not doubled.  Both are unreachable for valid shell (the printer never produces malformed arithmetic); the `\\` escape-skip inside the double-quote loop similarly requires a backslash-escaped quote character inside an arithmetic subscript, which does not appear in the corpus.
+- `optStringFlag.setShort()` in `internal/flags/flags.go` — only reachable if an `OptString` flag is registered with a non-zero short byte.  The only `OptString` flag in the current CLI (`--ast`) has `short=0`, so this method can never be called with the current flag configuration.
 
 If coverage drops, add tests before moving on.  Rechecking after a refactor is not optional — it has caught real regressions in this codebase.
+
+**Reading coverage numbers correctly:**  Always use the canonical command above and trust `tail -1` as ground truth.  When coverage drops, identify regressions with `go tool cover -func=/tmp/cov.out | grep -v 100.0%` and diagnose from the actual numbers — do not invent explanations.  Never compare across incompatible baselines: stashed vs. unstashed code, cached vs. fresh runs, and runs where tests were failing all produce different totals and must not be treated as equivalent.
 
 ## Test hierarchy
 
@@ -166,6 +171,7 @@ Any regression in field names, nesting, or ordering produces a readable diff.  P
 - **Testable entry point**: the `cmd/` binary exposes `run(args []string, stdin, stdout, stderr) int` so the CLI can be integration-tested without subprocess overhead; `stdout`/`stderr` are `io.Writer` parameters so tests can capture output without subprocesses
 - **`string` in, `string` out for formatters**: all language formatters accept source text as `string` and return `string`.  Formatters require the full source in memory (you cannot stream-format a jq expression one token at a time), and source files are small — `io.Reader` would add complexity with no benefit
 - **Single dispatch enum** (`fileKind`) — when the same set of file types is switched on in multiple places, consolidate into one enum and one set of helper functions; parallel switches are a maintenance hazard
+- **No callback parameters to defer imports** — if a function takes a `func(...)` parameter whose only purpose is to let the caller inject a dependency from another package, that is deferred-import avoidance, not real abstraction.  Before accepting such a parameter, verify that a direct import would create a circular dependency.  If no cycle exists, delete the callback and import directly.  Every such callback that has existed in this codebase (`JQFmt`, `RUNShellFmt`, the `jqFmt func(expr string, inline bool) string` threading through `shell.Format`/`FormatRUN`) turned out to be unnecessary after checking for cycles.
 
 ## Formatter integrity — no silent pass-through
 

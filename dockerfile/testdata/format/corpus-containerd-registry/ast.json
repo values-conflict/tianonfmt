@@ -1,0 +1,264 @@
+{
+	"type": "dockerfile",
+	"file": "input.dockerfile",
+	"instructions": [
+		{
+			"type": "FROM",
+			"platform": "$BUILDPLATFORM",
+			"ref": "golang:1.25",
+			"alias": "build",
+			"lines": [
+				{
+					"kind": "instruction",
+					"text": "FROM --platform=$BUILDPLATFORM golang:1.25 AS build"
+				}
+			],
+			"startLine": 1,
+			"endLine": 1
+		},
+		{
+			"type": "blank",
+			"lines": [
+				{
+					"kind": "blank"
+				}
+			],
+			"startLine": 2,
+			"endLine": 2
+		},
+		{
+			"type": "ENV",
+			"args": "CGO_ENABLED 0",
+			"lines": [
+				{
+					"kind": "instruction",
+					"text": "ENV CGO_ENABLED 0"
+				}
+			],
+			"startLine": 3,
+			"endLine": 3
+		},
+		{
+			"type": "blank",
+			"lines": [
+				{
+					"kind": "blank"
+				}
+			],
+			"startLine": 4,
+			"endLine": 4
+		},
+		{
+			"type": "WORKDIR",
+			"args": "/app",
+			"lines": [
+				{
+					"kind": "instruction",
+					"text": "WORKDIR /app"
+				}
+			],
+			"startLine": 5,
+			"endLine": 5
+		},
+		{
+			"type": "COPY",
+			"form": "plain",
+			"paths": "go.mod go.sum ./",
+			"lines": [
+				{
+					"kind": "instruction",
+					"text": "COPY go.mod go.sum ./"
+				}
+			],
+			"startLine": 6,
+			"endLine": 6
+		},
+		{
+			"type": "RUN",
+			"form": "shell",
+			"args": "go mod download",
+			"lines": [
+				{
+					"kind": "instruction",
+					"text": "RUN go mod download"
+				}
+			],
+			"startLine": 7,
+			"endLine": 7
+		},
+		{
+			"type": "COPY",
+			"form": "plain",
+			"paths": ". .",
+			"lines": [
+				{
+					"kind": "instruction",
+					"text": "COPY . ."
+				}
+			],
+			"startLine": 8,
+			"endLine": 8
+		},
+		{
+			"type": "blank",
+			"lines": [
+				{
+					"kind": "blank"
+				}
+			],
+			"startLine": 9,
+			"endLine": 9
+		},
+		{
+			"type": "ARG",
+			"args": "TARGETOS TARGETARCH TARGETVARIANT",
+			"lines": [
+				{
+					"kind": "instruction",
+					"text": "ARG TARGETOS TARGETARCH TARGETVARIANT"
+				}
+			],
+			"startLine": 10,
+			"endLine": 10
+		},
+		{
+			"type": "ENV",
+			"args": "GOOS=$TARGETOS GOARCH=$TARGETARCH VARIANT=$TARGETVARIANT",
+			"lines": [
+				{
+					"kind": "instruction",
+					"text": "ENV GOOS=$TARGETOS GOARCH=$TARGETARCH VARIANT=$TARGETVARIANT"
+				}
+			],
+			"startLine": 11,
+			"endLine": 11
+		},
+		{
+			"type": "blank",
+			"lines": [
+				{
+					"kind": "blank"
+				}
+			],
+			"startLine": 12,
+			"endLine": 12
+		},
+		{
+			"type": "RUN",
+			"form": "shell",
+			"args": "set -eux; \tcase \"$GOARCH\" in \t\tarm) export GOARM=\"${VARIANT#v}\" ;; \t\tamd64) export GOAMD64=\"$VARIANT\" ;; \t\tarm64) [ \"${VARIANT:-v8}\" = 'v8' ] ;; \t\t*) [ -z \"$VARIANT\" ] ;; \tesac; \tgo env | grep -E 'OS=|ARCH=|ARM=|AMD64='; \tgo build -v -trimpath -ldflags '-d -w' -o /containerd-registry",
+			"lines": [
+				{
+					"kind": "instruction",
+					"text": "RUN set -eux; \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "\tcase \"$GOARCH\" in \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "\t\tarm) export GOARM=\"${VARIANT#v}\" ;; \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "\t\tamd64) export GOAMD64=\"$VARIANT\" ;; \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "\t\tarm64) [ \"${VARIANT:-v8}\" = 'v8' ] ;; \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "\t\t*) [ -z \"$VARIANT\" ] ;; \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "\tesac; \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "\tgo env | grep -E 'OS=|ARCH=|ARM=|AMD64='; \\"
+				},
+				{
+					"kind": "continuation",
+					"text": "\tgo build -v -trimpath -ldflags '-d -w' -o /containerd-registry"
+				}
+			],
+			"startLine": 13,
+			"endLine": 21
+		},
+		{
+			"type": "blank",
+			"lines": [
+				{
+					"kind": "blank"
+				}
+			],
+			"startLine": 22,
+			"endLine": 22
+		},
+		{
+			"type": "FROM",
+			"platform": "$TARGETPLATFORM",
+			"ref": "alpine:3.21",
+			"lines": [
+				{
+					"kind": "instruction",
+					"text": "FROM --platform=$TARGETPLATFORM alpine:3.21"
+				}
+			],
+			"startLine": 23,
+			"endLine": 23
+		},
+		{
+			"type": "blank",
+			"lines": [
+				{
+					"kind": "blank"
+				}
+			],
+			"startLine": 24,
+			"endLine": 24
+		},
+		{
+			"type": "COPY",
+			"from": "build",
+			"form": "plain",
+			"paths": "/containerd-registry /usr/local/bin/",
+			"lines": [
+				{
+					"kind": "instruction",
+					"text": "COPY --from=build --link /containerd-registry /usr/local/bin/"
+				}
+			],
+			"startLine": 25,
+			"endLine": 25
+		},
+		{
+			"type": "blank",
+			"lines": [
+				{
+					"kind": "blank"
+				}
+			],
+			"startLine": 26,
+			"endLine": 26
+		},
+		{
+			"type": "CMD",
+			"form": "exec",
+			"args": [
+				"containerd-registry"
+			],
+			"lines": [
+				{
+					"kind": "instruction",
+					"text": "CMD [\"containerd-registry\"]"
+				}
+			],
+			"startLine": 27,
+			"endLine": 27
+		}
+	]
+}
