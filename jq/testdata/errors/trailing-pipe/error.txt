@@ -1,1 +1,1 @@
-jq parse error: unexpected token EOF ("") in expression
+jq parse error at 1:7: unexpected token EOF ("") in expression

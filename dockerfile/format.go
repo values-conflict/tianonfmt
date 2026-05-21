@@ -6,12 +6,21 @@ import (
 	"github.com/values-conflict/tianonfmt/shell"
 )
 
-// Format formats a parsed Dockerfile back to canonical source.
+// Format parses src as a Dockerfile and formats it.
+func Format(src string) (string, error) {
+	f, err := Parse(src)
+	if err != nil {
+		return "", err
+	}
+	return FormatFile(f)
+}
+
+// FormatFile formats a parsed Dockerfile back to canonical source.
 // RUN continuation lines are normalised using the shell formatter.
-func Format(f *File) string {
+func FormatFile(f *File) (string, error) {
 	w := &writer{}
 	w.file(f)
-	return w.out.String()
+	return w.out.String(), nil
 }
 
 type writer struct {

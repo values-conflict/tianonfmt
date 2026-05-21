@@ -35,7 +35,11 @@ func TestFormat(t *testing.T) {
 			if err != nil {
 				return "", err
 			}
-			b, err := json.MarshalIndent(shell.MarshalFile(f, "input.sh"), "", "\t")
+			m, err := shell.MarshalFile(f, "input.sh")
+			if err != nil {
+				return "", err
+			}
+			b, err := json.MarshalIndent(m, "", "\t")
 			if err != nil {
 				return "", err
 			}

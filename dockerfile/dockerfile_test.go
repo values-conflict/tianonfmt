@@ -25,11 +25,7 @@ func TestMain(m *testing.M) {
 func TestFormat(t *testing.T) {
 	testutil.Golden(t, "testdata/format", "input.dockerfile", []testutil.Case{
 		{Out: "output.dockerfile", Fn: func(src string) (string, error) {
-			f, err := dockerfile.Parse(src)
-			if err != nil {
-				return "", err
-			}
-			return dockerfile.Format(f), nil
+			return dockerfile.Format(src)
 		}, Idem: true},
 		{Out: "output.tidy.dockerfile", Fn: func(src string) (string, error) {
 			f, err := dockerfile.Parse(src)
@@ -37,18 +33,31 @@ func TestFormat(t *testing.T) {
 				return "", err
 			}
 			dockerfile.TidyFile(f, tidyRUNStub, normaliseSetFlagsStub)
-			return dockerfile.Format(f), nil
+			return dockerfile.FormatFile(f)
 		}},
 		{Out: "ast.json", Fn: func(src string) (string, error) {
 			f, err := dockerfile.Parse(src)
 			if err != nil {
 				return "", err
 			}
-			b, err := json.MarshalIndent(dockerfile.MarshalFile(f, "input.dockerfile"), "", "\t")
+			m, err := dockerfile.MarshalFile(f, "input.dockerfile")
+			if err != nil {
+				return "", err
+			}
+			b, err := json.MarshalIndent(m, "", "\t")
 			if err != nil {
 				return "", err
 			}
 			return string(b) + "\n", nil
+		}},
+	})
+}
+
+func TestParseErrors(t *testing.T) {
+	testutil.Golden(t, "testdata/errors", "input.dockerfile", []testutil.Case{
+		{Fn: func(src string) (string, error) {
+			_, err := dockerfile.Parse(src)
+			return "", err
 		}},
 	})
 }
@@ -166,7 +175,10 @@ func TestFormat_RUNShellFmt(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	out := dockerfile.Format(f)
+	out, err := dockerfile.FormatFile(f)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if !strings.Contains(out, "cmd1") {
 		t.Errorf("Format output missing cmd1: %q", out)
 	}
@@ -186,7 +198,7 @@ func TestFormat_EmptyInstructionLines(t *testing.T) {
 		}
 	}
 	// Must not panic.
-	_ = dockerfile.Format(f)
+	dockerfile.FormatFile(f)
 }
 
 func TestParse_BasicInstructions(t *testing.T) {
@@ -251,7 +263,7 @@ func TestFormat_SingleLineRUN(t *testing.T) {
 	// Single-line RUN hits the early-return path in runInstruction.
 	src := "FROM scratch\nRUN set -eux\n"
 	f, _ := dockerfile.Parse(src)
-	out := dockerfile.Format(f)
+	out, _ := dockerfile.FormatFile(f)
 	if !strings.Contains(out, "FROM scratch") {
 		t.Errorf("unexpected output: %q", out)
 	}
@@ -491,7 +503,10 @@ func TestFormatPreservesTokens(t *testing.T) {
 				t.Skipf("parse error: %v", err)
 				return
 			}
-			formatted := dockerfile.Format(f)
+			formatted, err := dockerfile.FormatFile(f)
+			if err != nil {
+				t.Fatalf("format: %v", err)
+			}
 			normIn := normalizeDockerfile(string(src))
 			normOut := normalizeDockerfile(formatted)
 			if normIn != normOut {

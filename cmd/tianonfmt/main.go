@@ -245,9 +245,9 @@ func (f *formatter) jq(src string) (string, error) {
 	}
 	if f.tidy {
 		jq.TidyFile(parsed)
-		return jq.FormatFileTidy(parsed), nil
+		return jq.FormatFileTidy(parsed)
 	}
-	return jq.FormatFile(parsed), nil
+	return jq.FormatFile(parsed)
 }
 
 func (f *formatter) dockerfile(src string) (string, error) {
@@ -259,14 +259,14 @@ func (f *formatter) dockerfile(src string) (string, error) {
 		dockerfile.TidyFile(parsed, tidyRUN, normalizeSetFlags)
 		dockerfile.TidyCmdEntrypoint(parsed)
 	}
-	return dockerfile.Format(parsed), nil
+	return dockerfile.FormatFile(parsed)
 }
 
 func (f *formatter) md(name, src string) (string, error) {
 	if f.tidy {
-		return markdown.FormatTidy(src, f.makeFenceFmt(name)), nil
+		return markdown.FormatTidy(src, f.makeFenceFmt(name))
 	}
-	return markdown.Format(src), nil
+	return markdown.Format(src)
 }
 
 // makeFenceFmt returns a fenceFmt callback for use with markdown.FormatTidy.
@@ -313,7 +313,7 @@ func (f *formatter) makeFenceFmt(name string) func(lang string, openLine int, co
 }
 
 func (f *formatter) template(src string) (string, error) {
-	return template.Format(src, jqFmtFunc), nil
+	return template.Format(src, jqFmtFunc)
 }
 
 func (f *formatter) shell(src string) (string, error) {
@@ -346,7 +346,8 @@ func jqFmtFunc(expr string, inline bool) string {
 		if ferr != nil {
 			return "" // parse failure — caller preserves original
 		}
-		return jq.FormatFile(f)
+		s, _ := jq.FormatFile(f)
+		return s
 	}
 	if inline {
 		return jq.FormatNodeInline(node)
@@ -771,7 +772,10 @@ func markdownASTPair(name, src string) (pre, post string, err error) {
 	if err != nil {
 		return "", "", err
 	}
-	formatted := markdown.Format(src)
+	formatted, err := markdown.Format(src)
+	if err != nil {
+		return "", "", err
+	}
 	post, err = marshalASTJSON(markdown.MarshalFile(formatted, name))
 	return pre, post, err
 }
@@ -784,16 +788,19 @@ func jqASTPair(name, src string) (pre, post string, err error) {
 	if err != nil {
 		return "", "", fmt.Errorf("jq parse: %w", err)
 	}
-	pre, err = marshalASTJSON(f.MarshalAST().Insert(1, "file", name))
+	pre, err = marshalASTJSON(jq.MarshalFile(f, name))
 	if err != nil {
 		return "", "", err
 	}
-	formatted := jq.FormatFile(f)
+	formatted, err := jq.FormatFile(f)
+	if err != nil {
+		return "", "", err
+	}
 	g, err := jq.ParseFile(formatted)
 	if err != nil {
 		return "", "", fmt.Errorf("jq re-parse after format: %w", err)
 	}
-	post, err = marshalASTJSON(g.MarshalAST().Insert(1, "file", name))
+	post, err = marshalASTJSON(jq.MarshalFile(g, name))
 	if err != nil {
 		return "", "", err
 	}
@@ -835,7 +842,10 @@ func dockerfileASTPair(name, src string) (pre, post string, err error) {
 	if err != nil {
 		return "", "", err
 	}
-	formatted := dockerfile.Format(f)
+	formatted, err := dockerfile.FormatFile(f)
+	if err != nil {
+		return "", "", err
+	}
 	g, err := dockerfile.Parse(formatted)
 	if err != nil {
 		return "", "", fmt.Errorf("dockerfile re-parse after format: %w", err)
@@ -846,7 +856,12 @@ func dockerfileASTPair(name, src string) (pre, post string, err error) {
 
 // marshalASTJSON encodes v as tab-indented JSON with a trailing newline.
 // HTML escaping is disabled so characters like & appear literally.
-func marshalASTJSON(v any) (string, error) {
+// fromErr, if non-nil, is returned immediately so callers can pass
+// (value, error) pairs from MarshalFile functions directly.
+func marshalASTJSON(v any, fromErr error) (string, error) {
+	if fromErr != nil {
+		return "", fromErr
+	}
 	var buf bytes.Buffer
 	enc := json.NewEncoder(&buf)
 	enc.SetEscapeHTML(false)

@@ -27,7 +27,8 @@ func realJQFmt(expr string, inline bool) string {
 		if ferr != nil {
 			return ""
 		}
-		return jq.FormatFile(f)
+		s, _ := jq.FormatFile(f)
+		return s
 	}
 	if inline {
 		return jq.FormatNodeInline(node)
@@ -40,7 +41,7 @@ func realJQFmt(expr string, inline bool) string {
 func TestFormat(t *testing.T) {
 	testutil.Golden(t, "testdata/format", "input.template", []testutil.Case{
 		{Out: "output.template", Fn: func(src string) (string, error) {
-			return template.Format(src, realJQFmt), nil
+			return template.Format(src, realJQFmt)
 		}, Idem: true},
 	})
 }
@@ -68,13 +69,20 @@ func TestIsTemplate(t *testing.T) {
 // ── Parse ─────────────────────────────────────────────────────────────────────
 
 func TestParse_Empty(t *testing.T) {
-	if segs := template.Parse(""); len(segs) != 0 {
+	segs, err := template.Parse("")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(segs) != 0 {
 		t.Errorf("expected empty segments, got %d", len(segs))
 	}
 }
 
 func TestParse_TextOnly(t *testing.T) {
-	segs := template.Parse("FROM debian\nRUN echo hi\n")
+	segs, err := template.Parse("FROM debian\nRUN echo hi\n")
+	if err != nil {
+		t.Fatal(err)
+	}
 	if len(segs) != 1 {
 		t.Fatalf("expected 1 segment, got %d", len(segs))
 	}
@@ -84,7 +92,10 @@ func TestParse_TextOnly(t *testing.T) {
 }
 
 func TestParse_JQBlock(t *testing.T) {
-	segs := template.Parse("FROM {{ .base }}\n")
+	segs, err := template.Parse("FROM {{ .base }}\n")
+	if err != nil {
+		t.Fatal(err)
+	}
 	if len(segs) < 2 {
 		t.Fatalf("expected at least 2 segments, got %d", len(segs))
 	}
@@ -105,7 +116,10 @@ func TestParse_NestedBraces(t *testing.T) {
 	// A block whose jq expression contains literal {{ and }} (e.g. in a string
 	// literal).  The parser must handle nested depth correctly.
 	src := "{{ if .x then \"{{\" else \"}}\" end }}\n"
-	segs := template.Parse(src)
+	segs, err := template.Parse(src)
+	if err != nil {
+		t.Fatal(err)
+	}
 	// Should produce exactly one JQSeg (the expression is the whole block).
 	var jqSegs []template.JQSeg
 	for _, seg := range segs {
@@ -125,7 +139,10 @@ func TestParse_NestedEatClose(t *testing.T) {
 	// A block containing a nested {{ }} pair where the inner close is -}}.
 	// Exercises the "depth > 0 with -}}" code path (pos += len(closeEat)).
 	src := "{{ {{ inner -}} outer }}\n"
-	segs := template.Parse(src)
+	segs, err := template.Parse(src)
+	if err != nil {
+		t.Fatal(err)
+	}
 	var jqSegs []template.JQSeg
 	for _, seg := range segs {
 		if j, ok := seg.(template.JQSeg); ok {
@@ -142,7 +159,10 @@ func TestParse_NestedEatClose(t *testing.T) {
 }
 
 func TestParse_EatEOL(t *testing.T) {
-	segs := template.Parse("FROM {{ .base -}}\n")
+	segs, err := template.Parse("FROM {{ .base -}}\n")
+	if err != nil {
+		t.Fatal(err)
+	}
 	var found bool
 	for _, seg := range segs {
 		if j, ok := seg.(template.JQSeg); ok && j.EatEOL {
@@ -158,7 +178,11 @@ func TestParse_EatEOL(t *testing.T) {
 
 func TestFormat_EmptySrc(t *testing.T) {
 	// Format("") must return "" (no segments → early return).
-	if out := template.Format("", nil); out != "" {
+	out, err := template.Format("", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if out != "" {
 		t.Errorf("Format(\"\") = %q, want \"\"", out)
 	}
 }
@@ -166,7 +190,7 @@ func TestFormat_EmptySrc(t *testing.T) {
 func TestFormat_NilJQFmt(t *testing.T) {
 	// jqFmt=nil: jq expressions pass through verbatim.
 	src := "FROM {{ .base }}\n"
-	out := template.Format(src, nil)
+	out, _ := template.Format(src, nil)
 	if !strings.Contains(out, ".base") {
 		t.Errorf("expression not preserved with nil jqFmt: %q", out)
 	}
@@ -180,7 +204,7 @@ func TestFormat_Comment(t *testing.T) {
 		return expr
 	}
 	src := "{{# this is a comment -}}\nFROM debian\n"
-	out := template.Format(src, jqFmt)
+	out, _ := template.Format(src, jqFmt)
 	if called {
 		t.Error("jqFmt should not be called for comment blocks")
 	}
@@ -193,7 +217,7 @@ func TestFormat_EatEOLPreserved(t *testing.T) {
 	// {{ expr -}} is a formatting marker (consumed by the evaluator, not the
 	// formatter).  The formatter's job is only to preserve -}} in the output.
 	src := "FROM {{ .base -}}\nEXTRA\n"
-	out := template.Format(src, func(expr string, _ bool) string { return expr })
+	out, _ := template.Format(src, func(expr string, _ bool) string { return expr })
 	if !strings.Contains(out, "-}}") {
 		t.Errorf("EatEOL marker -}} not preserved in output: %q", out)
 	}
@@ -205,12 +229,13 @@ func TestFormat_DefWithSemicolon(t *testing.T) {
 	// A def block that already carries a ";" should be formatted without adding
 	// another one.  jqFmt succeeds on the as-is expr (ParseFile handles it).
 	src := "{{ def foo: .bar; -}}\nFROM debian\n"
-	out := template.Format(src, realJQFmt)
+	out, _ := template.Format(src, realJQFmt)
 	if !strings.Contains(out, "def foo") {
 		t.Errorf("def not preserved: %q", out)
 	}
 	// Idempotency: second pass should produce the same result.
-	if out2 := template.Format(out, realJQFmt); out2 != out {
+	out2, _ := template.Format(out, realJQFmt)
+	if out2 != out {
 		t.Errorf("not idempotent:\npass1: %q\npass2: %q", out, out2)
 	}
 }
@@ -219,7 +244,7 @@ func TestFormat_MultiLineCommentIndented(t *testing.T) {
 	// A multi-line comment block whose {{ opener is at a tabbed indent level.
 	// The preceding newline ensures leadingTabs sees the tab prefix correctly.
 	src := "FROM debian\n\t{{\n\t# comment1\n\t# comment2\n\t-}}\n"
-	out := template.Format(src, nil)
+	out, _ := template.Format(src, nil)
 	if !strings.Contains(out, "# comment1") || !strings.Contains(out, "# comment2") {
 		t.Errorf("multi-line comment not preserved: %q", out)
 	}
@@ -237,7 +262,7 @@ func TestFormat_InlineForceBlockFails(t *testing.T) {
 		return "" // fails on non-inline attempt
 	}
 	src := "FROM {{ .base }}\n"
-	out := template.Format(src, jqFmt)
+	out, _ := template.Format(src, jqFmt)
 	// Should preserve the original expression (verbatim fallback)
 	if !strings.Contains(out, ".base") {
 		t.Errorf("expression not preserved after force-block failure: %q", out)
@@ -252,8 +277,8 @@ func TestBracketDelta_StringEscape(t *testing.T) {
 	src := "{{ if env.v then ( -}}\n{{ .x -}}\n{{ ) else \"\" end -}}\n"
 	// Simpler: test that a block with "({)" in a string has delta=0 via Format
 	src2 := "{{ .[\"key\"] }}\n"
-	out := template.Format(src, realJQFmt)
-	out2 := template.Format(src2, realJQFmt)
+	out, _ := template.Format(src, realJQFmt)
+	out2, _ := template.Format(src2, realJQFmt)
 	if !strings.Contains(out, "if env.v then (") {
 		t.Errorf("unexpected: %q", out)
 	}
@@ -272,7 +297,7 @@ func TestTrimPiece_BlankLines(t *testing.T) {
 		"{{ if .x then ( -}}\nX\n{{ ) else \"\" end -}}\n" +
 		"{{ if .y then ( -}}\nY\n{{ ) else \"\" end -}}\n" +
 		"{{ ) end -}}\n"
-	out := template.Format(src, realJQFmt)
+	out, _ := template.Format(src, realJQFmt)
 	if !strings.Contains(out, "if .x then (") {
 		t.Errorf("unexpected: %q", out)
 	}
@@ -282,7 +307,10 @@ func TestParse_NestedClose(t *testing.T) {
 	// Block containing "}" in a jq string — bracketDelta must skip string contents
 	// (exercises the inString + escape code path in bracketDelta).
 	src := `{{ "{\"key\": \"val\"}" }}`
-	segs := template.Parse(src)
+	segs, err := template.Parse(src)
+	if err != nil {
+		t.Fatal(err)
+	}
 	var jqSegs []template.JQSeg
 	for _, s := range segs {
 		if j, ok := s.(template.JQSeg); ok {
@@ -297,7 +325,10 @@ func TestParse_NestedClose(t *testing.T) {
 func TestParse_CommentInBlock(t *testing.T) {
 	// Block containing a jq comment — bracketDelta must skip comment to end-of-line.
 	src := "{{\n\t.foo # comment with ) and } chars\n}}\n"
-	segs := template.Parse(src)
+	segs, err := template.Parse(src)
+	if err != nil {
+		t.Fatal(err)
+	}
 	var jqSegs []template.JQSeg
 	for _, s := range segs {
 		if j, ok := s.(template.JQSeg); ok {
@@ -316,33 +347,24 @@ func TestFormat_AdjacentSubexpressions(t *testing.T) {
 		"{{ if .x then ( -}}\nX\n{{ ) else \"\" end -}}\n" +
 		"{{ if .y then ( -}}\nY\n{{ ) else \"\" end -}}\n" +
 		"{{ ) end -}}\n"
-	out := template.Format(src, realJQFmt)
+	out, _ := template.Format(src, realJQFmt)
 	if !strings.Contains(out, "if .x then (") || !strings.Contains(out, "if .y then (") {
 		t.Errorf("sub-expressions not preserved: %q", out)
 	}
-	out2 := template.Format(out, realJQFmt)
+	out2, _ := template.Format(out, realJQFmt)
 	if out != out2 {
 		t.Errorf("not idempotent:\npass1: %q\npass2: %q", out, out2)
 	}
 }
 
 func TestFormat_UnterminatedBlock(t *testing.T) {
-	// An unterminated {{ block (no matching }}) — the remainder after {{ is
-	// emitted as a TextSeg.
+	// An unterminated {{ block must return an error from both Parse and Format.
 	src := "FROM {{ .base\n"
-	segs := template.Parse(src)
-	// Expect two TextSegs: "FROM " and " .base\n" (the unterminated remainder).
-	var textSegs []string
-	for _, seg := range segs {
-		if ts, ok := seg.(template.TextSeg); ok {
-			textSegs = append(textSegs, ts.Text)
-		}
+	if _, err := template.Parse(src); err == nil {
+		t.Fatal("Parse: expected error for unterminated {{ block, got nil")
 	}
-	if len(textSegs) != 2 {
-		t.Fatalf("expected 2 text segs, got %d: %v", len(textSegs), segs)
-	}
-	if !strings.Contains(textSegs[1], ".base") {
-		t.Errorf("unterminated remainder not in text segs: %v", textSegs)
+	if _, err := template.Format(src, nil); err == nil {
+		t.Fatal("Format: expected error for unterminated {{ block, got nil")
 	}
 }
 
@@ -431,7 +453,11 @@ func TestFormatPreservesTokens(t *testing.T) {
 				t.Skip("no input.template")
 				return
 			}
-			formatted := template.Format(string(src), realJQFmt)
+			formatted, err := template.Format(string(src), realJQFmt)
+			if err != nil {
+				t.Skipf("format error: %v", err)
+				return
+			}
 			normIn := normalizeTemplate(string(src))
 			normOut := normalizeTemplate(formatted)
 			if normIn != normOut {

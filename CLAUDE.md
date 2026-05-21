@@ -177,7 +177,11 @@ Any regression in field names, nesting, or ordering produces a readable diff.  P
 - **One package per language**: `jq/`, `shell/`, `dockerfile/`, `markdown/`, `template/`
 - **Shared utilities in `internal/`** — never copy helpers across packages; extract to `internal/` instead
 - **Testable entry point**: the `cmd/` binary exposes `run(args []string, stdin, stdout, stderr) int` so the CLI can be integration-tested without subprocess overhead; `stdout`/`stderr` are `io.Writer` parameters so tests can capture output without subprocesses
-- **`string` in, `string` out for formatters**: all language formatters accept source text as `string` and return `string`.  Formatters require the full source in memory (you cannot stream-format a jq expression one token at a time), and source files are small — `io.Reader` would add complexity with no benefit
+- **`string` in, `(string, error)` out for formatters**: all language formatters accept source text as `string` and return `(string, error)`.  The `error` return must be present even if the formatter is currently infallible — dropping it would require a breaking API change the moment any failure mode is added.  Formatters require the full source in memory (you cannot stream-format a jq expression one token at a time), and source files are small — `io.Reader` would add complexity with no benefit
+- **Consistent language-package API** — every language package must expose these entry points with consistent names:
+  - `Format(src string) (string, error)` — combined parse+format.  Packages that need extra parameters (e.g. `shell` needs `lang syntax.LangVariant`) add them; the name and the `error` return are non-negotiable.
+  - `MarshalFile` — marshal a file with the filename embedded, returning `(any, error)`.  Packages with a distinct `*File` AST type: `MarshalFile(f *File, filename string) (any, error)`.  Packages without one (e.g. `markdown`): `MarshalFile(src, filename string) (any, error)`.  The error is currently always nil for valid input, but the slot must exist for the same reason as `Format` — future failure modes must not require a breaking API change.
+  - Any outlier — wrong name, missing entry point, missing `error` return — is a code smell.  The `cmd/` dispatch functions must not contain per-package special cases that exist solely because of API divergence.  All known API gaps have been closed; if new packages or entry points are added, they must conform immediately.
 - **Single dispatch enum** (`fileKind`) — when the same set of file types is switched on in multiple places, consolidate into one enum and one set of helper functions; parallel switches are a maintenance hazard
 - **No callback parameters to defer imports** — if a function takes a `func(...)` parameter whose only purpose is to let the caller inject a dependency from another package, that is deferred-import avoidance, not real abstraction.  Before accepting such a parameter, verify that a direct import would create a circular dependency.  If no cycle exists, delete the callback and import directly.  Every such callback that has existed in this codebase (`JQFmt`, `RUNShellFmt`, the `jqFmt func(expr string, inline bool) string` threading through `shell.Format`/`FormatRUN`) turned out to be unnecessary after checking for cycles.
 
@@ -196,6 +200,19 @@ Implementation consequences:
 
 This rule was hard-won from the jq-template formatter, where a verbatim fallback for "unparseable fragment blocks" masked the real bug (the fragments were never assembled together the way `jq-template.awk` does).  Once the fallback was replaced with a `panic`, the real bugs became immediately visible and fixable.
 
+## Parse error format
+
+**Parse errors must carry position information.**
+
+Every error returned by a `Parse` or `Format` function must include at minimum a 1-based line number; column is included when the parser tracks byte offsets.  The canonical format is `line:col: message` (consistent with mvdan/sh and Go's `go/token` convention).  A bare error message with no position is not acceptable — it forces callers to scan the source themselves.
+
+Concrete requirements per package:
+- **jq**: `jq parse error at LINE:COL: message` — `errorfAt(t Token, ...)` always called with the token at fault; `columnOf` derives the 1-based column from the token's byte offset and the source string.
+- **shell**: position provided natively by mvdan/sh — `shell parse: LINE:COL: message`.
+- **dockerfile**: `dockerfile parse error at line LINE: message` — line number from the parser's `p.pos` counter (1-based).
+- **template**: `template: unterminated {{ block at line LINE` — line counted by `strings.Count(src[:openPos], "\n") + 1`.
+- **markdown**: no invalid syntax exists by spec — `Format` and `MarshalFile` always return `nil` error.
+
 ## Code quality
 
 - **DRY**: proactively look for duplication and dead code; eliminate before adding new code
@@ -207,7 +224,7 @@ This rule was hard-won from the jq-template formatter, where a verbatim fallback
 
 ## CLI flags
 
-- `--tidy` applies idiomatic rewrites (shebang, `|| true → || :`, `which → command -v`, set-flag normalization, all CMD/ENTRYPOINT shell-forms → JSON form) and fails (exit 1) if any Wrong constructs remain that cannot be auto-fixed
+- `--tidy` behavior: see `README.md` and the implementation — do not duplicate the rewrite list here
 - `-w` (write): prints names of changed files, silent for unchanged; errors on stdin; mutually exclusive with `-d`
 - `-d` (diff): prints unified diffs; mutually exclusive with `-w`
 

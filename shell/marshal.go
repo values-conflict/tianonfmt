@@ -10,12 +10,12 @@ import (
 
 // MarshalFile converts a parsed shell File to a JSON-serialisable value.
 // filename is embedded as "file" in the top-level object; use "-" for stdin.
-func MarshalFile(f *syntax.File, filename string) any {
+func MarshalFile(f *syntax.File, filename string) (any, error) {
 	return fileAST{
 		Type:  "shell",
 		File:  filename,
 		Stmts: marshalStmts(f.Stmts),
-	}
+	}, nil
 }
 
 // ── JSON shapes ───────────────────────────────────────────────────────────────

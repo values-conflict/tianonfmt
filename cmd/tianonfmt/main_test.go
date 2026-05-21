@@ -711,7 +711,7 @@ func TestShellASTPair_ParseError(t *testing.T) {
 
 func TestMarshalASTJSON(t *testing.T) {
 	v := map[string]any{"key": "value", "num": 42}
-	out, err := marshalASTJSON(v)
+	out, err := marshalASTJSON(v, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -726,7 +726,7 @@ func TestMarshalASTJSON(t *testing.T) {
 
 func TestMarshalASTJSON_Error(t *testing.T) {
 	// json.Encoder.Encode fails for channels — exercises the error return path.
-	_, err := marshalASTJSON(make(chan int))
+	_, err := marshalASTJSON(make(chan int), nil)
 	if err == nil {
 		t.Error("expected error marshalling channel")
 	}

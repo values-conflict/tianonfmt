@@ -17,8 +17,8 @@ import (
 
 // Format formats a Markdown source string.
 // Fenced code block contents are passed through unchanged.
-func Format(src string) string {
-	return formatImpl(strings.Split(src, "\n"), nil)
+func Format(src string) (string, error) {
+	return formatImpl(strings.Split(src, "\n"), nil), nil
 }
 
 // FormatTidy applies the same normalizations as Format and additionally
@@ -29,8 +29,8 @@ func Format(src string) string {
 // content (lines joined with "\n", no trailing newline).  Returning "" keeps
 // the original content.  Fences with no content lines are skipped.
 // If fenceFmt is nil, FormatTidy behaves identically to Format.
-func FormatTidy(src string, fenceFmt func(lang string, openLine int, content string) string) string {
-	return formatImpl(strings.Split(src, "\n"), fenceFmt)
+func FormatTidy(src string, fenceFmt func(lang string, openLine int, content string) string) (string, error) {
+	return formatImpl(strings.Split(src, "\n"), fenceFmt), nil
 }
 
 func formatImpl(lines []string, fenceFmt func(lang string, openLine int, content string) string) string {
@@ -140,7 +140,7 @@ func formatImpl(lines []string, fenceFmt func(lang string, openLine int, content
 
 // MarshalFile converts a parsed markdown file to a JSON-serialisable value.
 // filename is embedded as "file" in the top-level object; use "-" for stdin.
-func MarshalFile(src, filename string) any {
+func MarshalFile(src, filename string) (any, error) {
 	type block = map[string]any
 	var blocks []any
 	lines := strings.Split(src, "\n")
@@ -220,7 +220,7 @@ func MarshalFile(src, filename string) any {
 		"type":   "markdown",
 		"file":   filename,
 		"blocks": blocks,
-	}
+	}, nil
 }
 
 // Lint returns violations in a markdown file that --tidy cannot auto-fix.

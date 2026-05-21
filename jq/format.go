@@ -29,11 +29,20 @@ import (
 
 const shortThreshold = 60
 
+// Format parses src as jq and formats it.
+func Format(src string) (string, error) {
+	f, err := ParseFile(src)
+	if err != nil {
+		return "", err
+	}
+	return FormatFile(f)
+}
+
 // FormatFile formats a complete jq file.
-func FormatFile(f *File) string {
+func FormatFile(f *File) (string, error) {
 	p := &printer{}
 	p.file(f)
-	return p.out.String()
+	return p.out.String(), nil
 }
 
 // FormatFileTidy formats f with tidy-level index-notation normalisations:
@@ -41,10 +50,10 @@ func FormatFile(f *File) string {
 //	.["foo"]  → .foo   (identifier-safe bracket key → dot notation)
 //	."foo"    → .foo   (dot-quoted identifier-safe key → dot notation)
 //	.["foo-bar"] → ."foo-bar"  (non-identifier bracket → dot-quoted)
-func FormatFileTidy(f *File) string {
+func FormatFileTidy(f *File) (string, error) {
 	p := &printer{tidy: true}
 	p.file(f)
-	return p.out.String()
+	return p.out.String(), nil
 }
 
 // FormatNode formats a single AST node.

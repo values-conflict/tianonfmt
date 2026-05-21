@@ -16,6 +16,7 @@
 package template
 
 import (
+	"fmt"
 	"regexp"
 	"strconv"
 	"strings"
@@ -37,7 +38,8 @@ func (TextSeg) templateSeg() {}
 func (JQSeg) templateSeg()   {}
 
 // Parse splits a template source into segments.
-func Parse(src string) []Segment {
+// Returns an error if the source contains an unterminated {{ block.
+func Parse(src string) ([]Segment, error) {
 	const open = "{{"
 	const close = "}}"
 	const closeEat = "-}}"
@@ -52,8 +54,12 @@ func Parse(src string) []Segment {
 			if remaining != "" {
 				segs = append(segs, TextSeg{Text: remaining})
 			}
-			break
+			return segs, nil
 		}
+
+		// Position of this {{ in the full source (for error reporting).
+		openPos := len(src) - len(remaining) + start
+		openLine := strings.Count(src[:openPos], "\n") + 1
 
 		// Text before the block.
 		if start > 0 {
@@ -121,12 +127,9 @@ func Parse(src string) []Segment {
 			}
 		}
 		if depth > 0 {
-			// Unterminated block — emit remainder as text.
-			segs = append(segs, TextSeg{Text: remaining})
-			break
+			return nil, fmt.Errorf("template: unterminated {{ block at line %d", openLine)
 		}
 	}
-	return segs
 }
 
 // Format reformats a template file.
@@ -140,10 +143,13 @@ func Parse(src string) []Segment {
 // Non-def, non-comment block expressions are assembled into groups by
 // balanced bracket depth and formatted together so that fragments like
 // "{{ ) else ( -}}" receive proper context-aware indentation.
-func Format(src string, jqFmt func(expr string, inline bool) string) string {
-	segs := Parse(src)
+func Format(src string, jqFmt func(expr string, inline bool) string) (string, error) {
+	segs, err := Parse(src)
+	if err != nil {
+		return "", err
+	}
 	if len(segs) == 0 {
-		return src
+		return src, nil
 	}
 
 	// ── Pass 1: classify each JQSeg ─────────────────────────────────────────
@@ -323,7 +329,7 @@ func Format(src string, jqFmt func(expr string, inline bool) string) string {
 			}
 		}
 	}
-	return b.String()
+	return b.String(), nil
 }
 
 // IsTemplate returns true if src looks like a jq-template file (contains {{ }}).

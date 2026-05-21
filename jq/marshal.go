@@ -92,6 +92,12 @@ func marshalComments(cs []*Comment) []string {
 	return out
 }
 
+// MarshalFile converts a parsed jq File to a JSON-serialisable value.
+// filename is embedded as "file" in the top-level object; use "-" for stdin.
+func MarshalFile(f *File, filename string) (any, error) {
+	return f.MarshalAST().Insert(1, "file", filename), nil
+}
+
 // ── node implementations ──────────────────────────────────────────────────────
 
 func (c *Comment) MarshalAST() OrderedMap {

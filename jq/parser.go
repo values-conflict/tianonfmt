@@ -19,7 +19,7 @@ func ParseExpr(src string) (Node, error) {
 		return nil, err
 	}
 	if tok := p.peek(); tok.Kind != EOF {
-		return nil, p.errorf("unexpected token %s after expression", tok.Kind)
+		return nil, p.errorfAt(tok, "unexpected token %s after expression", tok.Kind)
 	}
 	return node, nil
 }
@@ -111,14 +111,27 @@ func (p *parser) wrapComments(n Node) Node {
 
 // ── error helpers ────────────────────────────────────────────────────────────
 
-func (p *parser) errorf(format string, args ...interface{}) error {
-	return fmt.Errorf("jq parse error: "+format, args...)
+func (p *parser) errorfAt(t Token, format string, args ...interface{}) error {
+	col := p.columnOf(t.At)
+	return fmt.Errorf("jq parse error at %d:%d: %s", t.Line, col, fmt.Sprintf(format, args...))
+}
+
+func (p *parser) columnOf(at Pos) int {
+	offset := int(at)
+	if offset > len(p.src) {
+		offset = len(p.src)
+	}
+	nl := strings.LastIndex(p.src[:offset], "\n")
+	if nl < 0 {
+		return offset + 1
+	}
+	return offset - nl
 }
 
 func (p *parser) expect(k Kind) (Token, error) {
 	t := p.next()
 	if t.Kind != k {
-		return t, p.errorf("expected %s, got %s (%q)", k, t.Kind, t.Text)
+		return t, p.errorfAt(t, "expected %s, got %s (%q)", k, t.Kind, t.Text)
 	}
 	return t, nil
 }
@@ -227,7 +240,7 @@ func (p *parser) parseFuncDef() (*FuncDef, error) {
 	tok, _ := p.expect(KWDEF)
 	nameTok := p.next()
 	if nameTok.Kind != IDENT && nameTok.Kind != FIELD {
-		return nil, p.errorf("expected function name after def, got %s", nameTok.Kind)
+		return nil, p.errorfAt(nameTok, "expected function name after def, got %s", nameTok.Kind)
 	}
 	name := nameTok.Text
 
@@ -237,7 +250,7 @@ func (p *parser) parseFuncDef() (*FuncDef, error) {
 		for {
 			pt := p.next()
 			if pt.Kind != VAR && pt.Kind != IDENT {
-				return nil, p.errorf("expected parameter name, got %s", pt.Kind)
+				return nil, p.errorfAt(pt, "expected parameter name, got %s", pt.Kind)
 			}
 			params = append(params, pt.Text)
 			sep := p.next()
@@ -245,7 +258,7 @@ func (p *parser) parseFuncDef() (*FuncDef, error) {
 				break
 			}
 			if sep.Kind != SEMI {
-				return nil, p.errorf("expected ; or ) in parameter list, got %s", sep.Kind)
+				return nil, p.errorfAt(sep, "expected ; or ) in parameter list, got %s", sep.Kind)
 			}
 		}
 	}
@@ -745,7 +758,7 @@ func (p *parser) parsePrimary() (Node, error) {
 		return &BinOp{At: tok.At, Op: "neg", Left: operand}, nil
 	}
 
-	return nil, p.errorf("unexpected token %s (%q) in expression", t.Kind, t.Text)
+	return nil, p.errorfAt(t, "unexpected token %s (%q) in expression", t.Kind, t.Text)
 }
 
 func (p *parser) parseIdentOrCall() (Node, error) {
@@ -1126,7 +1139,8 @@ func (p *parser) parseObjectField() (*ObjectField, error) {
 		tok := p.next()
 		key = &Var{At: tok.At, Name: tok.Text}
 	default:
-		return nil, p.errorf("expected object key, got %s (%q)", p.peek().Kind, p.peek().Text)
+		tok := p.peek()
+		return nil, p.errorfAt(tok, "expected object key, got %s (%q)", tok.Kind, tok.Text)
 	}
 
 	keyOpt := p.peek().Kind == QUEST
@@ -1165,7 +1179,8 @@ func (p *parser) parsePattern() (Node, error) {
 	case LBRACE:
 		return p.parseObjectPattern()
 	default:
-		return nil, p.errorf("expected pattern, got %s", p.peek().Kind)
+		tok := p.peek()
+		return nil, p.errorfAt(tok, "expected pattern, got %s", tok.Kind)
 	}
 }
 
@@ -1196,7 +1211,7 @@ func (p *parser) parseObjectPattern() (*ObjectPattern, error) {
 	for p.peek().Kind != RBRACE {
 		keyTok := p.next()
 		if keyTok.Kind != IDENT {
-			return nil, p.errorf("expected identifier in object pattern, got %s", keyTok.Kind)
+			return nil, p.errorfAt(keyTok, "expected identifier in object pattern, got %s", keyTok.Kind)
 		}
 		field := &ObjPatField{Key: keyTok.Text}
 		if p.peek().Kind == COLON {

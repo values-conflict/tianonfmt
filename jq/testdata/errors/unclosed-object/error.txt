@@ -1,1 +1,1 @@
-jq parse error: expected object key, got Field (".foo")
+jq parse error at 1:2: expected object key, got Field (".foo")

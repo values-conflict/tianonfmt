@@ -1,1 +1,1 @@
-jq parse error: expected Var, got EOF ("")
+jq parse error at 1:6: expected Var, got EOF ("")

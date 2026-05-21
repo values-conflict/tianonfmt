@@ -1,6 +1,7 @@
 package dockerfile
 
 import (
+	"fmt"
 	"strings"
 )
 
@@ -147,6 +148,7 @@ func (p *parser) parseInstruction() (*Instruction, error) {
 
 	var logicalParts []string
 	escape := string(p.escape)
+	unterminated := false
 
 	for p.pos < len(p.lines) {
 		line := p.lines[p.pos]
@@ -186,12 +188,17 @@ func (p *parser) parseInstruction() (*Instruction, error) {
 		if continues {
 			// Strip the trailing escape char and accumulate without it.
 			logicalParts = append(logicalParts, strings.TrimRight(strippedTrimmed[:len(strippedTrimmed)-len(escape)], " \t"))
+			unterminated = true
 			p.pos++
 		} else {
 			logicalParts = append(logicalParts, stripped)
+			unterminated = false
 			p.pos++
 			break
 		}
+	}
+	if unterminated {
+		return nil, fmt.Errorf("dockerfile parse error at line %d: unterminated continuation", p.pos)
 	}
 
 	instr.EndLine = p.pos // 1-based: p.pos now points past the last line

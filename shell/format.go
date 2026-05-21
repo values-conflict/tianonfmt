@@ -66,7 +66,8 @@ func formatJQExpr(expr string, inline bool) string {
 		if ferr != nil {
 			return ""
 		}
-		return jq.FormatFile(f)
+		s, _ := jq.FormatFile(f)
+		return s
 	}
 	if inline {
 		return jq.FormatNodeInline(node)

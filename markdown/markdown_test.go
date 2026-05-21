@@ -33,13 +33,15 @@ func testFenceFmt(lang string, _ int, content string) string {
 		if err != nil {
 			return ""
 		}
-		return dockerfile.Format(f)
+		s, _ := dockerfile.FormatFile(f)
+		return s
 	case "jq":
 		f, err := jq.ParseFile(content)
 		if err != nil {
 			return ""
 		}
-		return jq.FormatFile(f)
+		s, _ := jq.FormatFile(f)
+		return s
 	case "bash", "sh", "shell":
 		out, err := shell.FormatWithTidy(content, shell.DetectLang(content))
 		if err != nil {
@@ -54,13 +56,17 @@ func testFenceFmt(lang string, _ int, content string) string {
 func TestFormat(t *testing.T) {
 	testutil.Golden(t, "testdata/format", "input.md", []testutil.Case{
 		{Out: "output.md", Fn: func(src string) (string, error) {
-			return markdown.Format(src), nil
+			return markdown.Format(src)
 		}, Idem: true},
 		{Out: "output.tidy.md", Fn: func(src string) (string, error) {
-			return markdown.FormatTidy(src, testFenceFmt), nil
+			return markdown.FormatTidy(src, testFenceFmt)
 		}, Idem: true},
 		{Out: "ast.json", Fn: func(src string) (string, error) {
-			b, err := json.MarshalIndent(markdown.MarshalFile(src, "input.md"), "", "\t")
+			m, err := markdown.MarshalFile(src, "input.md")
+			if err != nil {
+				return "", err
+			}
+			b, err := json.MarshalIndent(m, "", "\t")
 			if err != nil {
 				return "", err
 			}
@@ -171,7 +177,7 @@ func TestFormatPreservesTokens(t *testing.T) {
 				t.Skip("no input.md")
 				return
 			}
-			formatted := markdown.Format(string(src))
+			formatted, _ := markdown.Format(string(src))
 			normIn := normalizeMarkdown(string(src))
 			normOut := normalizeMarkdown(formatted)
 			if normIn != normOut {
@@ -186,7 +192,9 @@ func TestFormatPreservesTokens(t *testing.T) {
 
 func TestFormatTidy_NilMatchesFormat(t *testing.T) {
 	src := "# Title\n\n* bullet\n\n```jq\n.foo\n```\n"
-	if markdown.FormatTidy(src, nil) != markdown.Format(src) {
+	tidied, _ := markdown.FormatTidy(src, nil)
+	formatted, _ := markdown.Format(src)
+	if tidied != formatted {
 		t.Error("FormatTidy(src, nil) should equal Format(src)")
 	}
 }
@@ -196,7 +204,7 @@ func TestFormatTidy_FenceReplacement(t *testing.T) {
 	var gotLang string
 	var gotLine int
 	var gotContent string
-	result := markdown.FormatTidy(src, func(lang string, openLine int, content string) string {
+	result, _ := markdown.FormatTidy(src, func(lang string, openLine int, content string) string {
 		gotLang = lang
 		gotLine = openLine
 		gotContent = content
@@ -233,7 +241,7 @@ func TestFormatTidy_EmptyFenceSkipped(t *testing.T) {
 
 func TestFormatTidy_CallbackEmptyPreservesOriginal(t *testing.T) {
 	src := "```dockerfile\nFROM foo\n```\n"
-	result := markdown.FormatTidy(src, func(lang string, openLine int, content string) string {
+	result, _ := markdown.FormatTidy(src, func(lang string, openLine int, content string) string {
 		return "" // signal: keep original
 	})
 	if !strings.Contains(result, "FROM foo") {
@@ -244,7 +252,7 @@ func TestFormatTidy_CallbackEmptyPreservesOriginal(t *testing.T) {
 func TestFormatTidy_OuterNormalizationsApply(t *testing.T) {
 	// non-fence content still gets Format normalizations
 	src := "Title\n=====\n\n* item\n\n```jq\n.x\n```\n"
-	result := markdown.FormatTidy(src, nil)
+	result, _ := markdown.FormatTidy(src, nil)
 	if !strings.Contains(result, "# Title") {
 		t.Errorf("setext heading should be converted: %q", result)
 	}

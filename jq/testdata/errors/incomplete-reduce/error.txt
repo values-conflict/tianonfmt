@@ -1,1 +1,1 @@
-jq parse error: expected pattern, got EOF
+jq parse error at 1:14: expected pattern, got EOF

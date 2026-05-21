@@ -26,11 +26,7 @@ func TestFormat(t *testing.T) {
 	parse := func(src string) (*jq.File, error) { return jq.ParseFile(src) }
 	testutil.Golden(t, "testdata/format", "input.jq", []testutil.Case{
 		{Out: "output.jq", Fn: func(src string) (string, error) {
-			f, err := parse(src)
-			if err != nil {
-				return "", err
-			}
-			return jq.FormatFile(f), nil
+			return jq.Format(src)
 		}, Idem: true},
 		{Out: "output.tidy.jq", Fn: func(src string) (string, error) {
 			f, err := parse(src)
@@ -38,7 +34,7 @@ func TestFormat(t *testing.T) {
 				return "", err
 			}
 			jq.TidyFile(f)
-			return jq.FormatFileTidy(f), nil
+			return jq.FormatFileTidy(f)
 		}, Idem: true},
 		{Out: "ast.json", Fn: func(src string) (string, error) {
 			f, err := parse(src)
@@ -389,13 +385,19 @@ func TestFormatAllNodeTypes(t *testing.T) {
 			if err != nil {
 				t.Fatalf("parse %q: %v", src, err)
 			}
-			out := jq.FormatFile(f)
+			out, err := jq.FormatFile(f)
+			if err != nil {
+				t.Fatalf("format %q: %v", src, err)
+			}
 			// Round-trip: re-parse and re-format must be idempotent.
 			f2, err := jq.ParseFile(out)
 			if err != nil {
 				t.Fatalf("re-parse %q: %v", out, err)
 			}
-			out2 := jq.FormatFile(f2)
+			out2, err := jq.FormatFile(f2)
+			if err != nil {
+				t.Fatalf("re-format %q: %v", out, err)
+			}
 			if out != out2 {
 				t.Errorf("not idempotent for %q\nfirst:  %q\nsecond: %q", src, out, out2)
 			}
@@ -446,7 +448,10 @@ import "bar" as $bar {"origin": "test"};
 	if len(f.Imports) == 0 {
 		t.Error("expected Imports to be parsed")
 	}
-	out := jq.FormatFile(f)
+	out, err := jq.FormatFile(f)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if !strings.Contains(out, "module") || !strings.Contains(out, "include") {
 		t.Errorf("module/import not in output: %q", out)
 	}
@@ -534,12 +539,19 @@ func TestFormatSuffixChains(t *testing.T) {
 			if err != nil {
 				t.Fatalf("parse %q: %v", src, err)
 			}
-			out := jq.FormatFile(f)
+			out, err := jq.FormatFile(f)
+			if err != nil {
+				t.Fatalf("format %q: %v", src, err)
+			}
 			f2, err := jq.ParseFile(out)
 			if err != nil {
 				t.Fatalf("re-parse %q: %v", out, err)
 			}
-			if out2 := jq.FormatFile(f2); out != out2 {
+			out2, err := jq.FormatFile(f2)
+			if err != nil {
+				t.Fatalf("re-format %q: %v", out, err)
+			}
+			if out != out2 {
 				t.Errorf("not idempotent: %q → %q", out, out2)
 			}
 		})
@@ -558,7 +570,7 @@ func TestFormatObjectComputedKeys(t *testing.T) {
 			if err != nil {
 				t.Fatalf("parse: %v", err)
 			}
-			_ = jq.FormatFile(f)
+			jq.FormatFile(f)
 		})
 	}
 }
@@ -576,7 +588,10 @@ func TestAttachTrailingToField_AlreadyCommentedExpr(t *testing.T) {
 		t.Fatalf("parse: %v", err)
 	}
 	// Must format without panic.
-	out := jq.FormatFile(f)
+	out, err := jq.FormatFile(f)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if !strings.Contains(out, "key:") {
 		t.Errorf("object key missing from output: %q", out)
 	}
@@ -590,7 +605,10 @@ func TestFormatTrailingCommentInObject(t *testing.T) {
 	if err != nil {
 		t.Fatalf("parse: %v", err)
 	}
-	out := jq.FormatFile(f)
+	out, err := jq.FormatFile(f)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if !strings.Contains(out, ", #") {
 		t.Errorf("trailing comment should follow comma, got:\n%s", out)
 	}
@@ -602,7 +620,7 @@ func TestFormatTrailingCommentInObject(t *testing.T) {
 	if err != nil {
 		t.Fatalf("parse shorthand: %v", err)
 	}
-	_ = jq.FormatFile(f2) // must not panic
+	jq.FormatFile(f2) // must not panic
 }
 
 // TestParseErrors_FuncDef exercises parseFuncDef error paths.
@@ -678,7 +696,7 @@ func TestAttachTrailingToField_ExistingCommentedExpr(t *testing.T) {
 	if err != nil {
 		t.Fatalf("parse: %v", err)
 	}
-	_ = jq.FormatFile(f) // must not panic
+	jq.FormatFile(f) // must not panic
 }
 
 // TestFormatInlineVsMultiline verifies the inline/multiline threshold.
@@ -686,7 +704,7 @@ func TestFormatInlineVsMultiline(t *testing.T) {
 	// Short if: stays on one line (only has trailing newline, no mid-expression newlines).
 	short := `if .a then .b else .c end`
 	f, _ := jq.ParseFile(short)
-	out := jq.FormatFile(f)
+	out, _ := jq.FormatFile(f)
 	if strings.Contains(strings.TrimRight(out, "\n"), "\n") {
 		t.Errorf("short if should be inline, got:\n%s", out)
 	}
@@ -694,7 +712,7 @@ func TestFormatInlineVsMultiline(t *testing.T) {
 	// Long if: goes multiline
 	long := `if .aaaaaaaaaaaaaaaa then .bbbbbbbbbbbbbbbb else .cccccccccccccccc end`
 	f2, _ := jq.ParseFile(long)
-	out2 := jq.FormatFile(f2)
+	out2, _ := jq.FormatFile(f2)
 	if !strings.Contains(out2, "\n") {
 		t.Errorf("long if should be multiline, got: %q", out2)
 	}
@@ -741,7 +759,10 @@ func TestFormatPreservesTokens(t *testing.T) {
 				t.Skipf("input does not parse: %v", err)
 				return
 			}
-			formatted := jq.FormatFile(f)
+			formatted, err := jq.FormatFile(f)
+			if err != nil {
+				t.Fatalf("format: %v", err)
+			}
 			normIn := normalizeJQ(string(src))
 			normOut := normalizeJQ(formatted)
 			if normIn != normOut {
