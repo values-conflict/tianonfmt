@@ -21,6 +21,7 @@ Several repos in the corpus are collaborative.  For code comment style, the mech
 - [`fake-git`](https://github.com/tianon/fake-git/tree/4639d58ce5f6488e448a019acc2b5ffc55d0925f) — his project
 - [`debian-bin`](https://github.com/tianon/debian-bin/tree/d508ea34f15e88b8ac63d71ffb1938fccbc21206) — his personal scripts
 - [`actions/checkout/`](https://github.com/tianon/actions/blob/c109aa98a82622edf55e0e6380a1672368930b30/checkout/) — his action
+- [`blog`](https://github.com/tianon/tianon.github.io/tree/70f318822f383612a86900e95689f72793b9b083) — personal blog; the longest-form personal prose in the corpus
 
 **Mixed / collaborative** (commit counts as of 2026-04-24, at the corpus HEAD SHAs linked above):
 - [`doi/official-images`](https://github.com/docker-library/official-images) — heavily multi-contributor; Tianon is second-ranked author (~8,786 commits vs yosifkit's ~11,492); DOI image READMEs are generated stubs (see [markdown.md](markdown.md))
@@ -414,6 +415,23 @@ Parenthetical asides are extremely common in prose, adding context, nuance, or c
 
 Corpus ref: [`debuerreotype/README.md#L5`](https://github.com/debuerreotype/debuerreotype/blob/3c3272fa743e0257ae64081987c500c2923ea963/README.md#L5), [`gosu/README.md#L21`](https://github.com/tianon/gosu/blob/3d395d499a92ffa47d70c79d24a738b85075f477/README.md#L21).
 
+### Dashes
+
+Unicode dashes never appear.  Both the em-dash (`—`) and en-dash (`–`) are replaced by ASCII equivalents:
+
+- **Em-dash → ` -- `** (space, double hyphen, space): used very liberally for clause breaks, asides, and pivots in running prose, and as a label–description separator in list items:
+
+  > "it's *technically* defensible but practically sloppy -- and the sloppiness matters"
+
+  ```markdown
+  - `cgroup_enable=memory` -- enable "memory accounting" for containers
+  - `swapaccount=1` -- enable "swap accounting" for containers
+  ```
+
+- **En-dash → `-`** (single hyphen): used where a typographic en-dash would appear, eg, in ranges.
+
+Corpus refs: [`blog/_posts/2026-05-20-container-security.md#L6`](https://github.com/tianon/tianon.github.io/blob/70f318822f383612a86900e95689f72793b9b083/_posts/2026-05-20-container-security.md#L6), [`blog/_posts/2016-12-07-docker-setup.md#L106-L108`](https://github.com/tianon/tianon.github.io/blob/70f318822f383612a86900e95689f72793b9b083/_posts/2016-12-07-docker-setup.md#L106-L108).
+
 ### Concrete specificity
 
 Abstract descriptions are almost immediately followed by concrete examples:
@@ -465,3 +483,5 @@ Things that do not appear in Tianon's comments or documentation prose:
 - `s/he`, `they` (singular) or other gender-neutral contortions — documentation addresses "you" directly or uses "we" for the project
 - Punctuation inside quotation marks — terminators (`.`, `?`, `!`) always go *outside* the closing quote, contrary to American typographic convention: `"foo bar".` not `"foo bar."` — this is the logical-quotation style; when a sentence ends with a quoted fragment and also ends with `?` or `!`, the terminator is typically spaced from the closing quote: `this question ends with a "quoted bit" ?` (space before the `?`)
 - Curly/typographic quotation marks — always straight ASCII `"..."` and `'...'` in all files, not just markdown
+- Unicode em-dash `—` — always ` -- ` (spaced double hyphen) instead; see *Dashes* above
+- Unicode en-dash `–` — always `-` (single hyphen) instead; see *Dashes* above

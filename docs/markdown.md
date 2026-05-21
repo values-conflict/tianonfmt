@@ -7,7 +7,7 @@ Covers `.md` files — READMEs, installation guides, and other prose documentati
 The corpus contains two distinct sources of markdown:
 
 **Personal projects** (most reliable for style inference):
-[`gosu`](https://github.com/tianon/gosu/tree/3d395d499a92ffa47d70c79d24a738b85075f477), [`rawdns`](https://github.com/tianon/rawdns/tree/ea662544c8b03ef7133cc6fc75f63e107265b3f2), [`abstract-sockets`](https://github.com/tianon/abstract-sockets/tree/d08ca7040801fdde8c7ca0b1c844dbf28c2d1a1e), [`debuerreotype`](https://github.com/debuerreotype/debuerreotype/tree/3c3272fa743e0257ae64081987c500c2923ea963), [`hocker`](https://github.com/infosiftr/hocker/tree/ff4d4df2370391ca582abc51a64022501d903577), [`fake-git`](https://github.com/tianon/fake-git/tree/4639d58ce5f6488e448a019acc2b5ffc55d0925f), [`docker-postgres-upgrade`](https://github.com/tianon/docker-postgres-upgrade/tree/ffec3042572b093ab2c61310945f51d6d00fb09c)
+[`gosu`](https://github.com/tianon/gosu/tree/3d395d499a92ffa47d70c79d24a738b85075f477), [`rawdns`](https://github.com/tianon/rawdns/tree/ea662544c8b03ef7133cc6fc75f63e107265b3f2), [`abstract-sockets`](https://github.com/tianon/abstract-sockets/tree/d08ca7040801fdde8c7ca0b1c844dbf28c2d1a1e), [`debuerreotype`](https://github.com/debuerreotype/debuerreotype/tree/3c3272fa743e0257ae64081987c500c2923ea963), [`hocker`](https://github.com/infosiftr/hocker/tree/ff4d4df2370391ca582abc51a64022501d903577), [`fake-git`](https://github.com/tianon/fake-git/tree/4639d58ce5f6488e448a019acc2b5ffc55d0925f), [`docker-postgres-upgrade`](https://github.com/tianon/docker-postgres-upgrade/tree/ffec3042572b093ab2c61310945f51d6d00fb09c), [`blog`](https://github.com/tianon/tianon.github.io/tree/70f318822f383612a86900e95689f72793b9b083)
 
 These READMEs reflect Tianon's preferred markdown style without external constraints.
 
@@ -35,6 +35,8 @@ Tianon's additions to the fork are all bug fixes (escaped periods after links, e
 ```
 
 `##` is the most common section level.  `###` appears occasionally for nested sections but is not common in personal project READMEs.
+
+**Blog posts differ**: the post title is supplied by Jekyll frontmatter (`title: ...`), so the body's first-level sections use `#` — not `##`.  `##` would then be a subsection of a `#` section.  This is not a style inconsistency; it is a structural consequence of where the title lives.
 
 Section names follow no strict capitalisation rule but tend to be:
 - Title-case for formal sections: `## Usage`, `## Installation`, `## Warning`, `## Caveat`
@@ -72,9 +74,9 @@ set -Eeuo pipefail
 ```
 ```
 
-`sh` and `shell` are not used as language identifiers.
+`shell` is not used as a language identifier.  `sh` does appear, but only for shell config snippets that are neither a complete script nor an interactive session — the archetypal use is a `GRUB_CMDLINE_LINUX_DEFAULT` excerpt shown in isolation.
 
-Corpus refs: [`rawdns/README.md#L28-L33`](https://github.com/tianon/rawdns/blob/ea662544c8b03ef7133cc6fc75f63e107265b3f2/README.md#L28-L33), [`hocker/README.md#L15-L24`](https://github.com/infosiftr/hocker/blob/ff4d4df2370391ca582abc51a64022501d903577/README.md#L15-L24), [`fake-git/README.md#L33-L53`](https://github.com/tianon/fake-git/blob/4639d58ce5f6488e448a019acc2b5ffc55d0925f/README.md#L33-L53).
+Corpus refs: [`rawdns/README.md#L28-L33`](https://github.com/tianon/rawdns/blob/ea662544c8b03ef7133cc6fc75f63e107265b3f2/README.md#L28-L33), [`hocker/README.md#L15-L24`](https://github.com/infosiftr/hocker/blob/ff4d4df2370391ca582abc51a64022501d903577/README.md#L15-L24), [`fake-git/README.md#L33-L53`](https://github.com/tianon/fake-git/blob/4639d58ce5f6488e448a019acc2b5ffc55d0925f/README.md#L33-L53), [`blog/_posts/2016-12-07-docker-setup.md#L113`](https://github.com/tianon/tianon.github.io/blob/70f318822f383612a86900e95689f72793b9b083/_posts/2016-12-07-docker-setup.md#L113).
 
 ## Inline code
 
@@ -193,6 +195,28 @@ GitHub-flavored pipe tables for structured reference information (especially scr
 
 Corpus ref: [`debuerreotype/README.md#L28-L39`](https://github.com/debuerreotype/debuerreotype/blob/3c3272fa743e0257ae64081987c500c2923ea963/README.md#L28-L39).
 
+## Inline HTML
+
+`<small>...</small>` is the one HTML tag that appears in markdown prose.  It serves three roles:
+
+- **Standalone footnote-style paragraph** at the end of a post — caveats, credits, or tangential context that shouldn't interrupt the main body:
+
+  ```markdown
+  <small>(this post was written with the assistance of "claude my eyes right out" but all thoughts and understanding are Tianon's)</small>
+  ```
+
+- **Inline mid-sentence parenthetical** — when an aside is too long or digressive for normal parentheses but should stay anchored to its host sentence:
+
+  ```markdown
+  In a YubiKey <small>(or any other PIV-signing-supporting smart card? do they actually *have* competitors in this specific niche? 🤔)</small>, a given "slot" can hold one single private key.
+  ```
+
+- **Table cell decoration** — `<small>0x</small>` to visually downplay a prefix while keeping the adjacent inline code prominent.
+
+All other HTML tags are avoided; markdown syntax covers everything else.
+
+Corpus refs: [`blog/_posts/2026-05-20-container-security.md#L29`](https://github.com/tianon/tianon.github.io/blob/70f318822f383612a86900e95689f72793b9b083/_posts/2026-05-20-container-security.md#L29), [`blog/_posts/2025-07-10-yubi-whati.md#L12`](https://github.com/tianon/tianon.github.io/blob/70f318822f383612a86900e95689f72793b9b083/_posts/2025-07-10-yubi-whati.md#L12), [`blog/_posts/2025-07-10-yubi-whati.md#L18`](https://github.com/tianon/tianon.github.io/blob/70f318822f383612a86900e95689f72793b9b083/_posts/2025-07-10-yubi-whati.md#L18).
+
 ## Paragraphs and blank lines
 
 - **One blank line** between paragraphs
@@ -247,7 +271,7 @@ Reproducible, [snapshot](http://snapshot.debian.org)-based Debian rootfs builds.
 - Indented code blocks (4-space indent) — always fenced
 - `*` or `+` for unordered list bullets — always `-`
 - `i.e.`, `e.g.`, `etc.` with periods — always written without
-- HTML tags in markdown — avoided; the content is written in plain markdown
+- HTML block elements — avoided in general; `<small>` is the one exception (see *Inline HTML* above)
 - Reference-style links (`[text][label]` with a `[label]: url` reference block) — inline links only
 - Horizontal rules (`---` or `***`) as section separators
 - Explicit `<br>` for line breaks (uses two trailing spaces instead)
