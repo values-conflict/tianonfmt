@@ -820,8 +820,30 @@
 																				"raw": "\"\""
 																			},
 																			"right": {
-																				"type": "string",
-																				"raw": "\"Tags: \\($tags | join(\", \"))\""
+																				"type": "interpStr",
+																				"parts": [
+																					"Tags: ",
+																					{
+																						"type": "interp",
+																						"expr": {
+																							"type": "pipe",
+																							"left": {
+																								"type": "var",
+																								"name": "$tags"
+																							},
+																							"right": {
+																								"type": "call",
+																								"name": "join",
+																								"args": [
+																									{
+																										"type": "string",
+																										"raw": "\", \""
+																									}
+																								]
+																							}
+																						}
+																					}
+																				]
 																			}
 																		},
 																		"right": {
@@ -838,8 +860,30 @@
 																				}
 																			},
 																			"then": {
-																				"type": "string",
-																				"raw": "\"SharedTags: \\($sharedTags | join(\", \"))\""
+																				"type": "interpStr",
+																				"parts": [
+																					"SharedTags: ",
+																					{
+																						"type": "interp",
+																						"expr": {
+																							"type": "pipe",
+																							"left": {
+																								"type": "var",
+																								"name": "$sharedTags"
+																							},
+																							"right": {
+																								"type": "call",
+																								"name": "join",
+																								"args": [
+																									{
+																										"type": "string",
+																										"raw": "\", \""
+																									}
+																								]
+																							}
+																						}
+																					}
+																				]
 																			},
 																			"else": {
 																				"type": "call",
@@ -848,13 +892,52 @@
 																		}
 																	},
 																	"right": {
-																		"type": "string",
-																		"raw": "\"Directory: \\($major)/\\($variant)\""
+																		"type": "interpStr",
+																		"parts": [
+																			"Directory: ",
+																			{
+																				"type": "interp",
+																				"expr": {
+																					"type": "var",
+																					"name": "$major"
+																				}
+																			},
+																			"/",
+																			{
+																				"type": "interp",
+																				"expr": {
+																					"type": "var",
+																					"name": "$variant"
+																				}
+																			}
+																		]
 																	}
 																},
 																"right": {
-																	"type": "string",
-																	"raw": "\"Architectures: \\($arches | join(\", \"))\""
+																	"type": "interpStr",
+																	"parts": [
+																		"Architectures: ",
+																		{
+																			"type": "interp",
+																			"expr": {
+																				"type": "pipe",
+																				"left": {
+																					"type": "var",
+																					"name": "$arches"
+																				},
+																				"right": {
+																					"type": "call",
+																					"name": "join",
+																					"args": [
+																						{
+																							"type": "string",
+																							"raw": "\", \""
+																						}
+																					]
+																				}
+																			}
+																		}
+																	]
 																}
 															},
 															"right": {

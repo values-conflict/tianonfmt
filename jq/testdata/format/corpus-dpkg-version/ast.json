@@ -40,8 +40,17 @@
 							"name": ".epoch"
 						},
 						"then": {
-							"type": "string",
-							"raw": "\"\\(.epoch):\""
+							"type": "interpStr",
+							"parts": [
+								{
+									"type": "interp",
+									"expr": {
+										"type": "field",
+										"name": ".epoch"
+									}
+								},
+								":"
+							]
 						},
 						"else": {
 							"type": "string",
@@ -60,8 +69,17 @@
 						"name": ".revision"
 					},
 					"then": {
-						"type": "string",
-						"raw": "\"-\\(.revision)\""
+						"type": "interpStr",
+						"parts": [
+							"-",
+							{
+								"type": "interp",
+								"expr": {
+									"type": "field",
+									"name": ".revision"
+								}
+							}
+						]
 					},
 					"else": {
 						"type": "string",

@@ -132,8 +132,47 @@ var JQBareKeyRE = regexp.MustCompile(`^[a-zA-Z_][a-zA-Z0-9_]*$`)
 //     The formatter adds `empty` to chains with ≥ 6 flat items as the
 //     jq trailing-comma idiom; this strip ensures token-level comparison
 //     treats the added `empty` as a whitespace-equivalent transformation.
+//
+// normalizeInterpInStr normalizes \(...) blocks within a string token so that
+// whitespace changes inside interpolations compare equal.  The token is the
+// full raw string literal including surrounding quotes.
+func normalizeInterpInStr(tok string) string {
+	if !strings.Contains(tok, `\(`) {
+		return tok
+	}
+	var b strings.Builder
+	i := 0
+	for i < len(tok) {
+		if tok[i] == '\\' && i+1 < len(tok) && tok[i+1] == '(' {
+			end := ScanJQInterp(tok, i+2)
+			b.WriteString(`\(`)
+			if end >= 0 && end <= len(tok) {
+				b.WriteString(NormalizeJQ(tok[i+2 : end-1]))
+				b.WriteByte(')')
+				i = end
+			} else {
+				// Unterminated — copy verbatim.
+				b.WriteString(tok[i+2:])
+				break
+			}
+		} else {
+			b.WriteByte(tok[i])
+			i++
+		}
+	}
+	return b.String()
+}
+
 func NormalizeJQ(src string) string {
 	toks := TokenizeJQ(src)
+
+	// Normalize \(...) content within string tokens so that whitespace changes
+	// inside interpolations compare equal across input and formatted output.
+	for i, tok := range toks {
+		if strings.HasPrefix(tok, `"`) {
+			toks[i] = normalizeInterpInStr(tok)
+		}
+	}
 
 	for i := 0; i+1 < len(toks); i++ {
 		if !strings.HasPrefix(toks[i], `"`) || toks[i+1] != ":" {

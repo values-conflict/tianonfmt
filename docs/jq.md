@@ -560,6 +560,25 @@ String interpolation `\(.expr)` is used freely.  The interpolated expression is 
 
 Long interpolated expressions are never broken across lines within a string literal.
 
+**Formatter behavior:** the formatter parses and re-formats the jq expression inside every `\(...)` block, applying the same indentation and style rules recursively.  A multi-line object or pipe chain inside `\(...)` is re-indented to match the surrounding jq nesting depth.  An invalid jq expression inside `\(...)` causes a parse error for the whole file — it is not silently preserved verbatim.
+
+**Layout rule for multi-line `\(...)`:** when the inner expression produces multi-line output, the formatter uses block-style layout — `\(` on the current line, content indented one level deeper, `)` closing at the original depth:
+
+```jq
+@sh "tool --data \(
+	{
+		key: .key,
+		value: .value,
+		label: .label,
+	}
+	| tojson
+)"
+```
+
+When the inner expression fits on one line it stays inline: `"\($n)"`.
+
+**Note:** jq does **not** allow bare `|` pipes inside object field values — `{key: a | b}` is a syntax error; use `{key: (a | b)}` instead.
+
 ## Path expressions
 
 `.["key"]` is used for keys that are not valid identifiers.  `."key"` (dot followed by a quoted string) is also valid and occasionally seen:

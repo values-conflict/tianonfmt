@@ -1,0 +1,1 @@
+jq parse error at 1:1: unterminated \(...) interpolation in string

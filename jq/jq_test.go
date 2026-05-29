@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -13,7 +14,6 @@ import (
 
 	"github.com/values-conflict/tianonfmt/jq"
 )
-
 
 func TestMain(m *testing.M) {
 	flag.Parse()
@@ -175,7 +175,10 @@ func TestFormatNode(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	out := jq.FormatNode(node)
+	out, err := jq.FormatNode(node)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if out == "" {
 		t.Error("empty output from FormatNode")
 	}
@@ -186,7 +189,10 @@ func TestFormatNodeInline(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	out := jq.FormatNodeInline(node)
+	out, err := jq.FormatNodeInline(node)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if out == "" {
 		t.Error("empty output from FormatNodeInline")
 	}
@@ -242,13 +248,7 @@ func TestWalkVisitsAllNodes(t *testing.T) {
 	// Expect at least these types to appear in a walk of this expression.
 	want := []string{"*jq.File", "*jq.FuncDef", "*jq.IfExpr", "*jq.BinOp", "*jq.BoolLit"}
 	for _, w := range want {
-		found := false
-		for _, got := range types {
-			if got == w {
-				found = true
-				break
-			}
-		}
+		found := slices.Contains(types, w)
 		if !found {
 			t.Errorf("Walk did not visit %s; visited: %v", w, types)
 		}
@@ -363,21 +363,21 @@ func TestFormatAllNodeTypes(t *testing.T) {
 		`foreach .[] as $x (0; . + $x)`,
 		`reduce .[] as $x (0; . + $x)`,
 		`. as $x | $x`,
-		`.a[0:2]`,                // Slice
-		`.a[.b]`,                 // Index with key
-		`.a[]`,                   // Index iterator
-		`.a[]?`,                  // Index optional
-		`@base64`,                // FormatExpr without string
-		`@base64 "foo"`,          // FormatExpr with string
-		`[.a, .b, empty]`,        // Array with comma
-		`{a: .b, "c.d": .e}`,     // Object with quoted key
-		`("paren")`,              // Paren
-		`.a?`,                    // Optional
-		`.. `,                    // Recurse
-		`$__loc__`,               // LocExpr
-		`[.[] | select(.x)]`,     // ArrayPattern via select
-		`. as {a: $b} | $b`,      // ObjectPattern
-		`. as [$a, $b] | $a`,     // ArrayPattern
+		`.a[0:2]`,            // Slice
+		`.a[.b]`,             // Index with key
+		`.a[]`,               // Index iterator
+		`.a[]?`,              // Index optional
+		`@base64`,            // FormatExpr without string
+		`@base64 "foo"`,      // FormatExpr with string
+		`[.a, .b, empty]`,    // Array with comma
+		`{a: .b, "c.d": .e}`, // Object with quoted key
+		`("paren")`,          // Paren
+		`.a?`,                // Optional
+		`.. `,                // Recurse
+		`$__loc__`,           // LocExpr
+		`[.[] | select(.x)]`, // ArrayPattern via select
+		`. as {a: $b} | $b`,  // ObjectPattern
+		`. as [$a, $b] | $a`, // ArrayPattern
 	}
 	for _, src := range cases {
 		t.Run(src[:min(25, len(src))], func(t *testing.T) {
@@ -474,7 +474,10 @@ func TestLexNumber(t *testing.T) {
 			if err != nil {
 				t.Fatalf("parse %q: %v", src, err)
 			}
-			out := jq.FormatNode(node)
+			out, err := jq.FormatNode(node)
+			if err != nil {
+				t.Fatalf("format %q: %v", src, err)
+			}
 			if out == "" {
 				t.Errorf("empty output for %q", src)
 			}
@@ -486,15 +489,15 @@ func TestLexNumber(t *testing.T) {
 // to exercise the nodeInline switch directly (bypassing the length threshold).
 func TestNodeInlineAllTypes(t *testing.T) {
 	cases := []string{
-		`. as $x | $x`,             // AsExpr
-		`reduce .[] as $x (0; .)`, // ReduceExpr
-		`foreach .[] as $x (0; .)`, // ForeachExpr (no extract)
+		`. as $x | $x`,                // AsExpr
+		`reduce .[] as $x (0; .)`,     // ReduceExpr
+		`foreach .[] as $x (0; .)`,    // ForeachExpr (no extract)
 		`foreach .[] as $x (0; .; .)`, // ForeachExpr with extract
-		`-.x`,                      // BinOp neg
-		`.a.b`,                     // BinOp op="" (field chain suffix)
-		`. as [$a] | $a`,           // ArrayPattern in inline
-		`. as {a: $b} | $b`,        // ObjectPattern in inline
-		`label $lbl | break $lbl`,  // LabelExpr inline
+		`-.x`,                         // BinOp neg
+		`.a.b`,                        // BinOp op="" (field chain suffix)
+		`. as [$a] | $a`,              // ArrayPattern in inline
+		`. as {a: $b} | $b`,           // ObjectPattern in inline
+		`label $lbl | break $lbl`,     // LabelExpr inline
 	}
 	for _, src := range cases {
 		t.Run(src[:min(20, len(src))], func(t *testing.T) {
@@ -502,7 +505,10 @@ func TestNodeInlineAllTypes(t *testing.T) {
 			if err != nil {
 				t.Fatalf("parse %q: %v", src, err)
 			}
-			out := jq.FormatNodeInline(node)
+			out, err := jq.FormatNodeInline(node)
+			if err != nil {
+				t.Fatalf("format inline %q: %v", src, err)
+			}
 			if out == "" {
 				t.Errorf("FormatNodeInline(%q) = empty", src)
 			}
@@ -513,25 +519,25 @@ func TestNodeInlineAllTypes(t *testing.T) {
 // TestFormatSuffixChains exercises parseSuffix: chained index/slice/optional.
 func TestFormatSuffixChains(t *testing.T) {
 	cases := []string{
-		`.a.b.c`,         // field chaining
-		`.a[0].b[1:3]`,   // index then slice
-		`.a?.b?.c?`,      // optional chain
-		`.["key"].b`,     // bracket key then field
-		`.a[].b[]`,       // iterator chain
-		`.a[]?`,          // optional iterator
-		`.a[0]?`,         // optional index
-		`.a[1:3]?`,       // optional slice
-		`.a | .b?`,       // optional in pipeline
-		`.[1:]`,          // slice no end
-		`.[:3]`,          // slice no start
-		`.[.a]`,          // expression key
-		`.[-1]`,          // negative index
-		`.[0:2][]`,       // slice then iterator
-		`.foo.`,          // DOT+other: trailing dot → BinOp{op:"", right:Identity}
-		`."foo-bar"`,     // dot-quoted-string path (DOT+STR in parseSuffix)
-		`.foo | @uri`,    // format as standalone filter
-		`.foo@base64`,    // FORMAT as suffix (parseSuffix FORMAT case)
-		`.[0]@html`,      // FORMAT suffix on index
+		`.a.b.c`,       // field chaining
+		`.a[0].b[1:3]`, // index then slice
+		`.a?.b?.c?`,    // optional chain
+		`.["key"].b`,   // bracket key then field
+		`.a[].b[]`,     // iterator chain
+		`.a[]?`,        // optional iterator
+		`.a[0]?`,       // optional index
+		`.a[1:3]?`,     // optional slice
+		`.a | .b?`,     // optional in pipeline
+		`.[1:]`,        // slice no end
+		`.[:3]`,        // slice no start
+		`.[.a]`,        // expression key
+		`.[-1]`,        // negative index
+		`.[0:2][]`,     // slice then iterator
+		`.foo.`,        // DOT+other: trailing dot → BinOp{op:"", right:Identity}
+		`."foo-bar"`,   // dot-quoted-string path (DOT+STR in parseSuffix)
+		`.foo | @uri`,  // format as standalone filter
+		`.foo@base64`,  // FORMAT as suffix (parseSuffix FORMAT case)
+		`.[0]@html`,    // FORMAT suffix on index
 	}
 	for _, src := range cases {
 		t.Run(src, func(t *testing.T) {
@@ -626,9 +632,9 @@ func TestFormatTrailingCommentInObject(t *testing.T) {
 // TestParseErrors_FuncDef exercises parseFuncDef error paths.
 func TestParseErrors_FuncDef(t *testing.T) {
 	cases := []string{
-		"def 123: .;",          // non-ident function name
-		"def f(123): .;",       // non-ident parameter
-		"def f($a 123): .;",    // bad separator in param list
+		"def 123: .;",       // non-ident function name
+		"def f(123): .;",    // non-ident parameter
+		"def f($a 123): .;", // bad separator in param list
 	}
 	for _, src := range cases {
 		if _, err := jq.ParseFile(src); err == nil {
@@ -640,11 +646,11 @@ func TestParseErrors_FuncDef(t *testing.T) {
 // TestParseErrors_Reduce exercises parseReduce error paths.
 func TestParseErrors_Reduce(t *testing.T) {
 	cases := []string{
-		"reduce !invalid as $x (0; .)",   // bad expr after reduce
-		"reduce .[] as 123 (0; .)",       // bad pattern
-		"reduce .[] as $x 0; .)",         // missing (
-		"reduce .[] as $x (0 .)",         // missing ;
-		"reduce .[] as $x (0; . end",     // missing )
+		"reduce !invalid as $x (0; .)", // bad expr after reduce
+		"reduce .[] as 123 (0; .)",     // bad pattern
+		"reduce .[] as $x 0; .)",       // missing (
+		"reduce .[] as $x (0 .)",       // missing ;
+		"reduce .[] as $x (0; . end",   // missing )
 	}
 	for _, src := range cases {
 		if _, err := jq.ParseFile(src); err == nil {
@@ -656,9 +662,9 @@ func TestParseErrors_Reduce(t *testing.T) {
 // TestParseErrors_Foreach exercises parseForeach error paths.
 func TestParseErrors_Foreach(t *testing.T) {
 	cases := []string{
-		"foreach !invalid as $x (0; .)",  // bad expr
-		"foreach .[] as 123 (0; .)",      // bad pattern
-		"foreach .[] as $x 0; .)",        // missing (
+		"foreach !invalid as $x (0; .)", // bad expr
+		"foreach .[] as 123 (0; .)",     // bad pattern
+		"foreach .[] as $x 0; .)",       // missing (
 	}
 	for _, src := range cases {
 		if _, err := jq.ParseFile(src); err == nil {
@@ -718,7 +724,6 @@ func TestFormatInlineVsMultiline(t *testing.T) {
 	}
 }
 
-
 // ── token-level format preservation ──────────────────────────────────────────
 
 // The jq tokenizer and normalizer used by TestFormatPreservesTokens live in
@@ -727,8 +732,8 @@ func TestFormatInlineVsMultiline(t *testing.T) {
 // implementation without duplicating code.  Local shims keep the call sites
 // in this file unchanged.
 
-func tokenizeJQ(src string) []string  { return testutil.TokenizeJQ(src) }
-func normalizeJQ(src string) string   { return testutil.NormalizeJQ(src) }
+func tokenizeJQ(src string) []string { return testutil.TokenizeJQ(src) }
+func normalizeJQ(src string) string  { return testutil.NormalizeJQ(src) }
 
 // TestFormatPreservesTokens verifies that the formatter does not silently
 // alter the program beyond the two known mechanical transformations (object-key

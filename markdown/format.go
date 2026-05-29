@@ -18,7 +18,7 @@ import (
 // Format formats a Markdown source string.
 // Fenced code block contents are passed through unchanged.
 func Format(src string) (string, error) {
-	return formatImpl(strings.Split(src, "\n"), nil), nil
+	return formatImpl(strings.Split(src, "\n"), nil)
 }
 
 // FormatTidy applies the same normalizations as Format and additionally
@@ -26,14 +26,14 @@ func Format(src string) (string, error) {
 //
 // fenceFmt receives the language tag (lowercased, trimmed; empty if the fence
 // has no tag), the 1-based line number of the opening fence, and the block
-// content (lines joined with "\n", no trailing newline).  Returning "" keeps
-// the original content.  Fences with no content lines are skipped.
+// content (lines joined with "\n", no trailing newline).  Returning ("", nil)
+// keeps the original content.  Fences with no content lines are skipped.
 // If fenceFmt is nil, FormatTidy behaves identically to Format.
-func FormatTidy(src string, fenceFmt func(lang string, openLine int, content string) string) (string, error) {
-	return formatImpl(strings.Split(src, "\n"), fenceFmt), nil
+func FormatTidy(src string, fenceFmt func(lang string, openLine int, content string) (string, error)) (string, error) {
+	return formatImpl(strings.Split(src, "\n"), fenceFmt)
 }
 
-func formatImpl(lines []string, fenceFmt func(lang string, openLine int, content string) string) string {
+func formatImpl(lines []string, fenceFmt func(lang string, openLine int, content string) (string, error)) (string, error) {
 	out := make([]string, 0, len(lines))
 
 	inFence := false
@@ -63,7 +63,11 @@ func formatImpl(lines []string, fenceFmt func(lang string, openLine int, content
 				// Emit fence content, optionally reformatted.
 				if fenceFmt != nil && len(fenceBuf) > 0 {
 					content := strings.Join(fenceBuf, "\n")
-					if formatted := fenceFmt(fenceLangTag, fenceOpenLine, content); formatted != "" {
+					formatted, err := fenceFmt(fenceLangTag, fenceOpenLine, content)
+					if err != nil {
+						return "", err
+					}
+					if formatted != "" {
 						formatted = strings.TrimRight(formatted, "\n")
 						out = append(out, strings.Split(formatted, "\n")...)
 					} else {
@@ -135,7 +139,7 @@ func formatImpl(lines []string, fenceFmt func(lang string, openLine int, content
 	// Ensure single trailing newline.
 	result := strings.Join(out, "\n")
 	result = strings.TrimRight(result, "\n") + "\n"
-	return result
+	return result, nil
 }
 
 // MarshalFile converts a parsed markdown file to a JSON-serialisable value.

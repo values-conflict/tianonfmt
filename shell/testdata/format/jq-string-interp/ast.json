@@ -1,0 +1,28 @@
+{
+	"type": "shell",
+	"file": "input.sh",
+	"stmts": [
+		{
+			"type": "call",
+			"args": [
+				"set",
+				"-Eeuo",
+				"pipefail"
+			]
+		},
+		{
+			"type": "call",
+			"assigns": [
+				"result=$(jq --raw-output '\n\t.name as $n\n\t| @sh \"hello \\($n), you are \\(.age) years old\"\n')"
+			],
+			"args": []
+		},
+		{
+			"type": "call",
+			"assigns": [
+				"cmd=$(jq --raw-output '\n\t.tag as $t\n\t| @sh \"my-tool --payload \\({\nname: .name,\n    version: .version,\n        description: .description,\n            author: .author,\n                } | tojson)\"\n')"
+			],
+			"args": []
+		}
+	]
+}

@@ -1,0 +1,30 @@
+{
+	"type": "jq",
+	"query": {
+		"type": "interpStr",
+		"parts": [
+			"outer",
+			{
+				"type": "interp",
+				"expr": {
+					"type": "interpStr",
+					"parts": [
+						"inner",
+						{
+							"type": "interp",
+							"expr": {
+								"type": "call",
+								"name": "length",
+								"args": [
+									{
+										"type": "identity"
+									}
+								]
+							}
+						}
+					]
+				}
+			}
+		]
+	}
+}

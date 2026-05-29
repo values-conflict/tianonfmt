@@ -85,11 +85,11 @@ func (p *Pipe) nodePos() Pos { return p.At }
 
 // Comma: left , right (generator)
 type Comma struct {
-	At              Pos
-	Left            Node
-	Right           Node
-	MultiLine       bool // right operand started on a different line than the , token
-	BlankLineAfter  bool // a blank line follows the comma (before the right operand)
+	At             Pos
+	Left           Node
+	Right          Node
+	MultiLine      bool // right operand started on a different line than the , token
+	BlankLineAfter bool // a blank line follows the comma (before the right operand)
 }
 
 func (c *Comma) jqNode()      {}
@@ -204,11 +204,11 @@ func (f *Field) nodePos() Pos { return f.At }
 
 // Index: expr[key] or .[key] or expr[] or .[]
 type Index struct {
-	At         Pos
-	Expr       Node // nil when standalone e.g. .[0]
-	Key        Node // nil for iterator .[]
-	Optional   bool // trailing ?
-	DotAccess  bool // written as ."key" or expr."key" (dot-quoted form), not .["key"]
+	At        Pos
+	Expr      Node // nil when standalone e.g. .[0]
+	Key       Node // nil for iterator .[]
+	Optional  bool // trailing ?
+	DotAccess bool // written as ."key" or expr."key" (dot-quoted form), not .["key"]
 }
 
 func (i *Index) jqNode()      {}
@@ -273,7 +273,7 @@ type NumberLit struct {
 func (n *NumberLit) jqNode()      {}
 func (n *NumberLit) nodePos() Pos { return n.At }
 
-// StrLit: a complete string literal, raw text preserved.
+// StrLit: a complete string literal with no \(...) interpolations, raw text preserved.
 type StrLit struct {
 	At  Pos
 	Raw string // includes surrounding quotes
@@ -281,6 +281,25 @@ type StrLit struct {
 
 func (s *StrLit) jqNode()      {}
 func (s *StrLit) nodePos() Pos { return s.At }
+
+// InterpStr: a string literal containing one or more \(...) interpolation blocks.
+// Parts alternates between literal text segments and parsed jq sub-expressions.
+// Plain strings without interpolations are always represented as StrLit.
+type InterpStr struct {
+	At    Pos
+	Parts []InterpPart
+}
+
+func (s *InterpStr) jqNode()      {}
+func (s *InterpStr) nodePos() Pos { return s.At }
+
+// InterpPart is one segment of an InterpStr.  Exactly one of Lit and Expr is set:
+//   - Lit: raw literal bytes verbatim from the source (no surrounding quotes, no \( delimiters)
+//   - Expr: a parsed jq expression from a \(...) block
+type InterpPart struct {
+	Lit  string
+	Expr Node
+}
 
 // NullLit: null
 type NullLit struct{ At Pos }
@@ -308,11 +327,11 @@ func (a *Array) nodePos() Pos { return a.At }
 
 // Object: { field, … }
 type Object struct {
-	At                       Pos
-	Fields                   []*ObjectField
-	MultiLine                bool       // first field was on a different line than { in source
-	ClosingComments          []*Comment // leading comments before the closing }
-	BlankBeforeClosingComments bool     // blank line between last field and ClosingComments
+	At                         Pos
+	Fields                     []*ObjectField
+	MultiLine                  bool       // first field was on a different line than { in source
+	ClosingComments            []*Comment // leading comments before the closing }
+	BlankBeforeClosingComments bool       // blank line between last field and ClosingComments
 }
 
 func (o *Object) jqNode()      {}
@@ -409,7 +428,7 @@ func (l *LocExpr) nodePos() Pos { return l.At }
 
 // ArrayPattern: [a, b] — used in destructuring "as" patterns
 type ArrayPattern struct {
-	At   Pos
+	At    Pos
 	Elems []Node
 }
 

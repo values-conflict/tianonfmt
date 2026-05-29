@@ -31,20 +31,20 @@ const (
 
 	COMMENT // # ...  (text includes # but not the trailing newline)
 
-	IDENT   // foo, empty, not, …
-	FIELD   // .foo  (dot + name)
-	VAR     // $foo
-	FORMAT  // @base64
-	NUMBER  // 42, 3.14
-	STR     // complete string literal "…" (raw text, interpolations not parsed)
+	IDENT  // foo, empty, not, …
+	FIELD  // .foo  (dot + name)
+	VAR    // $foo
+	FORMAT // @base64
+	NUMBER // 42, 3.14
+	STR    // complete string literal "…" (raw text, interpolations not parsed)
 
-	PIPE    // |
-	COMMA   // ,
-	SEMI    // ;
-	COLON   // :
-	DOT     // .
-	DOTDOT  // ..
-	QUEST   // ?
+	PIPE   // |
+	COMMA  // ,
+	SEMI   // ;
+	COLON  // :
+	DOT    // .
+	DOTDOT // ..
+	QUEST  // ?
 
 	ASSIGN    // =
 	PIPEEQ    // |=

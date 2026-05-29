@@ -12,7 +12,8 @@ go tool cover -func=/tmp/cov.out | tail -1
 `-coverpkg=./...` is required to correctly track coverage for shared helper packages such as `internal/testutil/jqnorm.go`, which are imported by test binaries in other packages and would otherwise show 0% without this flag.
 
 **Known uncoverable lines** (not a bug, not a gap):
-- `jqNode()` / `nodePos()` one-liner interface-marker methods in `jq/ast.go` — Go's coverage tool shows these as 0% because they are empty `{}` bodies or single-return stubs whose only purpose is interface satisfaction; there is no executable statement to instrument.
+- `jqNode()` / `nodePos()` one-liner interface-marker methods in `jq/ast.go` — Go's coverage tool shows these as 0% because they are empty `{}` bodies or single-return stubs whose only purpose is interface satisfaction; there is no executable statement to instrument.  This applies to all AST node types including `InterpStr`.
+- `normalizeInterpInStr` `end < 0 || end > len(tok)` fallback in `internal/testutil/jqnorm.go` — fires only for string tokens with unterminated `\(...)` interpolations; `TokenizeJQ` uses `ScanJQStr` which correctly balances `\(...)` depth, so tokens it produces will never trigger this branch.
 - `templateSeg()` marker methods in `template/template.go` — same reason.
 - `main()` in `cmd/tianonfmt/main.go` — the test harness calls `run()` directly; `main()` is intentionally excluded.
 - `sortFlagsByOrder` `pri < 0` branch in `shell/flags.go` — fires only if a canonical combined-flag group contains a char absent from the order string, which is a configuration error impossible via well-formed input.
@@ -53,26 +54,34 @@ Prefer in this order:
 
 **When adding corpus/anticorpus fixtures:** always search `../corpus` and `../anticorpus` first before writing contrived fixtures.  The corpus search should target the specific pattern being tested (flag usage, if-condition style, etc.).  A contrived fixture is only justified when a corpus search turns up nothing useful.
 
+**Corpus fixture sourcing — three hard requirements:**
+1. **Remote commit only.** The file content must come from a commit reachable on `origin/main` or `origin/master` — not a local-only commit, not a local working-tree file that may have been modified by the formatter or by hand.  Verify with `git -C ../corpus/REPO ls-remote origin main master` before use.
+2. **Verbatim from the commit, not the filesystem.** Always extract the fixture content with `git -C ../corpus/REPO show <SHA>:path/to/file`, never by copying the on-disk file.  The on-disk copy may have local modifications (including prior formatter runs) that silently corrupt the fixture.
+3. **Full 40-character SHA in `meta.txt`.** The `Source:` URL must use the exact commit SHA obtained from `ls-remote` (not a branch name or short hash), producing a stable permalink.
+
 ## Golden fixture pattern
 
 All file-in / file-out formatters use `testutil.Golden()` from `internal/testutil`:
 
 ```go
-testutil.Golden(t, "testdata/format", ".sh", ".sh", func(src string) (string, error) {
-    return shell.Format(src, shell.DetectLang(src), nil)
+testutil.Golden(t, "testdata/format", "input.sh", []testutil.Case{
+    {Out: "output.sh", Fn: func(src string) (string, error) {
+        return shell.Format(src, shell.DetectLang(src))
+    }, Idem: true},
 })
 ```
 
-- Input files: `testdata/<suite>/<name>/input<inExt>`
-- Golden output files: `testdata/<suite>/<name>/output<outExt>` (regenerate with `-update`)
-- Always add both an idempotency test (apply twice, compare) alongside the primary golden test
-- Organize testdata by suite (`format/`, `errors/`, `lint/`) so purpose is obvious from the path
+- Input files: `testdata/<suite>/<name>/input.sh` (or `input.jq`, etc. — filename matches the `inFile` arg)
+- Golden output files: `testdata/<suite>/<name>/<Case.Out>` (regenerate with `-update`)
+- Set `Idem: true` on any case where the output should be idempotent (format∘format = format)
+- Multiple cases per input (format, tidy, AST) are expressed as a `[]testutil.Case` slice
+- Organize testdata by suite (`format/`, `errors/`) so purpose is obvious from the path
 
 ### Minimise the number of distinct input files
 
 **If we can parse it, we can format it and tidy it.**  Every input that exists should be tested against every applicable transformer.
 
-- **Do not create separate input files per suite.**  `testdata/format/` is the primary home for inputs.  `TestFormat`, `TestTidy`, `TestFormatRoundTrip`, and `TestMarshalAST` all read from `testdata/format/` and write differently-named outputs into the same fixture directory (`output.sh`, `output.tidy.sh`, `ast.json`).
+- **Do not create separate input files per suite.**  `testdata/format/` is the primary home for inputs.  A single `testutil.Golden` call with a `[]testutil.Case` slice covers format, tidy, AST, and any other transformer — all writing differently-named outputs into the same fixture directory (`output.sh`, `output.tidy.sh`, `ast.json`).
 - **`testdata/errors/`, `testdata/lint/`, and any other suite subdirectory exist only for inputs whose edge case is impossible to express in the format suite.**  If an input could live in `testdata/format/`, it must — a duplicate elsewhere is dead weight.
 - Before adding any new fixture, verify no existing fixture already exercises the same AST paths.  If one does, extend it rather than creating a parallel one.
 
@@ -85,7 +94,7 @@ Source: https://github.com/foo/bar/blob/<full-40-char-SHA>/path/to/file
 License: <Debian well-known short name>  (Expat, Apache-2.0, GPL-2, GPL-3, AGPL-3, …)
 ```
 
-Use the full 40-character commit SHA — never a branch ref.  Add a `Note:` line for anything needing clarification (e.g. the file is a snapshot of an older version, or it is shared verbatim between multiple upstream projects).
+Use the full 40-character commit SHA from `origin/main` or `origin/master` — never a branch ref, never a local-only commit.  Add a `Note:` line for anything needing clarification (e.g. the file is a snapshot of an older version, or it is shared verbatim between multiple upstream projects).
 
 For fixtures sourced from `corpus/` or `anticorpus/` (Tianon's own code or Docker official image repos), still include `Source:`.  If the source repo has no license file, write `License: **WARNING:** UNKNOWN` instead of omitting the line.
 
@@ -161,12 +170,14 @@ If a fixture directory contains `error.txt` instead of `output<outExt>`, `testut
 Every package with an AST marshaler has a `TestMarshalAST` golden test that reuses `testdata/format/` inputs and writes `output.json`, pinning the complete `--ast` JSON structure:
 
 ```go
-testutil.Golden(t, "testdata/format", ".jq", ".json", func(src string) (string, error) {
-    f, err := jq.ParseFile(src)
-    if err != nil { return "", err }
-    b, err := json.MarshalIndent(f.MarshalAST(), "", "\t")
-    if err != nil { return "", err }
-    return string(b) + "\n", nil
+testutil.Golden(t, "testdata/format", "input.jq", []testutil.Case{
+    {Out: "output.json", Fn: func(src string) (string, error) {
+        f, err := jq.ParseFile(src)
+        if err != nil { return "", err }
+        b, err := json.MarshalIndent(f.MarshalAST(), "", "\t")
+        if err != nil { return "", err }
+        return string(b) + "\n", nil
+    }},
 })
 ```
 

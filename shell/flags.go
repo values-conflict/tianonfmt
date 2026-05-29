@@ -13,8 +13,9 @@ type shortFlagSpec struct {
 	hasArg    bool   // true if this flag consumes the next argument
 	canonical bool   // short form is a well-known idiom; preserved in default tidy
 	pairWith  string // each char must also be present in the same combined-flag group
-	//                 for this flag's short form to be considered canonical
-	//                 (e.g. curl -s needs S, f, and L → pairWith: "SfL")
+	//                       for this flag's short form to be considered canonical
+	//                       (e.g. curl -s needs S, f, and L → pairWith: "SfL")
+	expandInFormat bool // expand to long form even in format (non-tidy) mode
 }
 
 // cmdCanonicalSpec defines canonical ordering, merging, and invariant rules for
@@ -100,7 +101,7 @@ var cmdFlagTables = map[string]map[string]shortFlagSpec{
 		"f": {long: "--fail", canonical: true},
 		"L": {long: "--location", canonical: true},
 		"o": {long: "--output", hasArg: true, canonical: true},
-		"s": {long: "--silent", canonical: true, pairWith: "S"}, // canonical when -S is present
+		"s": {long: "--silent", canonical: true, pairWith: "S"},     // canonical when -S is present
 		"S": {long: "--show-error", canonical: true, pairWith: "s"}, // canonical when -s is present
 		"O": {long: "--remote-name"},
 		"v": {long: "--verbose"},
@@ -207,6 +208,17 @@ var cmdFlagTables = map[string]map[string]shortFlagSpec{
 		"W": {long: "--show"},
 	},
 
+	// sha256sum (and aliases): all short flags are non-canonical and always
+	// expanded to long form, even in format mode (expandInFormat), because the
+	// long forms are always used in the corpus.  --strict is required in tidy mode.
+	"sha256sum": {
+		"c": {long: "--check", expandInFormat: true},
+		"b": {long: "--binary", expandInFormat: true},
+		"t": {long: "--text", expandInFormat: true},
+		"w": {long: "--warn", expandInFormat: true},
+		"z": {long: "--zero", expandInFormat: true},
+	},
+
 	// apt-get: -y is the canonical short form (the long --yes is unusual in the
 	// corpus); see also longToShortTables below for the --yes → -y reverse pass.
 	"apt-get": {
@@ -262,6 +274,12 @@ var cmdCanonicalSpecs = map[string]cmdCanonicalSpec{
 
 	// gpg/gpg2: --batch must always be present and must be the first argument.
 	"gpg": {longFirst: []string{"--batch"}},
+
+	// sha256sum: --strict must accompany --check in tidy mode.
+	// --strict causes sha256sum to exit non-zero for malformed checksum lines
+	// rather than silently passing over them; using --check without --strict
+	// is a latent correctness hazard.
+	"sha256sum": {longPairsTidy: map[string]string{"--check": "--strict"}},
 }
 
 // longToShortTables maps command names to long-flag → preferred-short-flag
@@ -279,11 +297,13 @@ var longToShortTables = map[string]map[string]string{
 // cmdAliases maps alternative command names to their canonical entry in the
 // tables above.  A single entry here covers all three lookup maps.
 var cmdAliases = map[string]string{
-	"gpg1":     "gpg",
-	"gpg2":     "gpg",
-	"dnf":      "yum",
-	"microdnf": "yum",
-	"tinydnf":  "yum",
+	"gpg1":      "gpg",
+	"gpg2":      "gpg",
+	"dnf":       "yum",
+	"microdnf":  "yum",
+	"tinydnf":   "yum",
+	"sha512sum": "sha256sum",
+	"sha1sum":   "sha256sum",
 }
 
 // resolveCmd returns the canonical command name for table lookups.
@@ -343,8 +363,10 @@ func normalizeShortFlags(call *syntax.CallExpr, strict, tidy bool) {
 		preMergeFlags(call, table, spec)
 	}
 
-	// Phase 2: per-arg normalization (tidy only — format mode preserves short flags).
-	if tidy {
+	// Phase 2: per-arg normalization.
+	// In tidy mode: expand all non-canonical short flags; apply long→short reverse normalization.
+	// In format mode: only expand single-char flags marked expandInFormat; combined flags are kept.
+	{
 		newArgs := make([]*syntax.Word, 0, len(call.Args)+4)
 		newArgs = append(newArgs, call.Args[0])
 
@@ -357,8 +379,8 @@ func normalizeShortFlags(call *syntax.CallExpr, strict, tidy bool) {
 				break
 			}
 
-			// Reverse normalization: long → preferred short (non-strict only).
-			if !strict && longTable != nil {
+			// Reverse normalization: long → preferred short (tidy, non-strict only).
+			if tidy && !strict && longTable != nil {
 				if preferred, ok := longTable[val]; ok {
 					word.Parts[0].(*syntax.Lit).Value = preferred
 					newArgs = append(newArgs, word)
@@ -379,7 +401,13 @@ func normalizeShortFlags(call *syntax.CallExpr, strict, tidy bool) {
 					newArgs = append(newArgs, word)
 					continue
 				}
-				if !strict && spec2.canonical && spec2.pairWith == "" {
+				// In format mode, only expand flags explicitly marked expandInFormat.
+				if !tidy && !spec2.expandInFormat {
+					newArgs = append(newArgs, word)
+					continue
+				}
+				// In tidy non-strict mode, keep canonical flags.
+				if tidy && !strict && spec2.canonical && spec2.pairWith == "" {
 					newArgs = append(newArgs, word)
 					continue
 				}
@@ -388,6 +416,11 @@ func normalizeShortFlags(call *syntax.CallExpr, strict, tidy bool) {
 				continue
 			}
 
+			// Combined flags: format mode does not expand them.
+			if !tidy {
+				newArgs = append(newArgs, word)
+				continue
+			}
 			expanded := expandCombinedFlags(flags, table, strict)
 			if expanded == nil {
 				newArgs = append(newArgs, word)
@@ -460,7 +493,10 @@ func normalizeShortFlags(call *syntax.CallExpr, strict, tidy bool) {
 func preMergeFlags(call *syntax.CallExpr, table map[string]shortFlagSpec, spec cmdCanonicalSpec) {
 	// Collect (char, argIdx) for each merge-group boolean char, deduplicating by char
 	// so each char is claimed by exactly the first arg that contains it.
-	type source struct{ char byte; argIdx int }
+	type source struct {
+		char   byte
+		argIdx int
+	}
 	var sources []source
 	seen := make(map[byte]bool)
 
@@ -711,11 +747,13 @@ func isCombinedGroupCanonical(flags string, table map[string]shortFlagSpec) bool
 	return true
 }
 
-
 // sortFlagsByOrder returns flags sorted by their position in order.
 // Flags not in order are appended at the end in their original relative order.
 func sortFlagsByOrder(flags, order string) string {
-	type cp struct{ c byte; pri, pos int }
+	type cp struct {
+		c        byte
+		pri, pos int
+	}
 	chars := make([]cp, len(flags))
 	for i := 0; i < len(flags); i++ {
 		pri := strings.IndexByte(order, flags[i])

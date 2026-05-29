@@ -311,8 +311,18 @@
 																	"name": "error",
 																	"args": [
 																		{
-																			"type": "string",
-																			"raw": "\"parent \\(.key) missing ref\""
+																			"type": "interpStr",
+																			"parts": [
+																				"parent ",
+																				{
+																					"type": "interp",
+																					"expr": {
+																						"type": "field",
+																						"name": ".key"
+																					}
+																				},
+																				" missing ref"
+																			]
 																		}
 																	]
 																}
@@ -336,16 +346,42 @@
 												"type": "format",
 												"name": "sh",
 												"str": {
-													"type": "string",
-													"raw": "\"docker pull \\($ref)\""
+													"type": "interpStr",
+													"parts": [
+														"docker pull ",
+														{
+															"type": "interp",
+															"expr": {
+																"type": "var",
+																"name": "$ref"
+															}
+														}
+													]
 												}
 											},
 											"right": {
 												"type": "format",
 												"name": "sh",
 												"str": {
-													"type": "string",
-													"raw": "\"docker tag \\($ref) \\(.key)\""
+													"type": "interpStr",
+													"parts": [
+														"docker tag ",
+														{
+															"type": "interp",
+															"expr": {
+																"type": "var",
+																"name": "$ref"
+															}
+														},
+														" ",
+														{
+															"type": "interp",
+															"expr": {
+																"type": "field",
+																"name": ".key"
+															}
+														}
+													]
 												}
 											}
 										}
@@ -419,8 +455,17 @@
 						"name": "error",
 						"args": [
 							{
-								"type": "string",
-								"raw": "\"unknown/unimplemented Builder: \\($builder)\""
+								"type": "interpStr",
+								"parts": [
+									"unknown/unimplemented Builder: ",
+									{
+										"type": "interp",
+										"expr": {
+											"type": "var",
+											"name": "$builder"
+										}
+									}
+								]
 							}
 						]
 					}
@@ -533,8 +578,16 @@
 													"name": "error",
 													"args": [
 														{
-															"type": "string",
-															"raw": "\"\\(.) does not end in '.git' so build will fail to recognize it as a Git URL\""
+															"type": "interpStr",
+															"parts": [
+																{
+																	"type": "interp",
+																	"expr": {
+																		"type": "identity"
+																	}
+																},
+																" does not end in '.git' so build will fail to recognize it as a Git URL"
+															]
 														}
 													]
 												}
@@ -1204,13 +1257,39 @@
 								"# trim out comment lines and unnecessary indentation"
 							],
 							"expr": {
-								"type": "string",
-								"raw": "\"(?m)^(\\t+#[^\\n]*\\n?|\\t{\\($indents)}(?\u003cextra\u003e.*)$)\""
+								"type": "interpStr",
+								"parts": [
+									"(?m)^(\\t+#[^\\n]*\\n?|\\t{",
+									{
+										"type": "interp",
+										"expr": {
+											"type": "var",
+											"name": "$indents"
+										}
+									},
+									"}(?\u003cextra\u003e.*)$)"
+								]
 							}
 						},
 						{
-							"type": "string",
-							"raw": "\"\\(.extra // \"\")\""
+							"type": "interpStr",
+							"parts": [
+								{
+									"type": "interp",
+									"expr": {
+										"type": "binOp",
+										"op": "//",
+										"left": {
+											"type": "field",
+											"name": ".extra"
+										},
+										"right": {
+											"type": "string",
+											"raw": "\"\""
+										}
+									}
+								}
+							]
 						}
 					]
 				},
@@ -1341,8 +1420,17 @@
 																																"type": "format",
 																																"name": "sh",
 																																"str": {
-																																	"type": "string",
-																																	"raw": "\"--provenance=mode=max,builder-id=\\(buildkit_provenance_builder_id)\""
+																																	"type": "interpStr",
+																																	"parts": [
+																																		"--provenance=mode=max,builder-id=",
+																																		{
+																																			"type": "interp",
+																																			"expr": {
+																																				"type": "call",
+																																				"name": "buildkit_provenance_builder_id"
+																																			}
+																																		}
+																																	]
 																																}
 																															}
 																														},
@@ -1436,8 +1524,42 @@
 																																"type": "format",
 																																"name": "sh",
 																																"str": {
-																																	"type": "string",
-																																	"raw": "\"--annotation \\(\"manifest,manifest-descriptor:\\(.key + \"=\" + .value)\")\""
+																																	"type": "interpStr",
+																																	"parts": [
+																																		"--annotation ",
+																																		{
+																																			"type": "interp",
+																																			"expr": {
+																																				"type": "interpStr",
+																																				"parts": [
+																																					"manifest,manifest-descriptor:",
+																																					{
+																																						"type": "interp",
+																																						"expr": {
+																																							"type": "binOp",
+																																							"op": "+",
+																																							"left": {
+																																								"type": "binOp",
+																																								"op": "+",
+																																								"left": {
+																																									"type": "field",
+																																									"name": ".key"
+																																								},
+																																								"right": {
+																																									"type": "string",
+																																									"raw": "\"=\""
+																																								}
+																																							},
+																																							"right": {
+																																								"type": "field",
+																																								"name": ".value"
+																																							}
+																																						}
+																																					}
+																																				]
+																																			}
+																																		}
+																																	]
 																																}
 																															}
 																														}
@@ -1532,8 +1654,48 @@
 																											"type": "format",
 																											"name": "sh",
 																											"str": {
-																												"type": "string",
-																												"raw": "\"--platform \\(.source.arches[.build.arch].platformString)\""
+																												"type": "interpStr",
+																												"parts": [
+																													"--platform ",
+																													{
+																														"type": "interp",
+																														"expr": {
+																															"type": "binOp",
+																															"op": "",
+																															"left": {
+																																"type": "index",
+																																"expr": {
+																																	"type": "binOp",
+																																	"op": "",
+																																	"left": {
+																																		"type": "field",
+																																		"name": ".source"
+																																	},
+																																	"right": {
+																																		"type": "field",
+																																		"name": ".arches"
+																																	}
+																																},
+																																"key": {
+																																	"type": "binOp",
+																																	"op": "",
+																																	"left": {
+																																		"type": "field",
+																																		"name": ".build"
+																																	},
+																																	"right": {
+																																		"type": "field",
+																																		"name": ".arch"
+																																	}
+																																}
+																															},
+																															"right": {
+																																"type": "field",
+																																"name": ".platformString"
+																															}
+																														}
+																													}
+																												]
 																											}
 																										}
 																									},
@@ -1649,8 +1811,18 @@
 																																			"name": "error",
 																																			"args": [
 																																				{
-																																					"type": "string",
-																																					"raw": "\"parent \\(.key) missing ref\""
+																																					"type": "interpStr",
+																																					"parts": [
+																																						"parent ",
+																																						{
+																																							"type": "interp",
+																																							"expr": {
+																																								"type": "field",
+																																								"name": ".key"
+																																							}
+																																						},
+																																						" missing ref"
+																																					]
 																																				}
 																																			]
 																																		}
@@ -1698,8 +1870,40 @@
 																					"type": "format",
 																					"name": "sh",
 																					"str": {
-																						"type": "string",
-																						"raw": "\"--file \\(.source.entries[0].File)\""
+																						"type": "interpStr",
+																						"parts": [
+																							"--file ",
+																							{
+																								"type": "interp",
+																								"expr": {
+																									"type": "binOp",
+																									"op": "",
+																									"left": {
+																										"type": "index",
+																										"expr": {
+																											"type": "binOp",
+																											"op": "",
+																											"left": {
+																												"type": "field",
+																												"name": ".source"
+																											},
+																											"right": {
+																												"type": "field",
+																												"name": ".entries"
+																											}
+																										},
+																										"key": {
+																											"type": "number",
+																											"raw": "0"
+																										}
+																									},
+																									"right": {
+																										"type": "field",
+																										"name": ".File"
+																									}
+																								}
+																							}
+																						]
 																					}
 																				}
 																			},
@@ -1767,8 +1971,41 @@
 													"type": "format",
 													"name": "sh",
 													"str": {
-														"type": "string",
-														"raw": "\"jq \\(\"\n\t\t\t\t.manifests |= (\n\t\t\t\t\tunique_by([ .digest, .size, .mediaType ])\n\t\t\t\t\t| if length != 1 then\n\t\t\t\t\t\terror(\\\"unexpected number of manifests: \\\\(length)\\\")\n\t\t\t\t\telse . end\n\t\t\t\t)\n\t\t\t\" | unindent_and_decomment_jq(3)) temp/index.json \u003e temp/index.json.new\""
+														"type": "interpStr",
+														"parts": [
+															"jq ",
+															{
+																"type": "interp",
+																"expr": {
+																	"type": "pipe",
+																	"left": {
+																		"type": "interpStr",
+																		"parts": [
+																			"\n\t\t\t\t.manifests |= (\n\t\t\t\t\tunique_by([ .digest, .size, .mediaType ])\n\t\t\t\t\t| if length != 1 then\n\t\t\t\t\t\terror(\\\"unexpected number of manifests: \\",
+																			{
+																				"type": "interp",
+																				"expr": {
+																					"type": "call",
+																					"name": "length"
+																				}
+																			},
+																			"\\\")\n\t\t\t\t\telse . end\n\t\t\t\t)\n\t\t\t"
+																		]
+																	},
+																	"right": {
+																		"type": "call",
+																		"name": "unindent_and_decomment_jq",
+																		"args": [
+																			{
+																				"type": "number",
+																				"raw": "3"
+																			}
+																		]
+																	}
+																}
+															},
+															" temp/index.json \u003e temp/index.json.new"
+														]
 													}
 												}
 											}
@@ -1951,8 +2188,48 @@
 																			"type": "format",
 																			"name": "sh",
 																			"str": {
-																				"type": "string",
-																				"raw": "\"--platform \\(.source.arches[.build.arch].platformString)\""
+																				"type": "interpStr",
+																				"parts": [
+																					"--platform ",
+																					{
+																						"type": "interp",
+																						"expr": {
+																							"type": "binOp",
+																							"op": "",
+																							"left": {
+																								"type": "index",
+																								"expr": {
+																									"type": "binOp",
+																									"op": "",
+																									"left": {
+																										"type": "field",
+																										"name": ".source"
+																									},
+																									"right": {
+																										"type": "field",
+																										"name": ".arches"
+																									}
+																								},
+																								"key": {
+																									"type": "binOp",
+																									"op": "",
+																									"left": {
+																										"type": "field",
+																										"name": ".build"
+																									},
+																									"right": {
+																										"type": "field",
+																										"name": ".arch"
+																									}
+																								}
+																							},
+																							"right": {
+																								"type": "field",
+																								"name": ".platformString"
+																							}
+																						}
+																					}
+																				]
 																			}
 																		}
 																	},
@@ -1960,8 +2237,40 @@
 																		"type": "format",
 																		"name": "sh",
 																		"str": {
-																			"type": "string",
-																			"raw": "\"--file \\(.source.entries[0].File)\""
+																			"type": "interpStr",
+																			"parts": [
+																				"--file ",
+																				{
+																					"type": "interp",
+																					"expr": {
+																						"type": "binOp",
+																						"op": "",
+																						"left": {
+																							"type": "index",
+																							"expr": {
+																								"type": "binOp",
+																								"op": "",
+																								"left": {
+																									"type": "field",
+																									"name": ".source"
+																								},
+																								"right": {
+																									"type": "field",
+																									"name": ".entries"
+																								}
+																							},
+																							"key": {
+																								"type": "number",
+																								"raw": "0"
+																							}
+																						},
+																						"right": {
+																							"type": "field",
+																							"name": ".File"
+																						}
+																					}
+																				}
+																			]
 																		}
 																	}
 																},
@@ -2042,8 +2351,17 @@
 												"type": "format",
 												"name": "sh",
 												"str": {
-													"type": "string",
-													"raw": "\"build=\\(tojson)\""
+													"type": "interpStr",
+													"parts": [
+														"build=",
+														{
+															"type": "interp",
+															"expr": {
+																"type": "call",
+																"name": "tojson"
+															}
+														}
+													]
 												}
 											},
 											"right": {
@@ -2114,8 +2432,17 @@
 						"name": "error",
 						"args": [
 							{
-								"type": "string",
-								"raw": "\"unknown/unimplemented Builder: \\($builder)\""
+								"type": "interpStr",
+								"parts": [
+									"unknown/unimplemented Builder: ",
+									{
+										"type": "interp",
+										"expr": {
+											"type": "var",
+											"name": "$builder"
+										}
+									}
+								]
 							}
 						]
 					}
@@ -2157,8 +2484,25 @@
 						"type": "format",
 						"name": "sh",
 						"str": {
-							"type": "string",
-							"raw": "\"docker push \\(.build.img)\""
+							"type": "interpStr",
+							"parts": [
+								"docker push ",
+								{
+									"type": "interp",
+									"expr": {
+										"type": "binOp",
+										"op": "",
+										"left": {
+											"type": "field",
+											"name": ".build"
+										},
+										"right": {
+											"type": "field",
+											"name": ".img"
+										}
+									}
+								}
+							]
 						}
 					},
 					"elseIfs": [
@@ -2196,8 +2540,25 @@
 												"type": "format",
 												"name": "sh",
 												"str": {
-													"type": "string",
-													"raw": "\"crane push temp \\(.build.img)\""
+													"type": "interpStr",
+													"parts": [
+														"crane push temp ",
+														{
+															"type": "interp",
+															"expr": {
+																"type": "binOp",
+																"op": "",
+																"left": {
+																	"type": "field",
+																	"name": ".build"
+																},
+																"right": {
+																	"type": "field",
+																	"name": ".img"
+																}
+															}
+														}
+													]
 												}
 											},
 											"right": {
@@ -2229,8 +2590,17 @@
 						"name": "error",
 						"args": [
 							{
-								"type": "string",
-								"raw": "\"unknown/unimplemented Builder: \\($builder)\""
+								"type": "interpStr",
+								"parts": [
+									"unknown/unimplemented Builder: ",
+									{
+										"type": "interp",
+										"expr": {
+											"type": "var",
+											"name": "$builder"
+										}
+									}
+								]
 							}
 						]
 					}

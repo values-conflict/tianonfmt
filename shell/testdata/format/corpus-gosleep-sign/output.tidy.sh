@@ -3,7 +3,7 @@ set -Eeuo pipefail
 
 cd "$(dirname "$(readlink -f "$BASH_SOURCE")")/artifacts"
 
-set -Eeuo pipefail
+set -x
 rm -f *.asc
 for f in gosleep*; do
 	gpg --batch --output "$f.asc" --detach-sign "$f"

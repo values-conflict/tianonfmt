@@ -14,7 +14,6 @@ import (
 	"github.com/values-conflict/tianonfmt/dockerfile"
 )
 
-
 func TestMain(m *testing.M) {
 	flag.Parse()
 	os.Exit(m.Run())
@@ -431,10 +430,10 @@ func tokenizeDockerfile(src string) []string {
 //  2. "..." quoted strings are unquoted: the surrounding quotes are stripped,
 //     the content is re-tokenized at whitespace, and each resulting word is
 //     also split at its first '='.  This handles two formatter behaviors:
-//      a. ENV key= "value" → ENV key value (quotes removed from value).
-//      b. Multi-line quoted shell arguments: indentation inside the string
-//         changes but the word content stays the same after whitespace is
-//         collapsed.
+//     a. ENV key= "value" → ENV key value (quotes removed from value).
+//     b. Multi-line quoted shell arguments: indentation inside the string
+//     changes but the word content stays the same after whitespace is
+//     collapsed.
 //
 //  3. Standalone '\' tokens (backslash line-continuation artifacts in RUN
 //     blocks) are discarded.  The shell formatter restructures continuation
@@ -466,7 +465,7 @@ func normalizeDockerfile(src string) string {
 			// Unquote: strip surrounding quotes, split at whitespace, then at '='.
 			// Standalone '\' words (backslash line-continuation) are discarded.
 			content := tok[1 : len(tok)-1]
-			for _, w := range strings.Fields(content) {
+			for w := range strings.FieldsSeq(content) {
 				if w == `\` {
 					continue
 				}

@@ -75,7 +75,7 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) (exitCode int
 			}
 		}
 	}()
-	die := func(format string, a ...interface{}) {
+	die := func(format string, a ...any) {
 		panic(dieSignal{"tianonfmt: " + fmt.Sprintf(format, a...)})
 	}
 
@@ -275,45 +275,38 @@ func (f *formatter) md(name, src string) (string, error) {
 //
 // TODO: tidy rewrites are always applied to fence content when f.tidy is true;
 // there is no way to format-only without tidy inside a tidy markdown pass.
-func (f *formatter) makeFenceFmt(name string) func(lang string, openLine int, content string) string {
-	return func(lang string, openLine int, content string) string {
-		var (
-			k      fileKind
-			warnOn bool // true for explicit (non-auto-detected) tags
-		)
-
+func (f *formatter) makeFenceFmt(name string) func(lang string, openLine int, content string) (string, error) {
+	return func(lang string, openLine int, content string) (string, error) {
+		var k fileKind
 		switch lang {
 		case "dockerfile":
-			k, warnOn = kindDockerfile, true
+			k = kindDockerfile
 		case "jq":
-			k, warnOn = kindJQ, true
+			k = kindJQ
 		case "bash", "sh", "shell":
-			k, warnOn = kindShell, true
+			k = kindShell
 		case "":
 			// Auto-detect: only proceed for confident detections.
 			switch detected := kindByContent(content); detected {
 			case kindDockerfile, kindShell:
 				k = detected
 			default:
-				return "" // not confident enough, pass through
+				return "", nil // not confident enough, pass through
 			}
 		default:
-			return "" // unsupported language tag, pass through silently
+			return "", nil // unsupported language tag, pass through silently
 		}
 
 		formatted, err := f.byKind(k, name, content)
 		if err != nil {
-			if warnOn && f.stderr != nil {
-				fmt.Fprintf(f.stderr, "tianonfmt: %s:%d: %v\n", name, openLine, err)
-			}
-			return ""
+			return "", fmt.Errorf("tianonfmt: %s:%d: %w", name, openLine, err)
 		}
-		return formatted
+		return formatted, nil
 	}
 }
 
 func (f *formatter) template(src string) (string, error) {
-	return template.Format(src, jqFmtFunc)
+	return template.Format(src)
 }
 
 func (f *formatter) shell(src string) (string, error) {
@@ -332,28 +325,6 @@ func (f *formatter) shell(src string) (string, error) {
 }
 
 // ── embedded jq callback ──────────────────────────────────────────────────────
-
-// jqFmtFunc reformats a jq expression for embedding in another language.
-// If inline is true, a single-line compact format is returned.
-// Returns "" on any parse failure so that callers preserve the original.
-func jqFmtFunc(expr string, inline bool) string {
-	trimmed := strings.TrimSpace(expr)
-	node, err := jq.ParseExpr(trimmed)
-	if err != nil {
-		// Fall back to full-file parse: handles assembled template programs,
-		// def/include/import with implied semicolons, and multi-statement files.
-		f, ferr := jq.ParseFile(trimmed)
-		if ferr != nil {
-			return "" // parse failure — caller preserves original
-		}
-		s, _ := jq.FormatFile(f)
-		return s
-	}
-	if inline {
-		return jq.FormatNodeInline(node)
-	}
-	return jq.FormatNode(node)
-}
 
 // ── file-type detection ───────────────────────────────────────────────────────
 
@@ -416,7 +387,7 @@ var dockerfileKeywords = map[string]bool{
 }
 
 func isDockerfileContent(src string) bool {
-	for _, line := range strings.Split(src, "\n") {
+	for line := range strings.SplitSeq(src, "\n") {
 		trimmed := strings.TrimSpace(line)
 		if trimmed == "" || strings.HasPrefix(trimmed, "#") {
 			continue
@@ -550,20 +521,6 @@ func lintShell(src string) []jq.Violation {
 		}
 		if strings.HasPrefix(trimmed, "which ") || trimmed == "which" {
 			out = append(out, jq.Violation{Line: i + 1, Msg: `"which": use "command -v" instead (which is non-standard; use --tidy to auto-fix flag-free calls)`})
-		}
-		// set -x at the global level is Wrong; only use locally around specific blocks.
-		// Check after normalization: any global set with -x in the flags is Wrong.
-		if strings.HasPrefix(trimmed, "set -") && strings.Contains(trimmed, "x") &&
-			!strings.HasPrefix(line, "\t") {
-			// Flag if this looks like a top-level set (no leading tab = depth 0).
-			// Exclude "set --" and "set -o" forms.
-			parts := strings.Fields(trimmed)
-			if len(parts) >= 2 && strings.HasPrefix(parts[1], "-") && parts[1] != "--" {
-				out = append(out, jq.Violation{
-					Line: i + 1,
-					Msg:  `"set -x" at the global level is Wrong; use "set +x" / "set -x" pairs around specific blocks only`,
-				})
-			}
 		}
 		if strings.HasPrefix(trimmed, "let ") || trimmed == "let" {
 			out = append(out, jq.Violation{Line: i + 1, Msg: `"let" is Wrong: use $((...)) or var=$((expr)) instead`})
@@ -718,7 +675,7 @@ func aptGetInstallViolation(args string, line int) *jq.Violation {
 	// Skip local file installs: the first non-flag package-like token starts with . or /
 	// e.g. "apt-get install -y ./pkg.deb" — recommends may be intentional.
 	afterInstall := strings.TrimPrefix(segment, "apt-get install")
-	for _, field := range strings.Fields(afterInstall) {
+	for field := range strings.FieldsSeq(afterInstall) {
 		if strings.HasPrefix(field, "-") {
 			continue
 		}
@@ -945,6 +902,3 @@ func computeDiff(name, before, after string) ([]byte, error) {
 	}
 	return buf.Bytes(), err
 }
-
-
-

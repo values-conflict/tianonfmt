@@ -133,13 +133,13 @@ configure_redis_session() {
 # Main
 ########################################################################
 
-if expr "$1" : "apache" 1> /dev/null; then
+if expr "$1" : "apache" 1>/dev/null; then
 	if [ -n "${APACHE_DISABLE_REWRITE_IP+x}" ]; then
 		a2disconf remoteip
 	fi
 fi
 
-if expr "$1" : "apache" 1> /dev/null || [ "$1" = "php-fpm" ] || [ "${NEXTCLOUD_UPDATE:-0}" -eq 1 ]; then
+if expr "$1" : "apache" 1>/dev/null || [ "$1" = "php-fpm" ] || [ "${NEXTCLOUD_UPDATE:-0}" -eq 1 ]; then
 	uid="$(id -u)"
 	gid="$(id -g)"
 	if [ "$uid" = '0' ]; then
@@ -310,7 +310,7 @@ if expr "$1" : "apache" 1> /dev/null || [ "$1" = "php-fpm" ] || [ "${NEXTCLOUD_U
 		if [ -n "${NEXTCLOUD_INIT_HTACCESS+x}" ] && [ "$installed_version" != "0.0.0.0" ]; then
 			run_as 'php /var/www/html/occ maintenance:update:htaccess'
 		fi
-	) 9> /var/www/html/nextcloud-init-sync.lock
+	) 9>/var/www/html/nextcloud-init-sync.lock
 
 	# warn if config files on persistent storage differ from the latest version of this image
 	for cfgPath in /usr/src/nextcloud/config/*.php; do

@@ -1,14 +1,14 @@
 package shell_test
 
 import (
+	"github.com/values-conflict/tianonfmt/shell"
+	"mvdan.cc/sh/v3/syntax"
 	"strings"
 	"testing"
-	"mvdan.cc/sh/v3/syntax"
-	"github.com/values-conflict/tianonfmt/shell"
 )
 
 func TestFormatFlagNormalization(t *testing.T) {
-	cases := []struct{
+	cases := []struct {
 		in, want string
 	}{
 		{"curl -S https://example.com\n", "curl -sS https://example.com\n"},
@@ -18,7 +18,9 @@ func TestFormatFlagNormalization(t *testing.T) {
 	}
 	for _, c := range cases {
 		out, err := shell.Format(c.in, syntax.LangBash)
-		if err != nil { t.Fatalf("err: %v", err) }
+		if err != nil {
+			t.Fatalf("err: %v", err)
+		}
 		if !strings.Contains(out, strings.TrimSuffix(c.want, "\n")) {
 			t.Errorf("Format(%q) = %q, want contains %q", c.in, out, c.want)
 		}

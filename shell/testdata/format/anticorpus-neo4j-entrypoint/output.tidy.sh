@@ -20,8 +20,8 @@ containsElement() {
 is_readable() {
 	# this code is fairly ugly but works no matter who this script is running as.
 	# It would be nice if the writability tests could use this logic somehow.
-	local _file=${1}
-	perm=$(stat -c %a "${_file}")
+	local _file=$1
+	perm=$(stat -c %a "$_file")
 
 	# everyone permission
 	if [[ ${perm:2:1} -ge 4 ]]; then
@@ -29,13 +29,13 @@ is_readable() {
 	fi
 	# owner permissions
 	if [[ ${perm:0:1} -ge 4 ]]; then
-		if [[ "$(stat -c %U ${_file})" = "${userid}" ]] || [[ "$(stat -c %u ${_file})" = "${userid}" ]]; then
+		if [[ "$(stat -c %U $_file)" = "$userid" ]] || [[ "$(stat -c %u $_file)" = "$userid" ]]; then
 			return 0
 		fi
 	fi
 	# group permissions
 	if [[ ${perm:1:1} -ge 4 ]]; then
-		if containsElement "$(stat -c %g ${_file})" "${groups[@]}" || containsElement "$(stat -c %G ${_file})" "${groups[@]}"; then
+		if containsElement "$(stat -c %g $_file)" "${groups[@]}" || containsElement "$(stat -c %G $_file)" "${groups[@]}"; then
 			return 0
 		fi
 	fi
@@ -44,8 +44,8 @@ is_readable() {
 
 is_writable() {
 	# It would be nice if this and the is_readable function could combine somehow
-	local _file=${1}
-	perm=$(stat -c %a "${_file}")
+	local _file=$1
+	perm=$(stat -c %a "$_file")
 
 	# everyone permission
 	if containsElement ${perm:2:1} 2 3 6 7; then
@@ -53,13 +53,13 @@ is_writable() {
 	fi
 	# owner permissions
 	if containsElement ${perm:0:1} 2 3 6 7; then
-		if [[ "$(stat -c %U ${_file})" = "${userid}" ]] || [[ "$(stat -c %u ${_file})" = "${userid}" ]]; then
+		if [[ "$(stat -c %U $_file)" = "$userid" ]] || [[ "$(stat -c %u $_file)" = "$userid" ]]; then
 			return 0
 		fi
 	fi
 	# group permissions
 	if containsElement ${perm:1:1} 2 3 6 7; then
-		if containsElement "$(stat -c %g ${_file})" "${groups[@]}" || containsElement "$(stat -c %G ${_file})" "${groups[@]}"; then
+		if containsElement "$(stat -c %g $_file)" "${groups[@]}" || containsElement "$(stat -c %G $_file)" "${groups[@]}"; then
 			return 0
 		fi
 	fi
@@ -73,7 +73,7 @@ expand_commands_optionally() {
 }
 
 print_permissions_advice_and_fail() {
-	_directory=${1}
+	_directory=$1
 	echo >&2 "
 Folder ${_directory} is not accessible for user: ${userid} or group ${groupid} or groups ${groups[@]}, this is commonly a file permissions issue on the mounted folder.
 
@@ -87,9 +87,9 @@ If the folder is owned by the current user, this can be done by adding this flag
 }
 
 check_mounted_folder_readable() {
-	local _directory=${1}
-	if ! is_readable "${_directory}"; then
-		print_permissions_advice_and_fail "${_directory}"
+	local _directory=$1
+	if ! is_readable "$_directory"; then
+		print_permissions_advice_and_fail "$_directory"
 	fi
 }
 
@@ -116,23 +116,23 @@ check_mounted_folder_writable_with_chown() {
 	#      The /data and /log folder are owned by neo4j by default, and these are already writable by the user.
 	#      (This is a very unlikely use case).
 
-	local mountFolder=${1}
+	local mountFolder=$1
 	if running_as_root; then
 		if ! secure_mode_enabled; then
 			# check folder permissions
-			if ! is_writable "${mountFolder}"; then
+			if ! is_writable "$mountFolder"; then
 				# warn that we're about to chown the folder and then chown it
 				echo "Warning: Folder mounted to \"${mountFolder}\" is not writable from inside container. Changing folder owner to ${userid}."
-				chown -R "${userid}":"${groupid}" "${mountFolder}"
+				chown -R "$userid":"$groupid" "$mountFolder"
 			# check permissions on files in the folder
-			elif [ $(gosu "${userid}":"${groupid}" find "${mountFolder}" -not -writable | wc -l) -gt 0 ]; then
+			elif [ $(gosu "$userid":"$groupid" find "$mountFolder" -not -writable | wc -l) -gt 0 ]; then
 				echo "Warning: Some files inside \"${mountFolder}\" are not writable from inside container. Changing folder owner to ${userid}."
-				chown -R "${userid}":"${groupid}" "${mountFolder}"
+				chown -R "$userid":"$groupid" "$mountFolder"
 			fi
 		fi
 	else
-		if [[ ! -w "${mountFolder}" ]] && [[ "$(stat -c %U ${mountFolder})" != "neo4j" ]]; then
-			print_permissions_advice_and_fail "${mountFolder}"
+		if [[ ! -w "$mountFolder" ]] && [[ "$(stat -c %U $mountFolder)" != "neo4j" ]]; then
+			print_permissions_advice_and_fail "$mountFolder"
 		fi
 	fi
 }
@@ -140,7 +140,7 @@ check_mounted_folder_writable_with_chown() {
 load_plugin_from_github() {
 	# Load a plugin at runtime. The provided github repository must have a versions.json on the master branch with the
 	# correct format.
-	local _plugin_name="${1}" #e.g. apoc, graph-algorithms, graph-ql
+	local _plugin_name="$1" #e.g. apoc, graph-algorithms, graph-ql
 
 	local _plugins_dir="${NEO4J_HOME}/plugins"
 	if [ -d /plugins ]; then
@@ -153,17 +153,17 @@ load_plugin_from_github() {
 
 	# Now we call out to github to get the versions.json for this plugin and we parse that to find the url for the correct plugin jar for our neo4j version
 	echo "Fetching versions.json for Plugin '${_plugin_name}' from ${_versions_json_url}"
-	local _versions_json="$(wget -q --timeout 300 --tries 30 -O - "${_versions_json_url}")"
-	local _plugin_jar_url="$(echo "${_versions_json}" | jq --raw-output ".[] | select(.neo4j==\"${_neo4j_version}\") | .jar")"
-	if [[ -z "${_plugin_jar_url}" ]]; then
+	local _versions_json="$(wget -q --timeout 300 --tries 30 -O - "$_versions_json_url")"
+	local _plugin_jar_url="$(echo "$_versions_json" | jq --raw-output ".[] | select(.neo4j==\"${_neo4j_version}\") | .jar")"
+	if [[ -z "$_plugin_jar_url" ]]; then
 		echo >&2 "Error: No jar URL found for version '${_neo4j_version}' in versions.json from '${_versions_json_url}'"
-		echo >&2 "${_versions_json}"
+		echo >&2 "$_versions_json"
 		exit 1
 	fi
 	echo "Installing Plugin '${_plugin_name}' from ${_plugin_jar_url} to ${_destination} "
-	wget -q --timeout 300 --tries 30 --output-document="${_destination}" "${_plugin_jar_url}"
+	wget -q --timeout 300 --tries 30 --output-document="$_destination" "$_plugin_jar_url"
 
-	if ! is_readable "${_destination}"; then
+	if ! is_readable "$_destination"; then
 		echo >&2 "Plugin at '${_destination}' is not readable"
 		exit 1
 	fi
@@ -172,25 +172,25 @@ load_plugin_from_github() {
 apply_plugin_default_configuration() {
 	# Set the correct Load a plugin at runtime. The provided github repository must have a versions.json on the master branch with the
 	# correct format.
-	local _plugin_name="${1}"    #e.g. apoc, graph-algorithms, graph-ql
-	local _reference_conf="${2}" # used to determine if we can override properties
+	local _plugin_name="$1"    #e.g. apoc, graph-algorithms, graph-ql
+	local _reference_conf="$2" # used to determine if we can override properties
 	local _neo4j_conf="${NEO4J_HOME}/conf/neo4j.conf"
 
 	local _property _value
 	echo "Applying default values for plugin ${_plugin_name} to neo4j.conf"
 	for _entry in $(jq --compact-output --raw-output "with_entries( select(.key==\"${_plugin_name}\") ) | to_entries[] | .value.properties | to_entries[]" /neo4jlabs-plugins.json); do
-		_property="$(jq --raw-output '.key' <<<"${_entry}")"
-		_value="$(jq --raw-output '.value' <<<"${_entry}")"
+		_property="$(jq --raw-output '.key' <<<"$_entry")"
+		_value="$(jq --raw-output '.value' <<<"$_entry")"
 
 		# the first grep strips out comments
-		if grep -o "^[^#]*" "${_reference_conf}" | grep -q --fixed-strings "${_property}="; then
+		if grep -o "^[^#]*" "$_reference_conf" | grep -q --fixed-strings "${_property}="; then
 			# property is already set in the user provided config. In this case we don't override what has been set explicitly by the user.
 			echo "Skipping ${_property} for plugin ${_plugin_name} because it is already set"
 		else
-			if grep -o "^[^#]*" "${_neo4j_conf}" | grep -q --fixed-strings "${_property}="; then
-				sed --in-place "s/${_property}=/&${_value},/" "${_neo4j_conf}"
+			if grep -o "^[^#]*" "$_neo4j_conf" | grep -q --fixed-strings "${_property}="; then
+				sed --in-place "s/${_property}=/&${_value},/" "$_neo4j_conf"
 			else
-				echo "${_property}=${_value}" >> "${_neo4j_conf}"
+				echo "${_property}=${_value}" >> "$_neo4j_conf"
 			fi
 		fi
 	done
@@ -199,57 +199,57 @@ apply_plugin_default_configuration() {
 install_neo4j_labs_plugins() {
 	# We store a copy of the config before we modify it for the plugins to allow us to see if there are user-set values in the input config that we shouldn't override
 	local _old_config="$(mktemp)"
-	cp "${NEO4J_HOME}"/conf/neo4j.conf "${_old_config}"
-	for plugin_name in $(echo "${NEO4JLABS_PLUGINS}" | jq --raw-output '.[]'); do
-		load_plugin_from_github "${plugin_name}"
-		apply_plugin_default_configuration "${plugin_name}" "${_old_config}"
+	cp "$NEO4J_HOME"/conf/neo4j.conf "$_old_config"
+	for plugin_name in $(echo "$NEO4JLABS_PLUGINS" | jq --raw-output '.[]'); do
+		load_plugin_from_github "$plugin_name"
+		apply_plugin_default_configuration "$plugin_name" "$_old_config"
 	done
-	rm "${_old_config}"
+	rm "$_old_config"
 }
 
 add_docker_default_to_conf() {
 	# docker defaults should NOT overwrite values already in the conf file
-	local _setting="${1}"
-	local _value="${2}"
-	local _neo4j_home="${3}"
+	local _setting="$1"
+	local _value="$2"
+	local _neo4j_home="$3"
 
-	if ! grep -q "^${_setting}=" "${_neo4j_home}"/conf/neo4j.conf; then
-		echo -e "\n"${_setting}=${_value} >> "${_neo4j_home}"/conf/neo4j.conf
+	if ! grep -q "^${_setting}=" "$_neo4j_home"/conf/neo4j.conf; then
+		echo -e "\n"${_setting}=${_value} >> "$_neo4j_home"/conf/neo4j.conf
 	fi
 }
 
 add_env_setting_to_conf() {
 	# settings from environment variables should overwrite values already in the conf
-	local _setting=${1}
-	local _value=${2}
-	local _neo4j_home=${3}
+	local _setting=$1
+	local _value=$2
+	local _neo4j_home=$3
 
-	if grep -qF "${_setting}=" "${_neo4j_home}"/conf/neo4j.conf; then
+	if grep -qF "${_setting}=" "$_neo4j_home"/conf/neo4j.conf; then
 		# Remove any lines containing the setting already
-		sed --in-place "/^${_setting}=.*/d" "${_neo4j_home}"/conf/neo4j.conf
+		sed --in-place "/^${_setting}=.*/d" "$_neo4j_home"/conf/neo4j.conf
 	fi
 	# Then always append setting to file
-	echo "${_setting}=${_value}" >> "${_neo4j_home}"/conf/neo4j.conf
+	echo "${_setting}=${_value}" >> "$_neo4j_home"/conf/neo4j.conf
 }
 
 set_initial_password() {
-	local _neo4j_auth="${1}"
+	local _neo4j_auth="$1"
 
 	# set the neo4j initial password only if you run the database server
-	if [ "${cmd}" = "neo4j" ]; then
+	if [ "$cmd" = "neo4j" ]; then
 		if [ "${_neo4j_auth:-}" = "none" ]; then
-			add_env_setting_to_conf "dbms.security.auth_enabled" "false" "${NEO4J_HOME}"
+			add_env_setting_to_conf "dbms.security.auth_enabled" "false" "$NEO4J_HOME"
 			# NEO4J_dbms_security_auth__enabled=false
 		elif [[ "${_neo4j_auth:-}" =~ ^([^/]+)\/([^/]+)/?([tT][rR][uU][eE])?$ ]]; then
 			admin_user="${BASH_REMATCH[1]}"
 			password="${BASH_REMATCH[2]}"
 			do_reset="${BASH_REMATCH[3]}"
 
-			if [ "${password}" = "neo4j" ]; then
+			if [ "$password" = "neo4j" ]; then
 				echo >&2 "Invalid value for password. It cannot be 'neo4j', which is the default."
 				exit 1
 			fi
-			if [ "${admin_user}" != "neo4j" ]; then
+			if [ "$admin_user" != "neo4j" ]; then
 				echo >&2 "Invalid admin username, it must be neo4j"
 				exit 1
 			fi
@@ -258,15 +258,15 @@ set_initial_password() {
 				# running set-initial-password as root will create subfolders to /data as root, causing startup fail when neo4j can't read or write the /data/dbms folder
 				# creating the folder first will avoid that
 				mkdir -p /data/dbms
-				chown "${userid}":"${groupid}" /data/dbms
+				chown "$userid":"$groupid" /data/dbms
 			fi
 
 			# Will exit with error if users already exist (and print a message explaining that)
 			# we probably don't want the message though, since it throws an error message on restarting the container.
-			if [ "${do_reset}" = "true" ]; then
-				${neo4j_admin_cmd} set-initial-password "${password}" --require-password-change $(expand_commands_optionally) 2> /dev/null || :
+			if [ "$do_reset" = "true" ]; then
+				$neo4j_admin_cmd set-initial-password "$password" --require-password-change $(expand_commands_optionally) 2>/dev/null || :
 			else
-				${neo4j_admin_cmd} set-initial-password "${password}" $(expand_commands_optionally) 2> /dev/null || :
+				$neo4j_admin_cmd set-initial-password "$password" $(expand_commands_optionally) 2>/dev/null || :
 			fi
 		elif [ -n "${_neo4j_auth:-}" ]; then
 			echo "$_neo4j_auth is invalid"
@@ -301,17 +301,17 @@ readonly neo4j_admin_cmd
 
 # Need to chown the home directory
 if running_as_root; then
-	chown -R "${userid}":"${groupid}" "${NEO4J_HOME}"
-	chmod 700 "${NEO4J_HOME}"
-	find "${NEO4J_HOME}" -mindepth 1 -maxdepth 1 -type d -exec chmod -R 700 {} \;
-	find "${NEO4J_HOME}"/conf -type f -exec chmod -R 600 {} \;
+	chown -R "$userid":"$groupid" "$NEO4J_HOME"
+	chmod 700 "$NEO4J_HOME"
+	find "$NEO4J_HOME" -mindepth 1 -maxdepth 1 -type d -exec chmod -R 700 {} \;
+	find "$NEO4J_HOME"/conf -type f -exec chmod -R 600 {} \;
 fi
 
 # ==== CHECK LICENSE AGREEMENT ====
 
 # Only prompt for license agreement if command contains "neo4j" in it
-if [[ "${cmd}" == *"neo4j"* ]]; then
-	if [ "${NEO4J_EDITION}" = "enterprise" ]; then
+if [[ "$cmd" == *"neo4j"* ]]; then
+	if [ "$NEO4J_EDITION" = "enterprise" ]; then
 		if [ "${NEO4J_ACCEPT_LICENSE_AGREEMENT:=no}" != "yes" ]; then
 			echo >&2 "
 In order to use Neo4j Enterprise Edition you must accept the license agreement.
@@ -354,7 +354,7 @@ fi
 : ${NEO4J_dbms_allow__format__migration:=${NEO4J_dbms_allowFormatMigration:-}}
 : ${NEO4J_dbms_connectors_default__advertised__address:=${NEO4J_dbms_connectors_defaultAdvertisedAddress:-}}
 
-if [ "${NEO4J_EDITION}" = "enterprise" ]; then
+if [ "$NEO4J_EDITION" = "enterprise" ]; then
 	: ${NEO4J_causal__clustering_expected__core__cluster__size:=${NEO4J_causalClustering_expectedCoreClusterSize:-}}
 	: ${NEO4J_causal__clustering_initial__discovery__members:=${NEO4J_causalClustering_initialDiscoveryMembers:-}}
 	: ${NEO4J_causal__clustering_discovery__advertised__address:=${NEO4J_causalClustering_discoveryAdvertisedAddress:-}}
@@ -379,14 +379,14 @@ unset NEO4J_dbms_txLog_rotation_retentionPolicy NEO4J_UDC_SOURCE \
 
 if [ -d /conf ]; then
 	check_mounted_folder_readable "/conf"
-	rm -rf "${NEO4J_HOME}"/conf/*
-	find /conf -type f -exec cp --preserve=ownership,mode {} "${NEO4J_HOME}"/conf \;
+	rm -rf "$NEO4J_HOME"/conf/*
+	find /conf -type f -exec cp --preserve=ownership,mode {} "$NEO4J_HOME"/conf \;
 fi
 
 if [ -d /ssl ]; then
 	check_mounted_folder_readable "/ssl"
-	rm -rf "${NEO4J_HOME}"/certificates
-	ln -s /ssl "${NEO4J_HOME}"/certificates
+	rm -rf "$NEO4J_HOME"/certificates
+	ln -s /ssl "$NEO4J_HOME"/certificates
 fi
 
 if [ -d /plugins ]; then
@@ -436,42 +436,42 @@ fi
 ## == DOCKER SPECIFIC DEFAULT CONFIGURATIONS ===
 ## these should not override *any* configurations set by the user
 
-add_docker_default_to_conf "dbms.tx_log.rotation.retention_policy" "100M size" "${NEO4J_HOME}"
-add_docker_default_to_conf "dbms.memory.pagecache.size" "512M" "${NEO4J_HOME}"
-add_docker_default_to_conf "dbms.default_listen_address" "0.0.0.0" "${NEO4J_HOME}"
+add_docker_default_to_conf "dbms.tx_log.rotation.retention_policy" "100M size" "$NEO4J_HOME"
+add_docker_default_to_conf "dbms.memory.pagecache.size" "512M" "$NEO4J_HOME"
+add_docker_default_to_conf "dbms.default_listen_address" "0.0.0.0" "$NEO4J_HOME"
 # set enterprise only docker defaults
-if [ "${NEO4J_EDITION}" = "enterprise" ]; then
-	add_docker_default_to_conf "causal_clustering.discovery_advertised_address" "$(hostname):5000" "${NEO4J_HOME}"
-	add_docker_default_to_conf "causal_clustering.transaction_advertised_address" "$(hostname):6000" "${NEO4J_HOME}"
-	add_docker_default_to_conf "causal_clustering.raft_advertised_address" "$(hostname):7000" "${NEO4J_HOME}"
+if [ "$NEO4J_EDITION" = "enterprise" ]; then
+	add_docker_default_to_conf "causal_clustering.discovery_advertised_address" "$(hostname):5000" "$NEO4J_HOME"
+	add_docker_default_to_conf "causal_clustering.transaction_advertised_address" "$(hostname):6000" "$NEO4J_HOME"
+	add_docker_default_to_conf "causal_clustering.raft_advertised_address" "$(hostname):7000" "$NEO4J_HOME"
 fi
 
 ## == ENVIRONMENT VARIABLE CONFIGURATIONS ===
 ## these override BOTH defaults and any existing values in the neo4j.conf file
 
 # save NEO4J_HOME and NEO4J_AUTH to temp variables that don't begin with NEO4J_ so they don't get added to the conf
-temp_neo4j_home="${NEO4J_HOME}"
+temp_neo4j_home="$NEO4J_HOME"
 temp_neo4j_auth="${NEO4J_AUTH:-}"
 # list env variables with prefix NEO4J_ and create settings from them
 unset NEO4J_AUTH NEO4J_SHA256 NEO4J_TARBALL NEO4J_EDITION NEO4J_ACCEPT_LICENSE_AGREEMENT NEO4J_HOME
 for i in $(set | grep ^NEO4J_ | awk -F'=' '{print $1}' | sort -rn); do
-	setting=$(echo "${i}" | sed 's|^NEO4J_||' | sed 's|_|.|g' | sed 's|\.\.|_|g')
+	setting=$(echo "$i" | sed 's|^NEO4J_||' | sed 's|_|.|g' | sed 's|\.\.|_|g')
 	value=$(echo "${!i}")
 	# Don't allow settings with no value or settings that start with a number (neo4j converts settings to env variables and you cannot have an env variable that starts with a number)
-	if [[ -n ${value} ]]; then
-		if [[ ! "${setting}" =~ ^[0-9]+.*$ ]]; then
-			add_env_setting_to_conf "${setting}" "${value}" "${temp_neo4j_home}"
+	if [[ -n $value ]]; then
+		if [[ ! "$setting" =~ ^[0-9]+.*$ ]]; then
+			add_env_setting_to_conf "$setting" "$value" "$temp_neo4j_home"
 		else
 			echo >&2 "WARNING: ${setting} not written to conf file because settings that start with a number are not permitted"
 		fi
 	fi
 done
-export NEO4J_HOME="${temp_neo4j_home}"
+export NEO4J_HOME="$temp_neo4j_home"
 unset temp_neo4j_home
 
 # ==== SET PASSWORD AND PLUGINS ====
 
-set_initial_password "${temp_neo4j_auth}"
+set_initial_password "$temp_neo4j_auth"
 
 if [[ ! -z "${NEO4JLABS_PLUGINS:-}" ]]; then
 	# NEO4JLABS_PLUGINS should be a json array of plugins like '["graph-algorithms", "apoc", "streams", "graphql"]'
@@ -480,13 +480,13 @@ fi
 
 # ==== INVOKE NEO4J STARTUP ====
 
-[ -f "${EXTENSION_SCRIPT:-}" ] && . ${EXTENSION_SCRIPT}
+[ -f "${EXTENSION_SCRIPT:-}" ] && . $EXTENSION_SCRIPT
 
-if [ "${cmd}" = "dump-config" ]; then
+if [ "$cmd" = "dump-config" ]; then
 	if ! is_writable "/conf"; then
 		print_permissions_advice_and_fail "/conf"
 	fi
-	cp --recursive "${NEO4J_HOME}"/conf/* /conf
+	cp --recursive "$NEO4J_HOME"/conf/* /conf
 	echo "Config Dumped"
 	exit 0
 fi
@@ -494,12 +494,12 @@ fi
 # Use su-exec to drop privileges to neo4j user
 # Note that su-exec, despite its name, does not replicate the
 # functionality of exec, so we need to use both
-if [ "${cmd}" = "neo4j" ]; then
+if [ "$cmd" = "neo4j" ]; then
 	if [ "${EXTENDED_CONF+"yes"}" = "yes" ]; then
-		${exec_cmd} neo4j console --expand-commands
+		$exec_cmd neo4j console --expand-commands
 	else
-		${exec_cmd} neo4j console
+		$exec_cmd neo4j console
 	fi
 else
-	${exec_cmd} "$@"
+	$exec_cmd "$@"
 fi

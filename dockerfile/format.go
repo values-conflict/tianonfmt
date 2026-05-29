@@ -19,7 +19,9 @@ func Format(src string) (string, error) {
 // RUN continuation lines are normalised using the shell formatter.
 func FormatFile(f *File) (string, error) {
 	w := &writer{}
-	w.file(f)
+	if err := w.file(f); err != nil {
+		return "", err
+	}
 	return w.out.String(), nil
 }
 
@@ -30,7 +32,7 @@ type writer struct {
 func (w *writer) writeln(s string) { w.out.WriteString(s); w.out.WriteByte('\n') }
 func (w *writer) newline()         { w.out.WriteByte('\n') }
 
-func (w *writer) file(f *File) {
+func (w *writer) file(f *File) error {
 	for _, d := range f.Directives {
 		w.writeln(d.Raw)
 	}
@@ -50,21 +52,24 @@ func (w *writer) file(f *File) {
 			w.writeln(strings.TrimRight(instr.Args, " \t"))
 			prevWasBlank = false
 		default:
-			w.instruction(instr)
+			if err := w.instruction(instr); err != nil {
+				return err
+			}
 			prevWasBlank = false
 		}
 	}
+	return nil
 }
 
-func (w *writer) instruction(instr *Instruction) {
+func (w *writer) instruction(instr *Instruction) error {
 	if len(instr.Lines) == 0 {
-		return
+		return nil
 	}
 	if instr.Keyword == "RUN" {
-		w.runInstruction(instr)
-		return
+		return w.runInstruction(instr)
 	}
 	w.plainInstruction(instr)
+	return nil
 }
 
 // plainInstruction emits a Dockerfile instruction preserving original
@@ -100,9 +105,9 @@ func (w *writer) plainInstruction(instr *Instruction) {
 
 // runInstruction emits a RUN instruction, applying shell normalisation to the
 // continuation lines.
-func (w *writer) runInstruction(instr *Instruction) {
+func (w *writer) runInstruction(instr *Instruction) error {
 	if len(instr.Lines) == 0 {
-		return
+		return nil
 	}
 
 	// Emit the first line (RUN ...) unchanged.
@@ -110,7 +115,7 @@ func (w *writer) runInstruction(instr *Instruction) {
 	w.writeln(formatFirstLine(firstLine.Text, instr.Keyword))
 
 	if len(instr.Lines) == 1 {
-		return // single-line RUN
+		return nil // single-line RUN
 	}
 
 	// Collect continuation + comment lines and pass to the shell formatter.
@@ -119,10 +124,14 @@ func (w *writer) runInstruction(instr *Instruction) {
 		contLines = append(contLines, line.Text)
 	}
 
-	normalised := shell.FormatRUN(contLines)
+	normalised, err := shell.FormatRUN(contLines)
+	if err != nil {
+		return err
+	}
 	for _, line := range normalised {
 		w.writeln(line)
 	}
+	return nil
 }
 
 // formatFirstLine uppercases the keyword while preserving the rest of the line.

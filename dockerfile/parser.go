@@ -29,7 +29,7 @@ func splitLines(src string) []string {
 
 type parser struct {
 	lines  []string
-	pos    int // index into lines (0-based)
+	pos    int  // index into lines (0-based)
 	escape byte // continuation escape character, default '\'
 }
 
@@ -94,12 +94,12 @@ func parseDirective(trimmed string) *Directive {
 	// Must match: # key = value (case-insensitive key)
 	rest := strings.TrimPrefix(trimmed, "#")
 	rest = strings.TrimSpace(rest)
-	eqIdx := strings.IndexByte(rest, '=')
-	if eqIdx < 0 {
+	before, after, ok := strings.Cut(rest, "=")
+	if !ok {
 		return nil
 	}
-	key := strings.TrimSpace(rest[:eqIdx])
-	val := strings.TrimSpace(rest[eqIdx+1:])
+	key := strings.TrimSpace(before)
+	val := strings.TrimSpace(after)
 	keyLower := strings.ToLower(key)
 	if keyLower != "syntax" && keyLower != "escape" && keyLower != "check" {
 		return nil

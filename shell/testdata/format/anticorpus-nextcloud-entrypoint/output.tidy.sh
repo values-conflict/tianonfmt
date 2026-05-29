@@ -26,21 +26,21 @@ run_path() {
 
 	echo "=> Searching for hook scripts (*.sh) to run, located in the folder \"${hook_folder_path}\""
 
-	if ! [ -d "${hook_folder_path}" ] || directory_empty "${hook_folder_path}"; then
+	if ! [ -d "$hook_folder_path" ] || directory_empty "$hook_folder_path"; then
 		echo "==> Skipped: the \"$1\" folder is empty (or does not exist)"
 		return 0
 	fi
 
-	find "${hook_folder_path}" -maxdepth 1 -iname '*.sh' '(' -type f -o -type l ')' -print | sort | (
+	find "$hook_folder_path" -maxdepth 1 -iname '*.sh' '(' -type f -o -type l ')' -print | sort | (
 		while read -r script_file_path; do
-			if ! [ -x "${script_file_path}" ]; then
+			if ! [ -x "$script_file_path" ]; then
 				echo "==> The script \"${script_file_path}\" was skipped, because it lacks the executable flag"
 				continue
 			fi
 
 			echo "==> Running the script (cwd: $(pwd)): \"${script_file_path}\""
 			found=$(( found + 1 ))
-			run_as "${script_file_path}" || {
+			run_as "$script_file_path" || {
 				return_code="$?"
 				echo "==> Failed at executing script \"${script_file_path}\". Exit code: ${return_code}"
 				exit 1
@@ -66,15 +66,15 @@ file_env() {
 	local def="${2:-}"
 	local varValue=$(env | grep -E "^${var}=" | sed --regexp-extended -e "s/^${var}=//")
 	local fileVarValue=$(env | grep -E "^${fileVar}=" | sed --regexp-extended -e "s/^${fileVar}=//")
-	if [ -n "${varValue}" ] && [ -n "${fileVarValue}" ]; then
+	if [ -n "$varValue" ] && [ -n "$fileVarValue" ]; then
 		echo >&2 "error: both $var and $fileVar are set (but are exclusive)"
 		exit 1
 	fi
-	if [ -n "${varValue}" ]; then
-		export "$var"="${varValue}"
-	elif [ -n "${fileVarValue}" ]; then
-		export "$var"="$(cat "${fileVarValue}")"
-	elif [ -n "${def}" ]; then
+	if [ -n "$varValue" ]; then
+		export "$var"="$varValue"
+	elif [ -n "$fileVarValue" ]; then
+		export "$var"="$(cat "$fileVarValue")"
+	elif [ -n "$def" ]; then
 		export "$var"="$def"
 	fi
 	unset "$fileVar"
@@ -133,13 +133,13 @@ configure_redis_session() {
 # Main
 ########################################################################
 
-if expr "$1" : "apache" 1> /dev/null; then
+if expr "$1" : "apache" 1>/dev/null; then
 	if [ -n "${APACHE_DISABLE_REWRITE_IP+x}" ]; then
 		a2disconf remoteip
 	fi
 fi
 
-if expr "$1" : "apache" 1> /dev/null || [ "$1" = "php-fpm" ] || [ "${NEXTCLOUD_UPDATE:-0}" -eq 1 ]; then
+if expr "$1" : "apache" 1>/dev/null || [ "$1" = "php-fpm" ] || [ "${NEXTCLOUD_UPDATE:-0}" -eq 1 ]; then
 	uid="$(id -u)"
 	gid="$(id -g)"
 	if [ "$uid" = '0' ]; then
@@ -268,10 +268,10 @@ if expr "$1" : "apache" 1> /dev/null || [ "$1" = "php-fpm" ] || [ "${NEXTCLOUD_U
 						fi
 						if [ -n "${NEXTCLOUD_TRUSTED_DOMAINS+x}" ]; then
 							echo "Setting trusted domains…"
-							set -Eeuo pipefail
+							set -f # turn off glob
 							NC_TRUSTED_DOMAIN_IDX=1
-							for DOMAIN in ${NEXTCLOUD_TRUSTED_DOMAINS}; do
-								DOMAIN=$(echo "${DOMAIN}" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
+							for DOMAIN in $NEXTCLOUD_TRUSTED_DOMAINS; do
+								DOMAIN=$(echo "$DOMAIN" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
 								run_as "php /var/www/html/occ config:system:set trusted_domains $NC_TRUSTED_DOMAIN_IDX --value=\"${DOMAIN}\""
 								NC_TRUSTED_DOMAIN_IDX=$(( NC_TRUSTED_DOMAIN_IDX + 1 ))
 							done
@@ -310,7 +310,7 @@ if expr "$1" : "apache" 1> /dev/null || [ "$1" = "php-fpm" ] || [ "${NEXTCLOUD_U
 		if [ -n "${NEXTCLOUD_INIT_HTACCESS+x}" ] && [ "$installed_version" != "0.0.0.0" ]; then
 			run_as 'php /var/www/html/occ maintenance:update:htaccess'
 		fi
-	) 9> /var/www/html/nextcloud-init-sync.lock
+	) 9>/var/www/html/nextcloud-init-sync.lock
 
 	# warn if config files on persistent storage differ from the latest version of this image
 	for cfgPath in /usr/src/nextcloud/config/*.php; do

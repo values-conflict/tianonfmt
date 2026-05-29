@@ -31,7 +31,9 @@ func Format(src string, lang syntax.LangVariant) (string, error) {
 	}
 	applyFormatRewrites(f)
 	normalizeAllShortFlags(f, false)
-	formatJQInAST(f)
+	if err := formatJQInAST(f); err != nil {
+		return "", err
+	}
 	return printShell(f)
 }
 
@@ -52,27 +54,15 @@ func FormatWithTidy(src string, lang syntax.LangVariant) (string, error) {
 	applyFormatRewrites(f)
 	ApplyTidy(f)
 	applyTidyHeredocs(f)
-	formatJQInAST(f)
+	if err := formatJQInAST(f); err != nil {
+		return "", err
+	}
 	return printShell(f)
 }
 
 // formatJQExpr parses and reformats a jq expression for embedding in shell.
-// Returns "" on parse failure so callers preserve the original.
-func formatJQExpr(expr string, inline bool) string {
-	trimmed := strings.TrimSpace(expr)
-	node, err := jq.ParseExpr(trimmed)
-	if err != nil {
-		f, ferr := jq.ParseFile(trimmed)
-		if ferr != nil {
-			return ""
-		}
-		s, _ := jq.FormatFile(f)
-		return s
-	}
-	if inline {
-		return jq.FormatNodeInline(node)
-	}
-	return jq.FormatNode(node)
+func formatJQExpr(expr string, inline bool) (string, error) {
+	return jq.FormatStr(expr, inline)
 }
 
 // ParseFile parses src as a shell script of the given language variant.
@@ -97,6 +87,7 @@ func printShell(f *syntax.File) (string, error) {
 	s := fixMultiLineClauses(buf.String())
 	s = fixArraySpacing(s)
 	s = fixHereStringSpacing(s)
+	s = fixFdRedirectSpacing(s)
 	s = fixArithSpacing(s)
 	s = fixEvalQuoting(s)
 	s = joinShiftPairs(s)
@@ -108,6 +99,16 @@ func printShell(f *syntax.File) (string, error) {
 // The digit-prefix case (e.g. arithmetic << 2) is excluded by requiring the
 // character after the space to be non-digit.
 var reHeredocSpace = regexp.MustCompile(`(<<-?) (['"A-Za-z_])`)
+
+// reFdRedirectSpace matches the space SpaceRedirects inserts after a
+// file-descriptor redirect like "2> /dev/null" or "2>> file".
+// Corpus style is cuddled: "2>/dev/null".
+//
+// The pattern anchors on whitespace before the fd digits so that "echo 2 > x"
+// (where 2 is a plain argument, not an fd) is never matched — in that form
+// ">" is a standalone token separated by spaces on both sides, not
+// immediately adjacent to the digit.
+var reFdRedirectSpace = regexp.MustCompile(`([ \t])([0-9]+)(>>?) `)
 
 // fixEvalQuoting wraps bare $(...) arguments to eval in double quotes:
 //
@@ -295,6 +296,20 @@ func arithCloseParen(src string, start int) int {
 		i++
 	}
 	return -1
+}
+
+// fixFdRedirectSpacing removes the space that SpaceRedirects inserts between a
+// file-descriptor number and its redirect file, restoring corpus style:
+//
+//	2> /dev/null  →  2>/dev/null
+//	2>> log       →  2>>log
+//
+// Bare redirects (">" and ">>") keep their space; only fd-prefixed forms are
+// affected.  "echo 2 > x" (plain argument, not an fd) is not matched because
+// ">" is a standalone token with whitespace on both sides, not directly
+// adjacent to the digit.
+func fixFdRedirectSpacing(src string) string {
+	return reFdRedirectSpace.ReplaceAllString(src, "$1$2$3")
 }
 
 // fixHereStringSpacing removes the space that SpaceRedirects inserts after
@@ -542,7 +557,7 @@ func arrayCloseParen(line string, openPos int) int {
 //
 //  1. Last item joined with "; do" on the same line:
 //     \tbookworm; do  →  \tbookworm \
-//                        ; do
+//     ; do
 //
 //  2. "; do" indented one level too deep (same as the items):
 //     \t; do  →  ; do
@@ -626,11 +641,11 @@ func matchSemiClauseJoined(line string) (tabs, item, keyword string, ok bool) {
 
 func newPrinter() *syntax.Printer {
 	return syntax.NewPrinter(
-		syntax.Indent(0),             // 0 = tabs (corpus: all .sh files use tabs)
-		syntax.BinaryNextLine(true),  // && / || at start of continuation line (bash.md §Notable omissions)
+		syntax.Indent(0),            // 0 = tabs (corpus: all .sh files use tabs)
+		syntax.BinaryNextLine(true), // && / || at start of continuation line (bash.md §Notable omissions)
 		syntax.SwitchCaseIndent(true),
 		syntax.KeepPadding(false),
-		syntax.SpaceRedirects(true),  // ">file" → "> file"; does not affect ">&2" (bash.md §Redirections)
+		syntax.SpaceRedirects(true), // ">file" → "> file"; fd-prefixed forms (e.g. "2>/dev/null") are corrected back by fixFdRedirectSpacing (bash.md §Redirections)
 	)
 }
 
@@ -651,14 +666,9 @@ func newPrinter() *syntax.Printer {
 //   - Blank continuation lines (lone "\"): preserved as-is
 //
 // FormatRUN normalises the continuation lines of a Dockerfile RUN instruction.
-func FormatRUN(lines []string) []string {
+func FormatRUN(lines []string) ([]string, error) {
 	if len(lines) == 0 {
-		return lines
-	}
-
-	type outLine struct {
-		text    string
-		hasCont bool // true if original line had continuation \
+		return lines, nil
 	}
 
 	depth := 0
@@ -703,7 +713,11 @@ func FormatRUN(lines []string) []string {
 			depth-- // temporarily decrease for this line (body at same depth as opener)
 		}
 
-		trimmed = reformatJQInLine(trimmed)
+		var err error
+		trimmed, err = reformatJQInLine(trimmed)
+		if err != nil {
+			return nil, err
+		}
 
 		result = append(result, appendCont(strings.Repeat("\t", depth+1)+trimmed, hasCont))
 
@@ -718,7 +732,7 @@ func FormatRUN(lines []string) []string {
 		}
 	}
 
-	return result
+	return result, nil
 }
 
 // appendCont appends " \" to line if hasCont is true.
@@ -816,7 +830,7 @@ func hdocBodyHasLeadingTabs(hdoc *syntax.Word) bool {
 		if !ok {
 			continue
 		}
-		for _, line := range strings.Split(lit.Value, "\n") {
+		for line := range strings.SplitSeq(lit.Value, "\n") {
 			if len(line) > 0 && line[0] == '\t' {
 				return true
 			}
@@ -854,19 +868,90 @@ func isUnquotedHeredocWord(w *syntax.Word) bool {
 // Note: eval $(...) → eval "$(...)​" quoting is done as a text-level
 // post-process (fixEvalQuoting) to avoid AST position issues with
 // zero-position nodes that cause comment misplacement.
-// normalizeAllShortFlags walks every CallExpr in the file and applies
-// normalizeShortFlags.  tidy=false for the format pass, tidy=true for tidy.
-// Called unconditionally (unlike formatJQInAST which is jqFmt-gated).
-func normalizeAllShortFlags(f *syntax.File, tidy bool) {
+func applyFormatRewrites(_ *syntax.File) {
+}
+
+// reLongFlagInComment matches a long-form CLI flag name inside a comment:
+// "--" followed by at least two lowercase letters.  This distinguishes actual
+// flag references like "--canonicalize" from "--" used as an em-dash in prose.
+var reLongFlagInComment = regexp.MustCompile(`--[a-z]{2,}`)
+
+// isPlatformComment reports whether text (the body of a shell comment, without
+// the leading '#') signals a platform-specific or portability-related flag
+// constraint that the formatter should respect rather than normalise.
+//
+// Two signals are recognised:
+//   - Platform/tooling keywords (case-insensitive): macos, darwin, bsd,
+//     coreutils, gnu, busybox, alpine, musl, posix, portable, portability
+//   - A long-form flag reference: "--word" (at least two lowercase letters)
+//     signals an explicit short-vs-long comparison (e.g. "# -f not --canonicalize").
+//     A bare "--" is treated as an em-dash and does not match.
+func isPlatformComment(text string) bool {
+	lower := strings.ToLower(text)
+	for _, kw := range []string{
+		"macos", "darwin", "bsd",
+		"coreutils", "gnu", "busybox", "alpine", "musl",
+		"posix", "portable", "portability",
+	} {
+		if strings.Contains(lower, kw) {
+			return true
+		}
+	}
+	return reLongFlagInComment.MatchString(text)
+}
+
+// stmtHasPlatformComment reports whether s has a trailing inline comment (on
+// the same line as s.End()) that signals a platform-specific or
+// portability-related flag constraint.  Comments that merely describe the
+// command's purpose (e.g. "# check mode") are not matched.
+func stmtHasPlatformComment(s *syntax.Stmt) bool {
+	endLine := s.End().Line()
+	for _, c := range s.Comments {
+		if c.Pos().Line() == endLine {
+			return isPlatformComment(c.Text)
+		}
+	}
+	return false
+}
+
+// collectProtectedLines builds a set of source line numbers on which flag
+// normalization should be suppressed.  Every line within the span of a
+// statement whose trailing comment signals a platform constraint is marked
+// protected — this covers not only the direct command but also any command
+// nested inside a $(…) subshell on the same source line
+// (e.g. gitDir="$(readlink -f …)" # -f not --canonicalize for macOS).
+func collectProtectedLines(f *syntax.File) map[uint]bool {
+	var protected map[uint]bool
 	syntax.Walk(f, func(n syntax.Node) bool {
-		if ce, ok := n.(*syntax.CallExpr); ok {
-			normalizeShortFlags(ce, false, tidy)
+		s, ok := n.(*syntax.Stmt)
+		if !ok || !stmtHasPlatformComment(s) {
+			return true
+		}
+		if protected == nil {
+			protected = make(map[uint]bool)
+		}
+		for line := s.Pos().Line(); line <= s.End().Line(); line++ {
+			protected[line] = true
 		}
 		return true
 	})
+	return protected
 }
 
-func applyFormatRewrites(_ *syntax.File) {
+// normalizeAllShortFlags walks every CallExpr in the file and applies
+// normalizeShortFlags, skipping commands on source lines that are protected
+// by a trailing comment.  tidy=false for the format pass, tidy=true for tidy.
+// Called unconditionally (unlike formatJQInAST which is jqFmt-gated).
+func normalizeAllShortFlags(f *syntax.File, tidy bool) {
+	protected := collectProtectedLines(f)
+	syntax.Walk(f, func(n syntax.Node) bool {
+		if ce, ok := n.(*syntax.CallExpr); ok {
+			if !protected[ce.Pos().Line()] {
+				normalizeShortFlags(ce, false, tidy)
+			}
+		}
+		return true
+	})
 }
 
 // ── jq-in-shell AST rewriting ────────────────────────────────────────────────
@@ -882,106 +967,164 @@ func applyFormatRewrites(_ *syntax.File) {
 // Corpus refs:
 //   - https://github.com/tianon/dockerfiles/blob/2118a1979eff7545e06570d1eefc6434d691e68d/buildkit/versions.sh#L62 single-line
 //   - https://github.com/tianon/dockerfiles/blob/2118a1979eff7545e06570d1eefc6434d691e68d/buildkit/versions.sh#L67-L70 multi-line
-func formatJQInAST(f *syntax.File) {
-	jqWalkStmts(f.Stmts, 0)
+func formatJQInAST(f *syntax.File) error {
+	return jqWalkStmts(f.Stmts, 0)
 }
 
 // jqWalkStmts visits each statement in stmts at the given shell nesting depth.
-func jqWalkStmts(stmts []*syntax.Stmt, depth int) {
+func jqWalkStmts(stmts []*syntax.Stmt, depth int) error {
 	for _, s := range stmts {
-		jqWalkStmt(s, depth)
+		if err := jqWalkStmt(s, depth); err != nil {
+			return err
+		}
 	}
+	return nil
 }
 
 // jqWalkStmt visits a single statement (its command and any redirects).
-func jqWalkStmt(stmt *syntax.Stmt, depth int) {
+func jqWalkStmt(stmt *syntax.Stmt, depth int) error {
 	if stmt == nil {
-		return
+		return nil
 	}
-	jqWalkCmd(stmt.Cmd, depth)
+	if err := jqWalkCmd(stmt.Cmd, depth); err != nil {
+		return err
+	}
 	for _, r := range stmt.Redirs {
 		if r.Word != nil {
-			jqWalkWord(r.Word, depth)
+			if err := jqWalkWord(r.Word, depth); err != nil {
+				return err
+			}
 		}
 	}
+	return nil
 }
 
 // jqWalkCmd visits a shell command, increasing depth for compound-statement bodies.
-func jqWalkCmd(cmd syntax.Command, depth int) {
+func jqWalkCmd(cmd syntax.Command, depth int) error {
 	if cmd == nil {
-		return
+		return nil
 	}
 	switch v := cmd.(type) {
 	case *syntax.CallExpr:
 		if len(v.Args) > 0 && wordLit(v.Args[0]) == "jq" {
 			if sgl := findJQExprArg(v.Args[1:]); sgl != nil {
-				reformatSglQuoted(sgl, depth)
+				if err := reformatSglQuoted(sgl, depth); err != nil {
+					return err
+				}
 			}
 		}
 		for _, assign := range v.Assigns {
 			if assign.Value != nil {
-				jqWalkWord(assign.Value, depth)
+				if err := jqWalkWord(assign.Value, depth); err != nil {
+					return err
+				}
 			}
 		}
 		for _, arg := range v.Args {
-			jqWalkWord(arg, depth)
+			if err := jqWalkWord(arg, depth); err != nil {
+				return err
+			}
 		}
 	case *syntax.IfClause:
 		// IfClause is recursive: .Else is another *IfClause for elif/else.
 		for ic := v; ic != nil; ic = ic.Else {
-			jqWalkStmts(ic.Cond, depth)
-			jqWalkStmts(ic.Then, depth+1)
+			// When the first condition statement is on a different line than the
+			// "if"/"elif" token, the printer indents the condition body by one
+			// extra level — mirror that in the depth counter.
+			condDepth := depth
+			if len(ic.Cond) > 0 && ic.Position.Line() != ic.Cond[0].Pos().Line() {
+				condDepth = depth + 1
+			}
+			if err := jqWalkStmts(ic.Cond, condDepth); err != nil {
+				return err
+			}
+			if err := jqWalkStmts(ic.Then, depth+1); err != nil {
+				return err
+			}
 		}
 	case *syntax.WhileClause:
-		jqWalkStmts(v.Cond, depth)
-		jqWalkStmts(v.Do, depth+1)
+		if err := jqWalkStmts(v.Cond, depth); err != nil {
+			return err
+		}
+		if err := jqWalkStmts(v.Do, depth+1); err != nil {
+			return err
+		}
 	case *syntax.ForClause:
 		if loop, ok := v.Loop.(*syntax.WordIter); ok {
 			for _, item := range loop.Items {
-				jqWalkWord(item, depth)
+				if err := jqWalkWord(item, depth); err != nil {
+					return err
+				}
 			}
 		}
-		jqWalkStmts(v.Do, depth+1)
+		if err := jqWalkStmts(v.Do, depth+1); err != nil {
+			return err
+		}
 	case *syntax.FuncDecl:
-		jqWalkStmt(v.Body, depth+1)
+		if err := jqWalkStmt(v.Body, depth+1); err != nil {
+			return err
+		}
 	case *syntax.Block:
-		jqWalkStmts(v.Stmts, depth+1)
+		if err := jqWalkStmts(v.Stmts, depth+1); err != nil {
+			return err
+		}
 	case *syntax.Subshell:
 		// ( ... ) does not add a printer indent level
-		jqWalkStmts(v.Stmts, depth)
+		if err := jqWalkStmts(v.Stmts, depth); err != nil {
+			return err
+		}
 	case *syntax.BinaryCmd:
-		jqWalkStmt(v.X, depth)
+		if err := jqWalkStmt(v.X, depth); err != nil {
+			return err
+		}
 		// When Y starts on a different line than X, BinaryNextLine mode puts
 		// the operator on a new indented line — reflect that in the depth.
 		yDepth := depth
 		if v.X.Pos().Line() != v.Y.Pos().Line() {
 			yDepth = depth + 1
 		}
-		jqWalkStmt(v.Y, yDepth)
+		if err := jqWalkStmt(v.Y, yDepth); err != nil {
+			return err
+		}
 	case *syntax.TimeClause:
-		jqWalkStmt(v.Stmt, depth)
+		if err := jqWalkStmt(v.Stmt, depth); err != nil {
+			return err
+		}
 	case *syntax.CoprocClause:
-		jqWalkStmt(v.Stmt, depth)
+		if err := jqWalkStmt(v.Stmt, depth); err != nil {
+			return err
+		}
 	case *syntax.CaseClause:
-		jqWalkWord(v.Word, depth)
+		if err := jqWalkWord(v.Word, depth); err != nil {
+			return err
+		}
 		for _, item := range v.Items {
-			jqWalkStmts(item.Stmts, depth+1)
+			// SwitchCaseIndent(true) adds two indent levels for case-body
+			// statements (one for the pattern line, one for the body), so depth
+			// must advance by two to match the actual printed indentation.
+			if err := jqWalkStmts(item.Stmts, depth+2); err != nil {
+				return err
+			}
 		}
 	}
+	return nil
 }
 
 // jqWalkWord descends into word parts that may contain command substitutions.
-func jqWalkWord(word *syntax.Word, depth int) {
+func jqWalkWord(word *syntax.Word, depth int) error {
 	if word == nil {
-		return
+		return nil
 	}
 	for _, part := range word.Parts {
-		jqWalkWordPart(part, depth)
+		if err := jqWalkWordPart(part, depth); err != nil {
+			return err
+		}
 	}
+	return nil
 }
 
 // jqWalkWordPart visits a single word part.
-func jqWalkWordPart(part syntax.WordPart, depth int) {
+func jqWalkWordPart(part syntax.WordPart, depth int) error {
 	switch v := part.(type) {
 	case *syntax.CmdSubst:
 		// When the body starts on the same line as $( (inline form), the printer
@@ -991,10 +1134,14 @@ func jqWalkWordPart(part syntax.WordPart, depth int) {
 		if len(v.Stmts) > 0 && v.Left.Line() != v.Stmts[0].Pos().Line() {
 			cmdDepth = depth + 1
 		}
-		jqWalkStmts(v.Stmts, cmdDepth)
+		if err := jqWalkStmts(v.Stmts, cmdDepth); err != nil {
+			return err
+		}
 	case *syntax.DblQuoted:
 		for _, p := range v.Parts {
-			jqWalkWordPart(p, depth)
+			if err := jqWalkWordPart(p, depth); err != nil {
+				return err
+			}
 		}
 	case *syntax.ParamExp:
 		if v.Index != nil {
@@ -1002,8 +1149,11 @@ func jqWalkWordPart(part syntax.WordPart, depth int) {
 		}
 	case *syntax.ProcSubst:
 		// <(...) always puts its body on a new indented line.
-		jqWalkStmts(v.Stmts, depth+1)
+		if err := jqWalkStmts(v.Stmts, depth+1); err != nil {
+			return err
+		}
 	}
+	return nil
 }
 
 // wordLit returns the literal string value of a word if it is a single literal,
@@ -1022,17 +1172,17 @@ func wordLit(w *syntax.Word) string {
 // valueFlags is the set of jq flags that consume additional arguments (NAME and/or VALUE).
 // Each maps to the number of extra args it consumes.
 var valueFlags = map[string]int{
-	"--arg":        2, // NAME VALUE
-	"--argjson":    2,
-	"--slurpfile":  2,
-	"--rawfile":    2,
-	"--json-args":  0, // terminates flag processing; rest are jq positional args
-	"--args":       0,
-	"-f":           1, // FILENAME
-	"--from-file":  1,
-	"--indent":     1, // N
-	"--tab":        0,
-	"--run-tests":  0,
+	"--arg":       2, // NAME VALUE
+	"--argjson":   2,
+	"--slurpfile": 2,
+	"--rawfile":   2,
+	"--json-args": 0, // terminates flag processing; rest are jq positional args
+	"--args":      0,
+	"-f":          1, // FILENAME
+	"--from-file": 1,
+	"--indent":    1, // N
+	"--tab":       0,
+	"--run-tests": 0,
 }
 
 // findJQExprArg finds the SglQuoted argument that is the jq filter expression.
@@ -1067,24 +1217,32 @@ func findJQExprArg(args []*syntax.Word) *syntax.SglQuoted {
 	return last
 }
 
-// reformatSglQuoted reformats sgl.Value as a jq expression using jqFmt.
+// reformatSglQuoted reformats sgl.Value as a jq expression.
 // depth is the shell nesting depth of the containing jq call (0 = top level).
 // Multi-line expressions are always indented to depth+1 tabs regardless of
 // the original indentation, normalising column-0, space-based, or otherwise
 // wrong indentation.  Single-line expressions are compacted in place.
-func reformatSglQuoted(sgl *syntax.SglQuoted, depth int) {
+func reformatSglQuoted(sgl *syntax.SglQuoted, depth int) error {
 	val := sgl.Value
 	if val == "" {
-		return
+		return nil
+	}
+
+	line := sgl.Pos().Line()
+	wrapErr := func(err error) error {
+		return fmt.Errorf("jq expression at line %d: %w", line, err)
 	}
 
 	if !strings.Contains(val, "\n") {
 		// Single-line: format compactly.
-		formatted := formatJQExpr(strings.TrimSpace(val), true)
-		if formatted != "" && !strings.Contains(formatted, "\n") {
+		formatted, err := formatJQExpr(strings.TrimSpace(val), true)
+		if err != nil {
+			return wrapErr(err)
+		}
+		if !strings.Contains(formatted, "\n") {
 			sgl.Value = formatted
 		}
-		return
+		return nil
 	}
 
 	// Multi-line: strip whatever indentation the content has, reformat with jq,
@@ -1110,9 +1268,9 @@ func reformatSglQuoted(sgl *syntax.SglQuoted, depth int) {
 	expr := strings.Join(stripped, "\n")
 
 	// Format the jq expression.
-	formatted := formatJQExpr(strings.TrimSpace(expr), false)
-	if formatted == "" {
-		return // parse failure — preserve original
+	formatted, err := formatJQExpr(strings.TrimSpace(expr), false)
+	if err != nil {
+		return wrapErr(err)
 	}
 
 	// Re-indent the formatted lines at the canonical depth.
@@ -1130,11 +1288,12 @@ func reformatSglQuoted(sgl *syntax.SglQuoted, depth int) {
 	if newVal != val {
 		sgl.Value = newVal
 	}
+	return nil
 }
 
 // reformatJQInLine reformats any `jq '...'` expression on a single shell line.
 // Used by FormatRUN for jq inside Dockerfile RUN blocks.
-func reformatJQInLine(line string) string {
+func reformatJQInLine(line string) (string, error) {
 	// Only attempt jq reformatting if the line actually contains a jq invocation.
 	// Without this guard, PowerShell single-quoted strings (and other non-jq
 	// constructs) would be incorrectly passed to the jq formatter.
@@ -1143,30 +1302,32 @@ func reformatJQInLine(line string) string {
 		strings.Contains(line, " jq '") || strings.Contains(line, "\tjq '") ||
 		strings.Contains(line, "$(jq '") || strings.Contains(line, "$(jq -")
 	if !hasJQ {
-		return line
+		return line, nil
 	}
 
 	sq := strings.LastIndex(line, "'")
 	if sq < 1 {
-		return line
+		return line, nil
 	}
 	firstSQ := strings.Index(line, "'")
 	if firstSQ == sq {
-		return line // only one quote — malformed or empty
+		return line, nil // only one quote — malformed or empty
 	}
 	expr := line[firstSQ+1 : sq]
 	if strings.Contains(expr, "'") {
-		return line // nested quotes — too complex
+		return line, nil // nested quotes — too complex
 	}
 
-	formatted := formatJQExpr(strings.TrimSpace(expr), true)
-	if formatted == "" || strings.Contains(formatted, "\n") {
-		return line
+	formatted, err := formatJQExpr(strings.TrimSpace(expr), true)
+	if err != nil {
+		return "", err
+	}
+	if strings.Contains(formatted, "\n") {
+		return line, nil
 	}
 	// Preserve everything after the closing quote (e.g. filename args, redirects).
-	return line[:firstSQ+1] + formatted + "'" + line[sq+1:]
+	return line[:firstSQ+1] + formatted + "'" + line[sq+1:], nil
 }
-
 
 // leadingWhitespace returns the leading whitespace (tabs and spaces) of s.
 func leadingWhitespace(s string) string {

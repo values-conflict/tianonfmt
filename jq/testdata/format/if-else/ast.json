@@ -43,8 +43,17 @@
 			"name": "error",
 			"args": [
 				{
-					"type": "string",
-					"raw": "\"unsupported arch: \\(.arch)\""
+					"type": "interpStr",
+					"parts": [
+						"unsupported arch: ",
+						{
+							"type": "interp",
+							"expr": {
+								"type": "field",
+								"name": ".arch"
+							}
+						}
+					]
 				}
 			]
 		}

@@ -24,6 +24,7 @@ package jq
 
 import (
 	"regexp"
+	"slices"
 	"strings"
 )
 
@@ -57,18 +58,38 @@ func FormatFileTidy(f *File) (string, error) {
 }
 
 // FormatNode formats a single AST node.
-func FormatNode(n Node) string {
+func FormatNode(n Node) (string, error) {
 	p := &printer{}
 	p.node(n)
-	return p.out.String()
+	return p.out.String(), nil
 }
 
-// FormatNodeInline formats a single AST node as a single-line compact string.
-// Used for jq-in-shell single-line expressions.
-func FormatNodeInline(n Node) string {
+// FormatNodeInline formats a single AST node as a compact single-line string.
+func FormatNodeInline(n Node) (string, error) {
 	p := &printer{}
 	p.nodeInline(n)
-	return p.out.String()
+	return p.out.String(), nil
+}
+
+// FormatStr parses src first as a single jq expression, falling back to a
+// full file parse (ParseFile) if that fails, then formats the result.
+// If inline is true a compact single-line form is produced.
+// This is the canonical entry point for formatting jq embedded in other
+// languages (shell, template, markdown fenced blocks).
+func FormatStr(src string, inline bool) (string, error) {
+	trimmed := strings.TrimSpace(src)
+	node, err := ParseExpr(trimmed)
+	if err != nil {
+		f, ferr := ParseFile(trimmed)
+		if ferr != nil {
+			return "", ferr
+		}
+		return FormatFile(f)
+	}
+	if inline {
+		return FormatNodeInline(node)
+	}
+	return FormatNode(node)
 }
 
 // printer accumulates formatted output.
@@ -93,7 +114,6 @@ func (p *printer) closeDelimiter(s string) {
 	}
 	p.write(s)
 }
-
 
 func (p *printer) tab() string { return strings.Repeat("\t", p.depth) }
 func (p *printer) write(s string) {
@@ -143,12 +163,7 @@ func hasAnyComment(n Node) bool {
 
 // anyPartHasComment reports whether any element has any kind of comment.
 func anyPartHasComment(parts []Node) bool {
-	for _, part := range parts {
-		if hasAnyComment(part) {
-			return true
-		}
-	}
-	return false
+	return slices.ContainsFunc(parts, hasAnyComment)
 }
 
 // ── top-level ────────────────────────────────────────────────────────────────
@@ -339,6 +354,33 @@ func (p *printer) node(n Node) {
 		p.write(v.Raw)
 	case *StrLit:
 		p.write(v.Raw)
+	case *InterpStr:
+		p.write(`"`)
+		for _, part := range v.Parts {
+			if part.Expr != nil {
+				// Pre-render at depth+1 to determine inline vs block layout.
+				sub := &printer{depth: p.depth + 1, tidy: p.tidy}
+				sub.node(part.Expr)
+				inner := sub.out.String()
+				if !strings.Contains(inner, "\n") {
+					p.write(`\(`)
+					p.write(inner)
+					p.write(`)`)
+				} else {
+					// Multi-line: block style — \(\n<indent>content\n<depth>)
+					p.write(`\(`)
+					p.nl()
+					p.write(strings.Repeat("\t", p.depth+1))
+					p.write(inner)
+					p.nl()
+					p.write(p.tab())
+					p.write(`)`)
+				}
+			} else {
+				p.write(part.Lit)
+			}
+		}
+		p.write(`"`)
 	case *NullLit:
 		p.write("null")
 	case *BoolLit:
@@ -1296,13 +1338,7 @@ func (p *printer) callExpr(v *Call) {
 
 	// If any argument has comments, use multi-line call format so each argument
 	// starts on its own line (ensuring leading comments are at line start).
-	anyCommented := false
-	for _, arg := range args {
-		if hasAnyComment(arg) {
-			anyCommented = true
-			break
-		}
-	}
+	anyCommented := slices.ContainsFunc(args, hasAnyComment)
 
 	if anyCommented {
 		p.write("(")
@@ -1629,6 +1665,12 @@ func anyNodeHasTrailingComment(n Node) bool {
 		return anyNodeHasTrailingComment(v.Key)
 	case *Slice:
 		return anyNodeHasTrailingComment(v.Start) || anyNodeHasTrailingComment(v.End)
+	case *InterpStr:
+		for _, part := range v.Parts {
+			if part.Expr != nil && anyNodeHasTrailingComment(part.Expr) {
+				return true
+			}
+		}
 	}
 	return false
 }
@@ -1806,6 +1848,18 @@ func (p *printer) nodeInline(n Node) {
 	case *Optional:
 		p.nodeInline(v.Expr)
 		p.write("?")
+	case *InterpStr:
+		p.write(`"`)
+		for _, part := range v.Parts {
+			if part.Expr != nil {
+				p.write(`\(`)
+				p.nodeInline(part.Expr)
+				p.write(`)`)
+			} else {
+				p.write(part.Lit)
+			}
+		}
+		p.write(`"`)
 	default:
 		p.node(n)
 	}

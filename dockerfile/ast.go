@@ -2,7 +2,7 @@ package dockerfile
 
 // File is the top-level AST node for a parsed Dockerfile.
 type File struct {
-	Directives   []*Directive  // # syntax= / # escape= lines before first instruction
+	Directives   []*Directive // # syntax= / # escape= lines before first instruction
 	Instructions []*Instruction
 }
 
@@ -46,9 +46,9 @@ type Line struct {
 type LineKind int
 
 const (
-	LineKindInstruction LineKind = iota // first line of an instruction
-	LineKindContinuation                // continuation of the previous line (after \)
-	LineKindComment                     // a # comment line inside a continuation block
-	LineKindBlank                       // a blank line between instructions
-	LineKindDirective                   // a parser directive line
+	LineKindInstruction  LineKind = iota // first line of an instruction
+	LineKindContinuation                 // continuation of the previous line (after \)
+	LineKindComment                      // a # comment line inside a continuation block
+	LineKindBlank                        // a blank line between instructions
+	LineKindDirective                    // a parser directive line
 )

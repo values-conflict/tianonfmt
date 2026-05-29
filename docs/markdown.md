@@ -237,8 +237,8 @@ Straight ASCII double quotes `"..."` for quoting terms and names, not typographi
 Contractions appear freely: `it's`, `they're`, `we're`, `you've`, `can't`.  This is an informal register — technical precision and conversational tone coexist.
 
 Abbreviations — these apply universally across all prose, not just markdown (see [prose.md](prose.md)):
-- `ie,` (not `i.e.,` — no periods, no comma after) for "that is"
-- `eg,` (not `e.g.,`) for "for example"
+- `ie,` (not `i.e.,` -- no periods) for "that is"; grammatically dubious but consistent corpus habit
+- `e.g.` with periods for "for example" in documentation prose; in code comments, restructure to avoid or just write the concrete example directly
 - `etc` (not `etc.`) — no trailing period
 
 Corpus refs: [`rawdns/README.md#L35`](https://github.com/tianon/rawdns/blob/ea662544c8b03ef7133cc6fc75f63e107265b3f2/README.md#L35), [`fake-git/README.md#L8`](https://github.com/tianon/fake-git/blob/4639d58ce5f6488e448a019acc2b5ffc55d0925f/README.md#L8).

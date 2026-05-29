@@ -26,30 +26,24 @@ func TestMain(m *testing.M) {
 
 // testFenceFmt is a best-effort fenceFmt callback using real sub-formatters.
 // It mirrors the logic in formatter.makeFenceFmt from cmd/tianonfmt/main.go.
-func testFenceFmt(lang string, _ int, content string) string {
+func testFenceFmt(lang string, _ int, content string) (string, error) {
 	switch lang {
 	case "dockerfile":
 		f, err := dockerfile.Parse(content)
 		if err != nil {
-			return ""
+			return "", err
 		}
-		s, _ := dockerfile.FormatFile(f)
-		return s
+		return dockerfile.FormatFile(f)
 	case "jq":
 		f, err := jq.ParseFile(content)
 		if err != nil {
-			return ""
+			return "", err
 		}
-		s, _ := jq.FormatFile(f)
-		return s
+		return jq.FormatFile(f)
 	case "bash", "sh", "shell":
-		out, err := shell.FormatWithTidy(content, shell.DetectLang(content))
-		if err != nil {
-			return ""
-		}
-		return out
+		return shell.FormatWithTidy(content, shell.DetectLang(content))
 	default:
-		return ""
+		return "", nil
 	}
 }
 
@@ -204,11 +198,11 @@ func TestFormatTidy_FenceReplacement(t *testing.T) {
 	var gotLang string
 	var gotLine int
 	var gotContent string
-	result, _ := markdown.FormatTidy(src, func(lang string, openLine int, content string) string {
+	result, _ := markdown.FormatTidy(src, func(lang string, openLine int, content string) (string, error) {
 		gotLang = lang
 		gotLine = openLine
 		gotContent = content
-		return "REPLACED\n"
+		return "REPLACED\n", nil
 	})
 	if gotLang != "dockerfile" {
 		t.Errorf("lang: got %q, want %q", gotLang, "dockerfile")
@@ -230,9 +224,9 @@ func TestFormatTidy_FenceReplacement(t *testing.T) {
 func TestFormatTidy_EmptyFenceSkipped(t *testing.T) {
 	src := "```dockerfile\n```\n"
 	called := false
-	markdown.FormatTidy(src, func(lang string, openLine int, content string) string {
+	markdown.FormatTidy(src, func(lang string, openLine int, content string) (string, error) { //nolint
 		called = true
-		return "REPLACED\n"
+		return "REPLACED\n", nil
 	})
 	if called {
 		t.Error("fenceFmt should not be called for empty fence")
@@ -241,8 +235,8 @@ func TestFormatTidy_EmptyFenceSkipped(t *testing.T) {
 
 func TestFormatTidy_CallbackEmptyPreservesOriginal(t *testing.T) {
 	src := "```dockerfile\nFROM foo\n```\n"
-	result, _ := markdown.FormatTidy(src, func(lang string, openLine int, content string) string {
-		return "" // signal: keep original
+	result, _ := markdown.FormatTidy(src, func(lang string, openLine int, content string) (string, error) {
+		return "", nil // signal: keep original
 	})
 	if !strings.Contains(result, "FROM foo") {
 		t.Errorf("original content should be preserved when callback returns empty: %q", result)

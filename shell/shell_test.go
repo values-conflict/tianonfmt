@@ -220,7 +220,10 @@ func TestApplyTidy_WhichWithFlags_Unchanged(t *testing.T) {
 func TestFormatRUN_BasicIndent(t *testing.T) {
 	// Continuation lines at depth 0 get 1 tab.
 	lines := []string{"\tapt-get update; \\", "\tapt-get install -y curl"}
-	got := shell.FormatRUN(lines)
+	got, err := shell.FormatRUN(lines)
+	if err != nil {
+		t.Fatal(err)
+	}
 	for _, l := range got {
 		trimmed := strings.TrimRight(l, " \\")
 		if !strings.HasPrefix(trimmed, "\t") {
@@ -236,7 +239,10 @@ func TestFormatRUN_IfBlock(t *testing.T) {
 		"\t\techo ok; \\",
 		"\tfi",
 	}
-	got := shell.FormatRUN(lines)
+	got, err := shell.FormatRUN(lines)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if len(got) < 3 {
 		t.Fatalf("expected 3 lines, got %d", len(got))
 	}
@@ -256,7 +262,10 @@ func TestFormatRUN_IfBlock(t *testing.T) {
 
 func TestFormatRUN_CommentAtColumnZero(t *testing.T) {
 	lines := []string{"\tapt-get update; \\", "# a comment", "\tapt-get install -y curl"}
-	got := shell.FormatRUN(lines)
+	got, err := shell.FormatRUN(lines)
+	if err != nil {
+		t.Fatal(err)
+	}
 	for _, l := range got {
 		if strings.HasPrefix(l, "#") {
 			// Comment lines must be at column 0 (no tab prefix).
@@ -267,7 +276,10 @@ func TestFormatRUN_CommentAtColumnZero(t *testing.T) {
 }
 
 func TestFormatRUN_Empty(t *testing.T) {
-	got := shell.FormatRUN(nil)
+	got, err := shell.FormatRUN(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if got != nil {
 		t.Errorf("empty input should return nil, got %v", got)
 	}
@@ -275,8 +287,14 @@ func TestFormatRUN_Empty(t *testing.T) {
 
 func TestFormatRUN_Idempotent(t *testing.T) {
 	lines := []string{"\tapt-get update; \\", "# comment", "\tapt-get install -y curl"}
-	first := shell.FormatRUN(lines)
-	second := shell.FormatRUN(first)
+	first, err := shell.FormatRUN(lines)
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := shell.FormatRUN(first)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if fmt.Sprint(first) != fmt.Sprint(second) {
 		t.Errorf("FormatRUN not idempotent\nfirst:  %v\nsecond: %v", first, second)
 	}
@@ -288,12 +306,21 @@ func TestNormalizeSetFlags_Bash(t *testing.T) {
 	cases := []struct{ in, want string }{
 		{"set -e", "set -Eeuo pipefail"},
 		{"set -eu", "set -Eeuo pipefail"},
-		{"set -eux", "set -Eeuo pipefail"},    // top-level: -x stripped
-		{"set -ex", "set -Eeuo pipefail"},    // top-level: -x stripped (global set -x is Wrong)
-		{"\tset -ex", "\tset -Eeuxo pipefail"}, // indented (inside block): -x preserved
-		{"set -Eeuo pipefail", "set -Eeuo pipefail"}, // already canonical
-		{"echo hi", "echo hi"},             // not a set command
-		{"set --", "set --"},               // positional args reset, leave alone
+		{"set -eux", "set -Eeuo pipefail -x"},                     // top-level: extras become separate trailing args
+		{"set -ex", "set -Eeuo pipefail -x"},                      // top-level: same
+		{"set -xEeuo pipefail", "set -Eeuo pipefail -x"},          // x embedded in flags → separated
+		{"set -Eeuo pipefail -x", "set -Eeuo pipefail -x"},        // already canonical
+		{"set -Eeuo pipefail -o xtrace", "set -Eeuo pipefail -x"}, // -o xtrace → -x
+		{"set -Eeuo pipefail -oxtrace", "set -Eeuo pipefail -x"},  // -o<name> embedded in cluster
+		{"set -Eeuo pipefail -o allexport", "set -Eeuo pipefail -a"},
+		{"set -Eeuo pipefail -o noglob", "set -Eeuo pipefail -o noglob"},       // unusual: stays long
+		{"set -Eeuo pipefail -x -o noglob", "set -Eeuo pipefail -x -o noglob"}, // already canonical
+		{"set -Eeuo pipefail -o allexport -o noglob", "set -Eeuo pipefail -a -o noglob"},
+		{"set -o errexit -o nounset -o pipefail", "set -Eeuo pipefail"}, // all-long core form
+		{"\tset -ex", "\tset -Eeuxo pipefail"},                          // indented: extras embedded in cluster
+		{"set -Eeuo pipefail", "set -Eeuo pipefail"},                    // already canonical, no extras
+		{"echo hi", "echo hi"},                                          // not a set command
+		{"set --", "set --"},                                            // positional args reset, leave alone
 	}
 	for _, tt := range cases {
 		t.Run(tt.in, func(t *testing.T) {
@@ -308,10 +335,10 @@ func TestNormalizeSetFlags_Bash(t *testing.T) {
 func TestNormalizeSetFlags_POSIX(t *testing.T) {
 	cases := []struct{ in, want string }{
 		{"set -e", "set -eu"},
-		{"set -eu", "set -eu"},             // already canonical
-		{"set -ex", "set -eu"},             // top-level: -x stripped (global set -x is Wrong)
-		{"set -Eeuo pipefail", "set -eu"},  // strips bash-only flags
-		{"\tset -ex", "\tset -eux"},        // indented (inside block): -x preserved
+		{"set -eu", "set -eu"},            // already canonical
+		{"set -ex", "set -eux"},           // x kept — set -eux is canonical at any level
+		{"set -Eeuo pipefail", "set -eu"}, // strips bash-specific flags
+		{"\tset -ex", "\tset -eux"},       // indented: same as top-level for POSIX
 	}
 	for _, tt := range cases {
 		t.Run(tt.in, func(t *testing.T) {
@@ -386,7 +413,6 @@ func TestQuoteEvalArgs_StringArg(t *testing.T) {
 // ── normalizeShortFlags edge cases ───────────────────────────────────────────
 
 // ── canonical preservation ────────────────────────────────────────────────────
-
 
 func TestNormalizeShortFlags_CanonicalSubsetPreserved(t *testing.T) {
 	// curl -fL: both canonical, no pairWith → keep.
@@ -619,7 +645,6 @@ func TestNormalizeShortFlags_PairWithSingleFlag(t *testing.T) {
 	}
 }
 
-
 func TestNormalizeShortFlags_NonCanonicalExpanded(t *testing.T) {
 	// grep -n: not canonical → expand to --line-number.
 	src := "grep -n 'pattern' file\n"
@@ -774,7 +799,10 @@ func TestFormatRUN_JQ_StartOfLine(t *testing.T) {
 	// Plain `jq '...'` at the start of a continuation line — detection fires,
 	// real jq formats {"a":1} → { a: 1 }.
 	lines := []string{`	jq '{"a":1}' /data.json`}
-	got := shell.FormatRUN(lines)
+	got, err := shell.FormatRUN(lines)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if len(got) != 1 || !strings.Contains(got[0], "{ a: 1 }") {
 		t.Errorf("jq at start of line not reformatted: %v", got)
 	}
@@ -783,7 +811,10 @@ func TestFormatRUN_JQ_StartOfLine(t *testing.T) {
 func TestFormatRUN_JQ_DollarParenPattern(t *testing.T) {
 	// `$(jq '...')` — tests hasJQ detection for subshell pattern.
 	lines := []string{`	result=$(jq '{"a":1}' /data.json)`}
-	got := shell.FormatRUN(lines)
+	got, err := shell.FormatRUN(lines)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if len(got) != 1 || !strings.Contains(got[0], "{ a: 1 }") {
 		t.Errorf("$(jq '...') not reformatted: %v", got)
 	}
@@ -792,7 +823,10 @@ func TestFormatRUN_JQ_DollarParenPattern(t *testing.T) {
 func TestFormatRUN_JQ_PreservesArgsAfterQuote(t *testing.T) {
 	// Filename arg after the closing quote must survive reformatting.
 	lines := []string{`	jq '{"a":1}' /input.json > /output.json`}
-	got := shell.FormatRUN(lines)
+	got, err := shell.FormatRUN(lines)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if len(got) != 1 || !strings.Contains(got[0], "/output.json") {
 		t.Errorf("args after closing quote dropped: %v", got)
 	}
@@ -801,7 +835,10 @@ func TestFormatRUN_JQ_PreservesArgsAfterQuote(t *testing.T) {
 func TestFormatRUN_JQ_PreservesHereString(t *testing.T) {
 	// `<<<\"$var\"` after the closing quote must survive reformatting.
 	lines := []string{`	jq '{"a":1}' <<<"$var"`}
-	got := shell.FormatRUN(lines)
+	got, err := shell.FormatRUN(lines)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if len(got) != 1 || !strings.Contains(got[0], `<<<"$var"`) {
 		t.Errorf("here-string after closing quote dropped: %v", got)
 	}
@@ -810,7 +847,10 @@ func TestFormatRUN_JQ_PreservesHereString(t *testing.T) {
 func TestFormatRUN_JQ_InPipeline(t *testing.T) {
 	// `... | jq '...'` — jq appears mid-line after a pipe.
 	lines := []string{`	cat /data.json | jq '{"a":1}'`}
-	got := shell.FormatRUN(lines)
+	got, err := shell.FormatRUN(lines)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if len(got) != 1 || !strings.Contains(got[0], "{ a: 1 }") {
 		t.Errorf("jq in pipeline not reformatted: %v", got)
 	}
@@ -819,7 +859,10 @@ func TestFormatRUN_JQ_InPipeline(t *testing.T) {
 func TestFormatRUN_JQ_NonJQSingleQuote_NotTouched(t *testing.T) {
 	// A single-quoted string in a non-jq command must not be touched.
 	lines := []string{"\techo 'hello world'"}
-	got := shell.FormatRUN(lines)
+	got, err := shell.FormatRUN(lines)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if len(got) != 1 || got[0] != "\techo 'hello world'" {
 		t.Errorf("non-jq single-quoted string was modified: %v", got)
 	}
@@ -875,13 +918,15 @@ func TestFormat_JQ_ReformatsInlineExpression(t *testing.T) {
 	}
 }
 
-
 // ── reformatJQInLine edge cases ──────────────────────────────────────────────
 
 func TestFormatRUN_JQ_NoSingleQuote(t *testing.T) {
 	// jq with no single-quoted expression (e.g. --rawfile) — sq<1 path.
 	lines := []string{"\tjq --null-input"}
-	got := shell.FormatRUN(lines)
+	got, err := shell.FormatRUN(lines)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if len(got) != 1 || got[0] != "\tjq --null-input" {
 		t.Errorf("jq with no quotes should pass through unchanged: %v", got)
 	}
@@ -890,7 +935,10 @@ func TestFormatRUN_JQ_NoSingleQuote(t *testing.T) {
 func TestFormatRUN_JQ_OnlyOneQuote(t *testing.T) {
 	// jq 'unclosed — only one quote, firstSQ==sq path.
 	lines := []string{"\tjq 'unclosed"}
-	got := shell.FormatRUN(lines)
+	got, err := shell.FormatRUN(lines)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if len(got) != 1 || got[0] != "\tjq 'unclosed" {
 		t.Errorf("malformed jq should pass through unchanged: %v", got)
 	}
@@ -899,7 +947,10 @@ func TestFormatRUN_JQ_OnlyOneQuote(t *testing.T) {
 func TestFormatRUN_JQ_NestedQuotes(t *testing.T) {
 	// jq expression containing a literal apostrophe — too complex, pass through.
 	lines := []string{"\tjq 'it'\\''s weird' file"}
-	got := shell.FormatRUN(lines)
+	got, err := shell.FormatRUN(lines)
+	if err != nil {
+		t.Fatal(err)
+	}
 	// nested single quotes: leave unchanged
 	if len(got) != 1 {
 		t.Errorf("nested quotes should produce 1 line: %v", got)
@@ -910,7 +961,10 @@ func TestFormatRUN_JQ_MultilineResult(t *testing.T) {
 	// jq expression that formats to multiline — formatJQExpr returns \n, skip.
 	// A def statement formats as multiline when inline=true fails.
 	lines := []string{"\tjq --null-input 'def f: .; f'"}
-	got := shell.FormatRUN(lines)
+	got, err := shell.FormatRUN(lines)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if len(got) != 1 {
 		t.Errorf("multiline jq result should produce 1 line: %v", got)
 	}
@@ -921,7 +975,10 @@ func TestFormatRUN_JQ_MultilineResult(t *testing.T) {
 func TestFormatRUN_Array_SingleQuoteSkip(t *testing.T) {
 	// Array assignment with a single-quoted value containing '=' — quote skip path.
 	lines := []string{"\tarr=('key=val' other)"}
-	got := shell.FormatRUN(lines)
+	got, err := shell.FormatRUN(lines)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if len(got) != 1 {
 		t.Errorf("expected 1 line, got %v", got)
 	}
@@ -930,7 +987,10 @@ func TestFormatRUN_Array_SingleQuoteSkip(t *testing.T) {
 func TestFormatRUN_Array_DoubleQuoteSkip(t *testing.T) {
 	// Array assignment with a double-quoted value containing '=' — dquote skip.
 	lines := []string{"\tarr=(\"key=val\" other)"}
-	got := shell.FormatRUN(lines)
+	got, err := shell.FormatRUN(lines)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if len(got) != 1 {
 		t.Errorf("expected 1 line, got %v", got)
 	}
@@ -939,7 +999,10 @@ func TestFormatRUN_Array_DoubleQuoteSkip(t *testing.T) {
 func TestFormatRUN_Array_CommentSkip(t *testing.T) {
 	// Array assignment followed by a comment — comment skip path.
 	lines := []string{"\tarr=(a b) # comment"}
-	got := shell.FormatRUN(lines)
+	got, err := shell.FormatRUN(lines)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if len(got) != 1 || !strings.Contains(got[0], "# comment") {
 		t.Errorf("comment should be preserved: %v", got)
 	}
@@ -1291,8 +1354,8 @@ func shExpandSubshells(tok string) []string {
 	i := 0
 	end := len(tok)
 	if strings.HasPrefix(tok, `"`) && end >= 2 && tok[end-1] == '"' {
-		i = 1   // skip opening "
-		end--   // stop before closing "
+		i = 1 // skip opening "
+		end-- // stop before closing "
 	}
 	var parts []string
 	litStart := i
@@ -1358,6 +1421,7 @@ func shExpandSubshells(tok string) []string {
 //     (NormalizeJQ) so that the formatter's whitespace and style rewrites inside
 //     jq expressions do not show up as token differences.  Flag arguments and
 //     non-jq single-quoted strings (sed patterns, etc.) are left untouched.
+//
 // jqValueFlags maps jq flags to the number of extra non-flag tokens they consume.
 // Used by normalizeShell to skip past flag arguments when seeking the jq expression.
 var jqValueFlags = map[string]int{
@@ -1366,16 +1430,53 @@ var jqValueFlags = map[string]int{
 	"--indent": 1,
 }
 
+// sha256SumFlagLong maps sha*sum short flags to their long forms.  Used by
+// normalizeShell to treat -c and --check as equivalent, so TestFormatPreservesTokens
+// passes whether the formatter expands or preserves the short form.
+var sha256SumFlagLong = map[string]string{
+	"-c": "--check",
+	"-b": "--binary",
+	"-t": "--text",
+	"-w": "--warn",
+	"-z": "--zero",
+}
+
+// sha256SumCmds is the set of sha*sum commands whose short flags are normalized.
+var sha256SumCmds = map[string]bool{
+	"sha256sum": true,
+	"sha512sum": true,
+	"sha1sum":   true,
+}
+
 func normalizeShell(src string) string {
 	toks := tokenizeShell(src)
 	var result []string
-	inJQ := false // true after "jq", until the expression arg is consumed
-	skipN := 0   // remaining non-flag tokens to skip (flag argument values)
+	inJQ := false     // true after "jq", until the expression arg is consumed
+	inShaSum := false // true after a sha*sum command, for flag normalization
+	skipN := 0        // remaining non-flag tokens to skip (flag argument values)
 	for _, tok := range toks {
 		if tok == `\` {
 			continue // backslash line-continuation artifact
 		}
 		tok = shNormalizeArith(tok)
+
+		// Reset inShaSum on pipeline/control operators so a sha*sum's flag
+		// normalization does not bleed into a subsequent command.
+		if inShaSum {
+			switch tok {
+			case "|", "||", "&&", "&", ";;", ";&", ";;&":
+				inShaSum = false
+			}
+		}
+
+		// Normalize sha*sum short flags to their long equivalents so that
+		// format-mode expansion (-c → --check) and comment-preserved short
+		// forms (-c) both map to the same canonical token.
+		if inShaSum {
+			if long, ok := sha256SumFlagLong[tok]; ok {
+				tok = long
+			}
+		}
 
 		if inJQ {
 			if skipN > 0 {
@@ -1407,9 +1508,14 @@ func normalizeShell(src string) string {
 		}
 
 		expanded := shExpandSubshells(tok)
-		if len(expanded) == 1 && expanded[0] == "jq" {
-			inJQ = true
-			skipN = 0
+		if len(expanded) == 1 {
+			if expanded[0] == "jq" {
+				inJQ = true
+				skipN = 0
+			}
+			if sha256SumCmds[expanded[0]] {
+				inShaSum = true
+			}
 		}
 		result = append(result, expanded...)
 	}
@@ -1451,4 +1557,3 @@ func TestFormatPreservesTokens(t *testing.T) {
 }
 
 // ── golden helper ─────────────────────────────────────────────────────────────
-

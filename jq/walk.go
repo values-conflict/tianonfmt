@@ -132,6 +132,13 @@ func Walk(n Node, fn func(Node) bool) {
 			Walk(v.Str, fn)
 		}
 
+	case *InterpStr:
+		for _, part := range v.Parts {
+			if part.Expr != nil {
+				Walk(part.Expr, fn)
+			}
+		}
+
 	case *Call:
 		for _, arg := range v.Args {
 			Walk(arg, fn)
@@ -186,4 +193,3 @@ func Walk(n Node, fn func(Node) bool) {
 		panic(fmt.Sprintf("jq/walk: unhandled Node type %T — add a case to Walk", n))
 	}
 }
-

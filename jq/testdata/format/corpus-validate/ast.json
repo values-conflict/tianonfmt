@@ -217,14 +217,77 @@
 																			"raw": "\"value\""
 																		},
 																		"else": {
-																			"type": "string",
-																			"raw": "\".\\($maybepath | map(\"[\\(tojson)]\") | add // \"\")\""
+																			"type": "interpStr",
+																			"parts": [
+																				".",
+																				{
+																					"type": "interp",
+																					"expr": {
+																						"type": "pipe",
+																						"left": {
+																							"type": "var",
+																							"name": "$maybepath"
+																						},
+																						"right": {
+																							"type": "pipe",
+																							"left": {
+																								"type": "call",
+																								"name": "map",
+																								"args": [
+																									{
+																										"type": "interpStr",
+																										"parts": [
+																											"[",
+																											{
+																												"type": "interp",
+																												"expr": {
+																													"type": "call",
+																													"name": "tojson"
+																												}
+																											},
+																											"]"
+																										]
+																									}
+																								]
+																							},
+																							"right": {
+																								"type": "binOp",
+																								"op": "//",
+																								"left": {
+																									"type": "call",
+																									"name": "add"
+																								},
+																								"right": {
+																									"type": "string",
+																									"raw": "\"\""
+																								}
+																							}
+																						}
+																					}
+																				}
+																			]
 																		}
 																	}
 																},
 																"right": {
-																	"type": "string",
-																	"raw": "\":\\n\\t\\($val | tojson)\""
+																	"type": "interpStr",
+																	"parts": [
+																		":\\n\\t",
+																		{
+																			"type": "interp",
+																			"expr": {
+																				"type": "pipe",
+																				"left": {
+																					"type": "var",
+																					"name": "$val"
+																				},
+																				"right": {
+																					"type": "call",
+																					"name": "tojson"
+																				}
+																			}
+																		}
+																	]
 																}
 															},
 															"right": {
@@ -263,8 +326,16 @@
 																				}
 																			},
 																			"then": {
-																				"type": "string",
-																				"raw": "\"\\n\\(.)\""
+																				"type": "interpStr",
+																				"parts": [
+																					"\\n",
+																					{
+																						"type": "interp",
+																						"expr": {
+																							"type": "identity"
+																						}
+																					}
+																				]
 																			},
 																			"else": {
 																				"type": "string",
@@ -311,8 +382,16 @@
 																		}
 																	},
 																	"then": {
-																		"type": "string",
-																		"raw": "\"\\n\\(.)\""
+																		"type": "interpStr",
+																		"parts": [
+																			"\\n",
+																			{
+																				"type": "interp",
+																				"expr": {
+																					"type": "identity"
+																				}
+																			}
+																		]
 																	},
 																	"else": {
 																		"type": "string",
@@ -407,8 +486,40 @@
 						]
 					},
 					{
-						"type": "string",
-						"raw": "\"valid:\\n\\t\\([ options | tojson ] | join(\"\\n\\t\"))\""
+						"type": "interpStr",
+						"parts": [
+							"valid:\\n\\t",
+							{
+								"type": "interp",
+								"expr": {
+									"type": "pipe",
+									"left": {
+										"type": "array",
+										"elem": {
+											"type": "pipe",
+											"left": {
+												"type": "call",
+												"name": "options"
+											},
+											"right": {
+												"type": "call",
+												"name": "tojson"
+											}
+										}
+									},
+									"right": {
+										"type": "call",
+										"name": "join",
+										"args": [
+											{
+												"type": "string",
+												"raw": "\"\\n\\t\""
+											}
+										]
+									}
+								}
+							}
+						]
 					}
 				]
 			}
@@ -446,8 +557,48 @@
 						]
 					},
 					{
-						"type": "string",
-						"raw": "\"length (\\(length)) must be: \\([ lengths | tojson ] | join(\", \"))\""
+						"type": "interpStr",
+						"parts": [
+							"length (",
+							{
+								"type": "interp",
+								"expr": {
+									"type": "call",
+									"name": "length"
+								}
+							},
+							") must be: ",
+							{
+								"type": "interp",
+								"expr": {
+									"type": "pipe",
+									"left": {
+										"type": "array",
+										"elem": {
+											"type": "pipe",
+											"left": {
+												"type": "call",
+												"name": "lengths"
+											},
+											"right": {
+												"type": "call",
+												"name": "tojson"
+											}
+										}
+									},
+									"right": {
+										"type": "call",
+										"name": "join",
+										"args": [
+											{
+												"type": "string",
+												"raw": "\", \""
+											}
+										]
+									}
+								}
+							}
+						]
 					}
 				]
 			}

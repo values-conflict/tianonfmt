@@ -26,14 +26,28 @@ The very next line after the shebang is always:
 set -Eeuo pipefail
 ```
 
-The flags appear in this exact order, combined into a single argument.  Breaking them out (`set -E -e -u -o pipefail`) is never done.
+The four core flags appear in this exact order, combined into a single argument.  Breaking them out (`set -E -e -u -o pipefail`) is never done.
 
 - `-E` — ERR trap is inherited by shell functions and subshells
 - `-e` — exit immediately on non-zero exit status
 - `-u` — treat unset variables as an error
 - `-o pipefail` — a pipeline fails if any command in it fails
 
-A `-x` flag is **not** added globally.  When tracing is needed for a specific block, `set -x` / `set +x` pairs are used inline around that block only.
+When a whole script should run with xtrace (debug output), `-x` is appended as a **separate trailing argument** after the canonical cluster, never embedded inside it:
+
+```bash
+set -Eeuo pipefail -x
+```
+
+Other extra flags follow the same rule — `set -Eeuo pipefail` is the fixed canonical block; anything outside it goes as a separate `-<flag>` or `-o <option>` arg.
+
+When tracing is needed for only a specific block (e.g. to suppress trace around credential material), `set +x` / `set -x` pairs isolate that block:
+
+```bash
+set +x
+b64token="$(tr -d '\n' <<<"x-access-token:$INPUT_TOKEN" | base64 --wrap=0)"
+set -x
+```
 
 Corpus ref: [`actions/checkout/checkout.sh#L1-L2`](https://github.com/tianon/actions/blob/c109aa98a82622edf55e0e6380a1672368930b30/checkout/checkout.sh#L1-L2), [`debian-bin/repo/buildd.sh#L1-L2`](https://github.com/tianon/debian-bin/blob/d508ea34f15e88b8ac63d71ffb1938fccbc21206/repo/buildd.sh#L1-L2).
 
@@ -153,7 +167,19 @@ cp "$src" "$dst"
 [ "$#" -eq 0 ]
 ```
 
-Parameter expansion syntax uses the full `${var}` form only when necessary for disambiguation (`${var}suffix`) — simple references use `$var` or `"$var"`.
+Parameter expansion syntax uses the full `${var}` form when adjacent content appears on either side of the variable within the same string — this makes the variable name visually distinct even when syntax highlighting is inconsistent.  Simple standalone references use `$var` or `"$var"` without braces.
+
+```bash
+# braces: variable is embedded in a larger string — $foo might be easy to miss
+local nextPage="https://hub.docker.com/v2/repositories/${repo}/tags/?page_size=100"
+buildArgs+=( "--arch=${ARCH}" )
+
+# no braces: variable stands alone — the $ is right at the boundary
+perm=$(stat -c %a "$_file")
+cp "$src" "$dst"
+```
+
+`--tidy` enforces this: `"${FOO}"` and bare `${FOO}` (sole content, no special operators) become `"$FOO"` and `$FOO` respectively.  Braces are always preserved when the variable participates in a modifier (`${var:-default}`, `${#var}`, `${var%pattern}`, array indexing, etc.).
 
 ### Command substitution
 
@@ -497,6 +523,22 @@ Corpus ref: [`debian-bin/repo/incoming.sh#L44-L53`](https://github.com/tianon/de
 
 **Error messages** always go to stderr: `echo >&2 "error: ..."` or `echo >&2 "warning: ..."`.  The prefix `error:` or `warning:` is literal text, lowercased, always followed by a colon, always active voice and specific.
 
+### Redirections
+
+Output redirections use a space between the operator and the file: `> /dev/null`, `>> log`.
+
+File-descriptor-prefixed redirections are **cuddled** — no space between the fd number and the operator: `2>/dev/null`, `2>>log`, not `2> /dev/null`.
+
+```bash
+if command -v apk > /dev/null && tryArch="$(apk --print-arch 2>/dev/null)"; then
+    arch="$tryArch"
+fi
+```
+
+The distinction: a bare `>` is always a redirect; a digit immediately before `>` unambiguously identifies the fd, so no space is needed for readability.  `>&2` (fd duplication) follows the same cuddled rule and is never spaced.
+
+Corpus refs: [`tianon-dockerfiles/.libs/deb-repo.sh#L22-L25`](https://github.com/tianon/dockerfiles/blob/2118a1979eff7545e06570d1eefc6434d691e68d/.libs/deb-repo.sh#L22-L25), [`home/bashrc.d/prompt.sh#L50`](https://github.com/tianon/home/blob/5bc25cdb0f8d5d745eb1f89d84bd78c4f13d0fb0/bashrc.d/prompt.sh#L50).
+
 **Suppressing `-x` trace around sensitive values** — when `bash -x` trace output would expose credential material, `set +x` / `set -x` pairs isolate the sensitive commands:
 
 ```bash
@@ -560,22 +602,93 @@ See [jq-sh.md](jq-sh.md) for the full conventions.  The short summary: `jq <<<"$
 
 ---
 
+## Architecture detection
+
+`uname -m` tests the **host kernel's** architecture, not the process's userspace architecture.
+These differ in 32-bit-userspace-on-64-bit-kernel configurations and similar setups.
+`uname -m` is **very strongly discouraged** for architecture detection.
+
+Use the appropriate userspace-aware tool instead, in preference order:
+
+- **Alpine**: `apk --print-arch` → outputs `x86_64`, `aarch64`, `armv7`, …
+  (`apk --print-architecture` is **not** a valid flag and silently falls through — use `--print-arch`)
+- **Debian/Ubuntu**: `dpkg --print-architecture` → outputs `amd64`, `arm64`, `armhf`, …
+- **RPM-based**: `rpm --query --queryformat='%{ARCH}' rpm` → outputs `x86_64`, `aarch64`, …
+- **Last resort**: `uname -m` with an explicit `>&2` warning that a better tool was not found
+
+`dpkg` uses Debian naming (`amd64`, `arm64`, `armhf`); `apk` uses musl/Alpine naming (`x86_64`, `aarch64`, `armv7`).
+These are **not interchangeable** — always write `case` patterns that match the specific tool's output format.
+
+Use `arch` as the generic normalized variable.  Tool-specific variables (`dpkgArch` for `dpkg --print-architecture`, `apkArch` for `apk --print-arch`) are only used when the raw tool output is needed directly; `arch` holds the result once it has been selected and normalized.
+
+Always include an explicit fallthrough for unsupported architectures so the build fails loudly:
+
+```bash
+arch=
+if command -v apk > /dev/null && tryArch="$(apk --print-arch 2>/dev/null)"; then
+	arch="$tryArch"
+elif command -v dpkg > /dev/null && tryArch="$(dpkg --print-architecture 2>/dev/null)"; then
+	arch="${tryArch##*-}"
+elif command -v rpm > /dev/null && tryArch="$(rpm --query --queryformat='%{ARCH}' rpm 2>/dev/null)"; then
+	arch="$tryArch"
+else
+	echo >&2 'warning: neither apk nor dpkg nor rpm found; falling back to uname -m'
+	arch="$(uname -m)"
+fi
+unset tryArch
+case "$arch" in
+	amd64 | x86_64)    goArch='amd64' ;;
+	arm64 | aarch64)   goArch='arm64' ;;
+	armhf | armv7)     goArch='arm' ;;
+	*) echo >&2 "error: unsupported architecture '$arch'"; exit 1 ;;
+esac
+```
+
+Corpus ref: [`docker-library/bashbrew/scripts/bashbrew-host-arch.sh`](https://github.com/docker-library/bashbrew/blob/6c47dbbb89c2665758a08e580424c128f5f423da/scripts/bashbrew-host-arch.sh).
+
+---
+
+## Formatter conventions
+
+### Trailing-comment escape hatch
+
+When a command has a trailing inline comment that signals a **platform-specific or portability-related** flag constraint, the formatter suppresses all flag normalization for every command on that source line — in both format and tidy mode.
+
+```bash
+sha256sum -c - <<<"${sha256} *${file}" # these flags have to be silly for macOS's sake (it has no GNU coreutils)
+sha256sum -c - <<<"${sha256} *${file}" # short form, not --check, for tool compat
+```
+
+Without the comments, the formatter would expand `-c` → `--check` and (in tidy mode) add `--strict`.  With matching comments, the flags are left exactly as written.
+
+**What counts as a matching comment:** the formatter checks the comment text for two signals:
+
+1. **Platform/tooling keywords** (case-insensitive): `macos`, `darwin`, `bsd`, `coreutils`, `gnu`, `busybox`, `alpine`, `musl`, `posix`, `portable`, `portability`
+2. **A long-form flag reference** — `--word` (two or more lowercase letters after `--`) signals an explicit short-vs-long comparison (e.g. `# -f instead of --canonicalize`).  A bare `--` used as an em-dash does not match.
+
+A comment like `# check mode` that merely describes the command's purpose does **not** match and does not suppress normalization.
+
+**Scope:** the guard applies to every command on the same source line as the outer statement — including commands nested inside `$(…)` on that line (e.g. `gitDir="$(readlink -f …)" # -f not --canonicalize for macOS` protects the inner `readlink`).
+
+---
+
 ## Notable omissions
 
 Things Tianon **never** does in standalone shell scripts:
 
 - `#!/bin/bash` or `#!/bin/sh` shebang (always `#!/usr/bin/env bash`) — `--tidy` fixes this automatically
-- `set -e` alone (bare minimum with no `-u`) — `--tidy` auto-normalises it: bash scripts get `set -Eeuo pipefail`; POSIX/sh scripts get `set -eu`.  If `-x` is already present, it is preserved (`-eux` → `-Eeuxo pipefail`).  Simpler forms already containing `-u` (`set -eu`, `set -eux`) appear in Tianon's corpus for entrypoints and are not changed; only bare `set -e` is normalised.  `--tidy` also flags the bare form in its lint check.
+- `set -e` alone (bare minimum with no `-u`) — `--tidy` auto-normalises any `set` command that touches error-handling flags: bash scripts get `set -Eeuo pipefail`; POSIX/sh scripts get `set -eu`.  Long-form equivalents (`-o errexit`, `-o nounset`, `-o errtrace`) are collapsed to their short forms.  Extra flags outside the `{E,e,u,o,pipefail}` core are preserved: at the top level they become separate trailing args (`set -Eeuo pipefail -x`); inside a block they are embedded in the cluster (`\tset -ex` → `\tset -Eeuxo pipefail`).  `--tidy` also flags the bare `set -e` form in its lint check.
 - `which` to locate commands (`command -v` is the POSIX-correct alternative; Tianon even aliases `which='command -v'` in his own bashrc) — `--tidy` fixes flag-free `which cmd` calls automatically
 - `echo -e` for escape sequences — `printf` handles escapes portably; `echo -e` is not POSIX; `--tidy` flags this
 - `echo -n` for output without a trailing newline — use `printf '%s'` instead; `--tidy` flags this
 - Backtick command substitution — always `$(...)` style; `--tidy` converts `` `cmd` `` → `$(cmd)` automatically
 - The `function` keyword — always `name() { ... }` style; `--tidy` removes `function` automatically
-- `set -x` at the global level — only `set -x` / `set +x` pairs locally; `--tidy` strips `-x` from top-level `set` normalisations and flags any global `set` containing `-x`
 - `[ ]` tests with `==` (uses `=` for POSIX string comparison) — `--tidy` converts `[ ... == ... ]` → `[ ... = ... ]` automatically
+- `"${FOO}"` or bare `${FOO}` when the variable is the sole content and has no special operator — `--tidy` strips the braces to `"$FOO"` / `$FOO`; braces that are genuinely needed (adjacent string content, modifiers, array indexing, etc.) are always preserved
 - Arithmetic with `let` or `$((var = expr))` assignment — use `$((...))` or `var=$((expr))`; `--tidy` flags `let`
 - `declare -i` for integer-type variables — use untyped variables; `--tidy` flags this
 - `&&` or `||` at the *end* of a continuation line (always at the start of the next line) — the formatter enforces this automatically via `BinaryNextLine` mode
+- `sha256sum` (and `sha512sum`, `sha1sum`) short flags — all short forms (`-c`, `-b`, `-t`, `-w`, `-z`) are always expanded to their long equivalents even in format (non-tidy) mode, because the long forms are used throughout the corpus.  Additionally, `--tidy` adds `--strict` whenever `--check` is present — `--check` without `--strict` silently passes over malformed checksum lines.  (Use the trailing-comment escape hatch when a platform constraint requires the short form; see [§Trailing-comment escape hatch](#trailing-comment-escape-hatch).)
 - `curl` without `--fail` / `-f` — every `curl` call must have `-f` so that HTTP errors (4xx/5xx) are treated as failures; `--tidy` adds it automatically and folds it into the canonical combined idiom (`-f` + `-sSL` → `-fsSL`; `-f` + `-sS` → `-fsS` when not following redirects)
 - `curl --show-error` / `-S` without `--silent` / `-s` — `--show-error` without `--silent` is a no-op (stderr output is already shown by default); both format and tidy add the missing `-s` automatically.  Conversely, `--silent` alone suppresses stderr with no way to see curl errors; `--tidy` adds the missing `-S` (this is a larger semantic change, so only `--tidy` does it).  Both are normalised to their short combined form (`-sS`) in either mode.
 - `curl --fail`, `curl --silent`, `curl --show-error`, `curl --location`, `curl --output` in long form — `--tidy` normalises all four to their short canonical equivalents and merges them into the combined idiom (`--fail --silent --location` → `-fsSL`)

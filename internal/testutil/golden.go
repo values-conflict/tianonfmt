@@ -115,7 +115,24 @@ func runCase(t *testing.T, fixtureDir, inFile, src string, c Case, prevOutputs m
 	outPath := filepath.Join(fixtureDir, c.Out)
 
 	if fnErr != nil {
-		t.Fatalf("run: %v", fnErr)
+		// A named-output case may still be an error fixture if error.txt exists
+		// (or is being created via -update).  This lets a single fixture declare
+		// "formatting this input produces an error" without a dedicated test case.
+		if *Update {
+			if err := os.WriteFile(errPath, []byte(fnErr.Error()+"\n"), 0o644); err != nil {
+				t.Fatalf("write error.txt: %v", err)
+			}
+			return
+		}
+		errData, readErr := os.ReadFile(errPath)
+		if readErr != nil {
+			t.Fatalf("run: %v", fnErr)
+		}
+		want := strings.TrimRight(string(errData), "\n")
+		if fnErr.Error() != want {
+			t.Errorf("error mismatch\ngot:  %q\nwant: %q", fnErr.Error(), want)
+		}
+		return
 	}
 
 	if c.Idem {

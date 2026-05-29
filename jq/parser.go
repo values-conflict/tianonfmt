@@ -111,16 +111,13 @@ func (p *parser) wrapComments(n Node) Node {
 
 // ── error helpers ────────────────────────────────────────────────────────────
 
-func (p *parser) errorfAt(t Token, format string, args ...interface{}) error {
+func (p *parser) errorfAt(t Token, format string, args ...any) error {
 	col := p.columnOf(t.At)
 	return fmt.Errorf("jq parse error at %d:%d: %s", t.Line, col, fmt.Sprintf(format, args...))
 }
 
 func (p *parser) columnOf(at Pos) int {
-	offset := int(at)
-	if offset > len(p.src) {
-		offset = len(p.src)
-	}
+	offset := min(int(at), len(p.src))
 	nl := strings.LastIndex(p.src[:offset], "\n")
 	if nl < 0 {
 		return offset + 1
@@ -562,7 +559,10 @@ func (p *parser) parseSuffix(left Node) (Node, error) {
 				left = &BinOp{At: tok.At, Op: "", Left: left, Right: right}
 			case STR:
 				strTok := p.next()
-				key := &StrLit{At: strTok.At, Raw: strTok.Text}
+				key, err := p.parseStrNode(strTok)
+				if err != nil {
+					return nil, err
+				}
 				left = &Index{At: tok.At, Expr: left, Key: key, DotAccess: true}
 			default:
 				left = &BinOp{At: tok.At, Op: "", Left: left, Right: &Identity{At: tok.At}}
@@ -584,7 +584,11 @@ func (p *parser) parseSuffix(left Node) (Node, error) {
 			var strNode Node
 			if p.peek().Kind == STR {
 				strTok := p.next()
-				strNode = &StrLit{At: strTok.At, Raw: strTok.Text}
+				var err error
+				strNode, err = p.parseStrNode(strTok)
+				if err != nil {
+					return nil, err
+				}
 			}
 			right := &FormatExpr{At: tok.At, Name: tok.Text[1:], Str: strNode}
 			left = &BinOp{At: tok.At, Op: "|", Left: left, Right: right}
@@ -708,7 +712,10 @@ func (p *parser) parsePrimary() (Node, error) {
 			return &Field{At: tok.At, Name: "." + nameTok.Text}, nil
 		case STR:
 			strTok := p.next()
-			key := &StrLit{At: strTok.At, Raw: strTok.Text}
+			key, err := p.parseStrNode(strTok)
+			if err != nil {
+				return nil, err
+			}
 			return &Index{At: tok.At, Key: key, DotAccess: true}, nil
 		}
 		return &Identity{At: tok.At}, nil
@@ -730,7 +737,11 @@ func (p *parser) parsePrimary() (Node, error) {
 		var strNode Node
 		if p.peek().Kind == STR {
 			strTok := p.next()
-			strNode = &StrLit{At: strTok.At, Raw: strTok.Text}
+			var err error
+			strNode, err = p.parseStrNode(strTok)
+			if err != nil {
+				return nil, err
+			}
 		}
 		return &FormatExpr{At: tok.At, Name: tok.Text[1:], Str: strNode}, nil
 
@@ -743,7 +754,7 @@ func (p *parser) parsePrimary() (Node, error) {
 
 	case STR:
 		tok := p.next()
-		return &StrLit{At: tok.At, Raw: tok.Text}, nil
+		return p.parseStrNode(tok)
 
 	case KWAND, KWOR:
 		tok := p.next()
@@ -1235,5 +1246,109 @@ func (p *parser) parseObjectPattern() (*ObjectPattern, error) {
 	return op, nil
 }
 
+// ── string interpolation parsing ─────────────────────────────────────────────
+
+// parseStrNode converts a STR token to a StrLit (no \() in text) or an InterpStr
+// (one or more \(...) blocks with fully-parsed sub-expressions).
+func (p *parser) parseStrNode(tok Token) (Node, error) {
+	if !strings.Contains(tok.Text, `\(`) {
+		return &StrLit{At: tok.At, Raw: tok.Text}, nil
+	}
+	return p.parseInterpStr(tok)
+}
+
+// parseInterpStr builds an InterpStr by scanning tok.Text for \(...) blocks
+// and recursively calling ParseExpr on each interpolated expression.
+// Parse errors inside \(...) propagate as jq parse errors.
+func (p *parser) parseInterpStr(tok Token) (*InterpStr, error) {
+	raw := tok.Text // "...content..."
+	node := &InterpStr{At: tok.At}
+	i := 1            // skip opening "
+	n := len(raw) - 1 // stop before closing "
+	litStart := 1
+
+	for i < n {
+		if raw[i] != '\\' || i+1 >= n || raw[i+1] != '(' {
+			i++
+			continue
+		}
+		// Found \( — collect literal before it.
+		if i > litStart {
+			node.Parts = append(node.Parts, InterpPart{Lit: raw[litStart:i]})
+		}
+		interpStart := i + 2 // right after \(
+		end := interpClose(raw, interpStart)
+		if end < 0 {
+			return nil, p.errorfAt(tok, "unterminated \\(...) interpolation in string")
+		}
+		innerExpr := raw[interpStart:end]
+		innerNode, err := ParseExpr(strings.TrimSpace(innerExpr))
+		if err != nil {
+			// Compute the source line of the \( by counting newlines before it.
+			interpLine := tok.Line + strings.Count(raw[:i], "\n")
+			return nil, fmt.Errorf("jq parse error in \\(...) at line %d: %w", interpLine, err)
+		}
+		node.Parts = append(node.Parts, InterpPart{Expr: innerNode})
+		litStart = end + 1 // right after )
+		i = litStart
+	}
+	if litStart < n {
+		node.Parts = append(node.Parts, InterpPart{Lit: raw[litStart:n]})
+	}
+	return node, nil
+}
+
+// interpClose returns the index of the ) that closes the \(...) block
+// starting at src[pos] (the byte immediately after \().
+// Handles nested (...) and "..." strings.  Returns -1 if not found.
+func interpClose(src string, pos int) int {
+	depth := 1
+	for i := pos; i < len(src); {
+		switch src[i] {
+		case '(':
+			depth++
+			i++
+		case ')':
+			depth--
+			if depth == 0 {
+				return i
+			}
+			i++
+		case '"':
+			i = skipInterpString(src, i)
+		default:
+			i++
+		}
+	}
+	return -1
+}
+
+// skipInterpString advances past a jq string literal starting at src[pos]
+// (the opening "), correctly handling \(...) nesting so that a " inside
+// an interpolation is not treated as the closing delimiter.
+func skipInterpString(src string, pos int) int {
+	pos++ // skip opening "
+	depth := 0
+	for pos < len(src) {
+		switch {
+		case src[pos] == '"' && depth == 0:
+			return pos + 1
+		case src[pos] == '\\' && pos+1 < len(src) && src[pos+1] == '(':
+			depth++
+			pos += 2
+		case src[pos] == '\\' && pos+1 < len(src):
+			pos += 2
+		case src[pos] == '(' && depth > 0:
+			depth++
+			pos++
+		case src[pos] == ')' && depth > 0:
+			depth--
+			pos++
+		default:
+			pos++
+		}
+	}
+	return pos
+}
 
 var _ = strings.TrimPrefix // used indirectly

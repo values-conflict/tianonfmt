@@ -1,0 +1,120 @@
+{
+	"type": "shell",
+	"file": "input.sh",
+	"stmts": [
+		{
+			"type": "call",
+			"args": [
+				"set",
+				"-Eeuo",
+				"pipefail"
+			]
+		},
+		{
+			"type": "for",
+			"loop": {
+				"type": "wordIter",
+				"name": "item",
+				"items": [
+					"\"${items[@]}\""
+				]
+			},
+			"do": [
+				{
+					"type": "case",
+					"word": "\"$item\"",
+					"items": [
+						{
+							"patterns": [
+								"stable"
+							],
+							"stmts": [
+								{
+									"type": "call",
+									"assigns": [
+										"version=\"$(jq \u003c\u003c\u003c \"$dist\" --raw-output '\n\t\t\t\tfirst(\n\t\t\t\t\t.[]\n\t\t\t\t\t| select(.stable == true)\n\t\t\t\t\t| .version\n\t\t\t\t\t| ltrimstr(\"go\")\n\t\t\t\t)\n\t\t\t\t// error(\"no stable version found\")\n\t\t\t')\""
+									],
+									"args": []
+								}
+							]
+						},
+						{
+							"patterns": [
+								"*.*.*"
+							],
+							"stmts": [
+								{
+									"type": "call",
+									"assigns": [
+										"version=\"$(jq \u003c\u003c\u003c \"$dist\" --raw-output --arg spec \"$item\" '\n\t\t\t\tfirst(\n\t\t\t\t\t.[]\n\t\t\t\t\t| select(.version == (\"go\" + $spec))\n\t\t\t\t\t| .version\n\t\t\t\t\t| ltrimstr(\"go\")\n\t\t\t\t)\n\t\t\t\t// error(\"version go\\($spec) not found\")\n\t\t\t')\""
+									],
+									"args": []
+								}
+							]
+						},
+						{
+							"patterns": [
+								"*"
+							],
+							"stmts": [
+								{
+									"type": "if",
+									"cond": [
+										{
+											"type": "binary",
+											"op": "||",
+											"x": {
+												"type": "stmt",
+												"cmd": {
+													"type": "call",
+													"assigns": [
+														"version=\"$(jq \u003c\u003c\u003c \"$dist\" --raw-output --arg spec \"$item\" '\n\t\t\t\t\tfirst(\n\t\t\t\t\t\t.[]\n\t\t\t\t\t\t| select(.stable == true)\n\t\t\t\t\t\t| select(.version | ltrimstr(\"go\") | startswith($spec + \".\"))\n\t\t\t\t\t\t| .version\n\t\t\t\t\t\t| ltrimstr(\"go\")\n\t\t\t\t\t)\n\t\t\t\t\t// error(\"no version matching \\($spec) found\")\n\t\t\t\t')\""
+													],
+													"args": []
+												},
+												"negated": true
+											},
+											"y": {
+												"type": "call",
+												"args": [
+													"[",
+													"-z",
+													"\"$version\"",
+													"]"
+												]
+											}
+										}
+									],
+									"then": [
+										{
+											"type": "stmt",
+											"cmd": {
+												"type": "call",
+												"args": [
+													"echo",
+													"\"warning: no match for $item\""
+												]
+											},
+											"redirs": [
+												{
+													"op": "\u003e\u0026",
+													"word": "2"
+												}
+											]
+										},
+										{
+											"type": "call",
+											"args": [
+												"continue"
+											]
+										}
+									]
+								}
+							]
+						}
+					]
+				}
+			]
+		}
+	]
+}

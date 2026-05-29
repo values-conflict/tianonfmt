@@ -1,0 +1,3 @@
+Source: https://github.com/tianon/actions/blob/2413eba030bdf9956ffbf43e8fb106aa9109660f/checkout/checkout.sh
+License: Apache-2.0
+Note: contains set +x / set -x xtrace toggle — these must be preserved by --tidy, not rewritten to set -Eeuo pipefail

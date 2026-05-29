@@ -29,7 +29,7 @@ Corpus ref: [`meta-scripts/registry/lookup.go#L3-L10`](https://github.com/docker
 
 ## Comments
 
-**Exported symbols have doc comments** in the standard Go style (sentence starting with the symbol name).  The doc comment is dense and complete — it references related types using the `[TypeName]` link syntax:
+**Exported symbols have doc comments** in the standard Go style (sentence starting with the symbol name).  The doc comment is dense and complete — it references related types using the `[TypeName]` link syntax.  Doc comments are never wrapped across multiple lines; write one long line.  `go doc`, godoc, and IDEs all join continuation lines anyway, so wrapped and unwrapped source produce identical rendered output -- and unwrapped source produces cleaner diffs:
 
 ```go
 // a wrapper around [ociregistry.Interface.GetManifest] (and `GetTag`, `GetBlob`, and the `Resolve*` versions of the above) that accepts a [Reference] and always returns a [ociregistry.BlobReader] (in the case of a HEAD request, it will be a zero-length reader with just a valid descriptor)

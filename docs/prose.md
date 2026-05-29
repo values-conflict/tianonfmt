@@ -35,6 +35,10 @@ Several repos in the corpus are collaborative.  For code comment style, the mech
 
 ## Code comment conventions
 
+Two distinct modes appear in code files.  The rules in this section (lowercase, no period, fragments) apply to **inline code comments** -- comments that explain *how* or *why* code is written a certain way, adjacent to the code they describe.  When a comment instead documents *what a thing is* -- a package doc comment, a large explanatory header in a file, something that could move to a README with no loss of meaning -- it is **documentation prose** and follows the formal style of the Writing voice section instead: complete sentences, sentence-case capitals, terminal periods.  The test: if the comment would make sense unchanged in a README, it is documentation prose, not an inline comment.
+
+Note that README and documentation prose are also distinct from each other: README is allowed to be playful and tongue-in-cheek because it partly serves a marketing function; documentation prose inside a code file is purely documentation and stays formal.
+
 ### Capitalisation: first word is lowercase
 
 Comment sentences begin with a **lowercase letter**, even when they form a complete sentence.  This is consistent across bash, jq, Go, Perl, and AWK.
@@ -69,6 +73,18 @@ func Lookup(ctx context.Context, ref Reference, opts *LookupOptions) ...
 
 Corpus refs: [`doi/bashbrew/scripts/jq-template.awk#L1`](https://github.com/docker-library/bashbrew/blob/d662ff01570964b5f648df009c9269f388285692/scripts/jq-template.awk#L1), [`meta-scripts/registry/lookup.go#L12`](https://github.com/docker-library/meta-scripts/blob/205031aee2fdfbbd449038afd58f0f0a6915c217/registry/lookup.go#L12), [`debian-bin/jq/deb822.jq#L3`](https://github.com/tianon/debian-bin/blob/d508ea34f15e88b8ac63d71ffb1938fccbc21206/jq/deb822.jq#L3), [`doi/perl-bashbrew/lib/Bashbrew.pm#L16`](https://github.com/docker-library/perl-bashbrew/blob/2ab6f478d8cf809b67ebd21930e84c51ad61dc7b/lib/Bashbrew.pm#L16).
 
+**List items follow the same lowercase rule.** Fragments are strongly preferred — a list item is almost always a short label, phrase, or clause, not a sentence.  The first word is lowercase.  If a list item is genuinely so large it requires one or more full, complete sentences to express, those sentences may begin with a capital, but that situation is the rare exception.
+
+```go
+// good:
+//   - no rlimit pre-raise capture: guests see the host value
+//   - no seccomp-unotify fast path (Phase 2+): every syscall pays the full round-trip cost
+
+// bad:
+//   - No rlimit pre-raise capture: guests see the host value
+//   - No seccomp-unotify fast path (Phase 2+): every syscall pays the full round-trip cost
+```
+
 ### Punctuation: no terminal period
 
 Comments do **not** end with a period, even when the comment is a complete sentence.  This is consistent across all languages.
@@ -87,6 +103,10 @@ Comments do **not** end with a period, even when the comment is a complete sente
 ```
 
 Exceptions: `!` appears for genuine emphasis (`# this script assumes gawk!`), and `?` appears in question-form `TODO`s and consideration comments.  A comment that is a verbatim quote or a genuinely complete and formal thought may start with a capital, but this is rare — most of Tianon's comments are fragments, not sentences.
+
+The near-absence of sentences in inline code comments is not accidental.  Sentences require capitals, periods, and complete grammatical structure -- all of which add visual noise and pressure to wrap.  The zero occurrences of double-space-after-period in corpus Go inline comments is not a gap in the data; it is the data: sentences do not appear there, so the question never arises.
+
+**Double space after sentence terminators** (`.`, `!`, `?`) applies to documentation prose and exported godoc, where sentences are unavoidable.  It does not apply to inline comments because inline comments should not contain sentences.
 
 ### `TODO` format
 
@@ -122,6 +142,48 @@ Patterns within `TODO` comments:
 - Some `TODO`s in jq use a space before the `?`: `# TODO consider ... ?` — this is an idiosyncrasy of jq comment style
 
 Corpus refs: [`tianon-dockerfiles/buildkit/versions.sh#L17`](https://github.com/tianon/dockerfiles/blob/2118a1979eff7545e06570d1eefc6434d691e68d/buildkit/versions.sh#L17), [`debian-bin/jq/deb822.jq#L15`](https://github.com/tianon/debian-bin/blob/d508ea34f15e88b8ac63d71ffb1938fccbc21206/jq/deb822.jq#L15), [`meta-scripts/registry/lookup.go#L27-L28`](https://github.com/docker-library/meta-scripts/blob/205031aee2fdfbbd449038afd58f0f0a6915c217/registry/lookup.go#L27-L28), [`doi/perl-bashbrew/lib/Bashbrew.pm#L12`](https://github.com/docker-library/perl-bashbrew/blob/2ab6f478d8cf809b67ebd21930e84c51ad61dc7b/lib/Bashbrew.pm#L12).
+
+### Consistent mode within a block
+
+A comment block should stay in one mode throughout -- either all fragments (no terminal periods, lowercase first words) or all complete sentences (periods, sentence-case first words).  Flopping between modes in the same block is confusing:
+
+```go
+// bad -- mixes a sentence-like opening with fragment continuations:
+// shimFlag is the internal argv[1] that activates shim mode.
+// this check must precede cobra init; cobra exits 2 on unknown flags
+
+// good -- one line when it fits, or explicit bullets if longer:
+// shimFlag is the argv[1] for shim mode -- must precede cobra init
+
+// or, when there are genuinely separate thoughts:
+// shimFlag is the argv[1] for shim mode
+// - the Matrix (1999) reference: none of the kernel interfaces are real
+// - must precede cobra init; cobra exits 2 on unknown flags
+```
+
+The practical rule: if the first line ends with a period, every line in the block should end with a period.  If the first line does not, none should.
+
+### Never wrap a single thought; use explicit bullets for multiple thoughts
+
+Wrapping a single comment thought across multiple lines is always wrong -- this applies to inline comments, exported godoc, and documentation prose alike.  Wrapping makes diffs noisier (adding one word can reflow an entire block), and inconsistent wrapping signals nothing meaningful about structure -- it's just accidental noise from whenever the line got too long.  Go's doc tools (`go doc`, `godoc`, every IDE) render continuation lines as joined text, so a one-long-line comment and its wrapped equivalent produce identical output.
+
+A secondary benefit: single-line comments are grep-friendly.  `grep TODO` returns the complete thought in one output line; a wrapped TODO requires reading surrounding lines to reconstruct the intent.
+
+The two correct forms:
+
+- **Short fragment or long one-liner:** either keep it short, or write one long line.  There is no length limit.  A 120-character comment line is fine; a reflowed 80-character block is not.
+- **Explicit `// - item` bullets when there are multiple distinct thoughts.**  Each bullet is its own line.  Bullets make clear that items are separate concepts, not just a wrapped sentence:
+
+```go
+// good -- explicit bullets, each a separate fragment:
+// - captures rlimits before any raise
+// - sets umask(0)
+// - exits if _SIMULACRA_FUNC is set
+
+// avoid -- wrapping makes it look like one thought:
+// captures rlimits before any raise, sets umask(0), and exits if
+// _SIMULACRA_FUNC is set
+```
 
 ### URL citations
 
@@ -318,6 +380,7 @@ Commit messages follow the standard imperative, sentence-case form — the same 
 - Version bumps: **"Update NAME to VERSION"** — consistent across all automated and manual version updates
 - Parenthetical context appended when needed: `"Handle the case where distro-info-data isn't already installed (bookworm/mips64le)"`
 - Emoji used sparingly to convey tone — frustration, irony, or wry commentary on external constraints: `"Update to actions/checkout@v4 🙃"` (the 🙃 here is disparagement of GitHub forcing version-pinning churn on users, not self-deprecation)
+- No GitHub issue, PR, or discussion references — neither full URLs nor `#NNN` shorthand; both forms generate notification spam on the referenced thread
 
 Examples from the corpus:
 
@@ -428,7 +491,7 @@ Unicode dashes never appear.  Both the em-dash (`—`) and en-dash (`–`) are r
   - `swapaccount=1` -- enable "swap accounting" for containers
   ```
 
-- **En-dash → `-`** (single hyphen): used where a typographic en-dash would appear, eg, in ranges.
+- **En-dash → `-`** (single hyphen): used where a typographic en-dash would appear (eg. in ranges).
 
 Corpus refs: [`blog/_posts/2026-05-20-container-security.md#L6`](https://github.com/tianon/tianon.github.io/blob/70f318822f383612a86900e95689f72793b9b083/_posts/2026-05-20-container-security.md#L6), [`blog/_posts/2016-12-07-docker-setup.md#L106-L108`](https://github.com/tianon/tianon.github.io/blob/70f318822f383612a86900e95689f72793b9b083/_posts/2016-12-07-docker-setup.md#L106-L108).
 
@@ -474,7 +537,7 @@ Things that do not appear in Tianon's comments or documentation prose:
 - Capital letter to start a comment sentence (except Go exported doc comments)
 - Period at the end of a comment line
 - Vague `TODO`s (`# TODO fix this`, `# TODO improve`)
-- `e.g.` or `i.e.` with periods — always `eg,` and `ie,`
+- `e.g.` or `i.e.` with periods -- `ie,` is Tianon's shorthand for `i.e.,` ("that is": a restatement, not an example); punctuationally informal but semantically correct in prose; in CLI usage blocks (`eg: ./gosu tianon bash`), `eg:` is correct and `ie:` would be wrong -- those lines are genuinely illustrative examples, not restatements; `eg,` does not appear in corpus prose (yet)
 - `etc.` with a period — always `etc` without
 - Passive voice in error messages (`"an error occurred"`) — always active and specific
 - Over-hedging in error messages (`"there may have been a problem"`) — states the problem directly

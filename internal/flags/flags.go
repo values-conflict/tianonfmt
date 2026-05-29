@@ -93,7 +93,7 @@ func (fs *FlagSet) OptString(long string, short byte, def, usage string) *string
 // return an error.
 func (fs *FlagSet) Parse(args []string) ([]string, error) {
 	var positional []string
-	for i := 0; i < len(args); i++ {
+	for i := range args {
 		arg := args[i]
 
 		switch {

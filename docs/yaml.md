@@ -174,6 +174,55 @@ Steps without a `name:` are common for short, self-explanatory commands:
 - run: git log --oneline
 ```
 
+**When to omit `name:`:** a step's `run:` stands as its own name when it is the kind of command a developer would type directly or see in a project `README` — a single, standard tool invocation with familiar flags.  When `run:` involves unusual flags, cross-module plumbing (`-C`, `../...`), or phrasing that would require a reader to pause and parse, add a `name:` that states what the step is actually doing.
+
+When using `name:`, the name is the exact thing being done — the command, the flag set, or the output artifact — not an abstract category:
+
+```yaml
+# Good: exact command or flag set
+- name: staticcheck
+  run: go tool -C .go-tools staticcheck ../...
+
+- name: go test
+  run: go test -coverpkg=./... -race -count=1 ./... -args -test.gocoverdir="$GOCOVERDIR"
+
+- name: go test -tags posix_trap
+  run: go test -tags posix_trap -coverpkg=./... -race -count=1 ./... -args -test.gocoverdir="$GOCOVERDIR"
+
+# Good: step that produces a file whose name is obvious for its purpose → use the filename as the name
+- name: coverage.out
+  run: go tool covdata textfmt -i "$GOCOVERDIR" -o coverage.out
+
+- name: coverage.html
+  run: go tool cover -html=coverage.out -o coverage.html
+
+- name: upload coverage.out
+  uses: actions/upload-artifact@v7
+  with:
+    path: coverage.out
+
+# Avoid: category labels that hide what actually runs
+- name: lint
+  run: go tool -C .go-tools staticcheck ../...
+
+- name: coverage report
+  run: go tool cover -html=coverage.out -o coverage.html
+```
+
+**Separate mutation from assertion.**  When one step modifies state (formats files, tidies modules) and a following step asserts the result (`git diff --exit-code`), keep them as separate unnamed steps rather than joining with `&&`.  Each step does one thing; failure is attributed to the right step; the diff output is visible in its own step log with shell tracing (`-x`):
+
+```yaml
+- run: gofmt -s -w .
+- run: git diff --exit-code
+
+- name: go mod tidy
+  run: |
+    go mod tidy
+    go -C .go-tools mod tidy
+    go -C .go-tools work sync
+- run: git diff --exit-code
+```
+
 ### `uses:` — action references
 
 Action references always pin to a specific version tag (e.g., `@v6`), never `@main` or `@HEAD`:
@@ -183,6 +232,8 @@ Action references always pin to a specific version tag (e.g., `@v6`), never `@ma
 - uses: tianon/bashbrew@tianon
 ```
 
+Pinned versions are kept current: bump to a newer tag when a new version is available and the bump does not cause workflow breakage or loss of fidelity in the action's output.
+
 Local actions (within the same repository) use relative paths:
 
 ```yaml
@@ -191,6 +242,50 @@ Local actions (within the same repository) use relative paths:
 ```
 
 ## Shell in run steps
+
+### Never use `${{ }}` inside `run:` blocks
+
+GitHub Actions expressions (`${{ }}`) inside `run:` blocks are **almost never correct** and should be avoided.  They create two compounding problems:
+
+**Security** — the expression value is interpolated directly into the shell command string before the shell sees it.  An attacker-controlled value (e.g. a PR branch name, a commit message, a label) containing shell metacharacters becomes a command injection vulnerability.  GitHub's own security hardening guide explicitly warns against this pattern.
+
+**Shell quoting** — the expression value arrives as a raw string fragment embedded in YAML, then in shell.  Quoting it correctly for both layers simultaneously is error-prone and context-dependent.  There is no safe general solution.
+
+The correct pattern is to pass any expression value through `env:` and reference it as a plain shell variable:
+
+```yaml
+# Wrong — expression injected into shell:
+- run: echo '${{ steps.build.outputs.digest }}'
+
+# Correct — value passed safely via environment:
+- env:
+    DIGEST: ${{ steps.build.outputs.digest }}
+  run: echo "$DIGEST"
+```
+
+The runner assigns `env:` values before the shell starts, treating them as data rather than code.  Shell variables are never interpreted as commands.
+
+**When `${{ }}` IS appropriate** — outside of shell code, expressions are fine and expected: `runs-on:`, `if:`, `with:`, `env:` values at step/job level, `concurrency.group`, `strategy:` fields, `outputs:` at job level.  The rule applies specifically to the content of `run:` blocks and any other context where values are interpolated into shell source.
+
+**The same principle applies to any action input that accepts code**, not just `run:`.  The most common case beyond `run:` is `actions/github-script`'s `script:` input, which accepts JavaScript.  The correct pattern is identical — pass via `env:`, read as `process.env.VAR`:
+
+```yaml
+# Wrong — expression injected into JavaScript source:
+- uses: actions/github-script@v8
+  with:
+    script: |
+      const n = ${{ github.event.pull_request.number }};
+
+# Correct — value passed safely via environment:
+- uses: actions/github-script@v8
+  env:
+    PR_NUMBER: ${{ github.event.pull_request.number }}
+  with:
+    script: |
+      const n = Number(process.env.PR_NUMBER);
+```
+
+Corpus ref (correct pattern): [`doi/official-images/.github/workflows/munge-pr.yml`](https://github.com/docker-library/official-images/blob/master/.github/workflows/munge-pr.yml) — `IMAGES: ${{ needs.gather.outputs.images }}` passed via `env:`, consumed as `process.env.IMAGES` inside the `script:` block.
 
 ### Single-line commands
 
@@ -259,14 +354,16 @@ Boolean values are unquoted (`true`, `false`).  Numbers are unquoted.  Strings a
 
 ```yaml
 strategy:
-  fail-fast: false
   matrix:
     runner:
       - ubuntu-24.04
       - ubuntu-22.04
+  fail-fast: false
 ```
 
 `fail-fast: false` appears consistently — Tianon prefers to see all jobs complete rather than cancelling on the first failure.
+
+`fail-fast: false` always comes **at the end** of the `strategy:` block, after `matrix:`. The matrix definition is the primary content; `fail-fast` is a modifier and reads naturally as a postscript.
 
 Dynamic matrix from a previous job:
 
@@ -336,7 +433,21 @@ Inline comments (on the same line as a value) are used sparingly:
 
 ## `if:` conditionals on steps
 
-Step conditionals use GitHub Actions expression syntax:
+Step conditionals use GitHub Actions expression syntax. **`if:` is always the last field in a step**, after `name:`, `id:`, `uses:`/`run:`, `with:`, and `env:`. This ordering puts the action first (what the step does) and the condition last (whether it runs), matching the natural reading order.
+
+```yaml
+# Good: if: last
+- name: coverage.out
+  run: go tool covdata textfmt -i "$GOCOVERDIR" -o coverage.out
+  if: matrix.go == 'stable'
+
+# Bad: if: before run:
+- name: coverage.out
+  if: matrix.go == 'stable'
+  run: go tool covdata textfmt -i "$GOCOVERDIR" -o coverage.out
+```
+
+Examples:
 
 ```yaml
 - name: Single Branch

@@ -328,6 +328,18 @@ func (s *StrLit) MarshalAST() OrderedMap {
 	return OrderedMap{{"type", "string"}, {"raw", s.Raw}}
 }
 
+func (s *InterpStr) MarshalAST() OrderedMap {
+	parts := make([]any, len(s.Parts))
+	for i, part := range s.Parts {
+		if part.Expr != nil {
+			parts[i] = OrderedMap{{"type", "interp"}, {"expr", marshalNode(part.Expr)}}
+		} else {
+			parts[i] = part.Lit
+		}
+	}
+	return OrderedMap{{"type", "interpStr"}, {"parts", parts}}
+}
+
 func (n *NullLit) MarshalAST() OrderedMap {
 	return OrderedMap{{"type", "null"}}
 }

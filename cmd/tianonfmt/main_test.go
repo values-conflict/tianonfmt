@@ -13,6 +13,7 @@ import (
 	"testing"
 
 	"github.com/values-conflict/tianonfmt/internal/testutil"
+	"github.com/values-conflict/tianonfmt/jq"
 )
 
 func TestMain(m *testing.M) {
@@ -195,40 +196,47 @@ func TestIsDockerfileContent(t *testing.T) {
 	}
 }
 
-// ── jqFmtFunc ─────────────────────────────────────────────────────────────────
+// ── jq.FormatStr ─────────────────────────────────────────────────────────────
 
-func TestJQFmtFunc_Inline(t *testing.T) {
-	got := jqFmtFunc(".foo | .bar", true)
+func TestJQFormatStr_Inline(t *testing.T) {
+	got, err := jq.FormatStr(".foo | .bar", true)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if got == "" {
 		t.Error("expected non-empty result")
 	}
 }
 
-func TestJQFmtFunc_Multiline(t *testing.T) {
-	got := jqFmtFunc("if .x then .y else .z end", false)
+func TestJQFormatStr_Multiline(t *testing.T) {
+	got, err := jq.FormatStr("if .x then .y else .z end", false)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if got == "" {
 		t.Error("expected non-empty result")
 	}
 }
 
-func TestJQFmtFunc_ParseError(t *testing.T) {
-	got := jqFmtFunc("((((invalid", false)
-	if got != "" {
-		t.Errorf("expected empty on parse error, got %q", got)
+func TestJQFormatStr_ParseError(t *testing.T) {
+	_, err := jq.FormatStr("((((invalid", false)
+	if err == nil {
+		t.Error("expected error on parse error, got nil")
 	}
 }
 
-func TestJQFmtFunc_InvalidChar(t *testing.T) {
-	// "!" is not valid jq — the lexer returns an INVALID token, the parser
-	// returns an error, and jqFmtFunc returns "" (no panic).
-	got := jqFmtFunc("!invalid", false)
-	if got != "" {
-		t.Errorf("expected empty on invalid char, got %q", got)
+func TestJQFormatStr_InvalidChar(t *testing.T) {
+	_, err := jq.FormatStr("!invalid", false)
+	if err == nil {
+		t.Error("expected error on invalid char, got nil")
 	}
 }
 
-func TestJQFmtFunc_FileExpression(t *testing.T) {
-	got := jqFmtFunc("def f: .+1; .[]|f", false)
+func TestJQFormatStr_FileExpression(t *testing.T) {
+	got, err := jq.FormatStr("def f: .+1; .[]|f", false)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if got == "" {
 		t.Error("expected non-empty for file-level expression")
 	}
@@ -495,19 +503,6 @@ func TestLintShell_DeclareI(t *testing.T) {
 	}
 	if !found {
 		t.Error("expected violation for declare -i")
-	}
-}
-
-func TestLintShell_GlobalSetX(t *testing.T) {
-	vs := lintShell("#!/usr/bin/env bash\nset -Eeuxo pipefail\necho hi\n")
-	found := false
-	for _, v := range vs {
-		if strings.Contains(v.Msg, "set -x") {
-			found = true
-		}
-	}
-	if !found {
-		t.Error("expected violation for global set -x")
 	}
 }
 
@@ -1227,17 +1222,14 @@ func TestRun_TidyMarkdownAutoDetectNotConfident(t *testing.T) {
 }
 
 func TestRun_TidyMarkdownFenceParseError(t *testing.T) {
-	// Explicit jq tag with invalid content: warning to stderr, content preserved.
+	// Explicit jq tag with invalid content: error propagated, exit non-zero.
 	path := writeTempMD(t, "# Doc\n\n```jq\n{{not valid jq}}\n```\n")
-	stdout, stderr, code := runCLI(t, "", "--tidy "+path)
-	if code != 0 {
-		t.Fatalf("exit %d\nstdout: %s\nstderr: %s", code, stdout, stderr)
+	_, stderr, code := runCLI(t, "", "--tidy "+path)
+	if code == 0 {
+		t.Fatal("expected non-zero exit for invalid jq in fenced block, got 0")
 	}
-	if !strings.Contains(stdout, "{{not valid jq}}") {
-		t.Errorf("invalid fence content should be preserved, got:\n%s", stdout)
-	}
-	if !strings.Contains(stderr, ".md:3:") {
-		t.Errorf("expected warning with line number in stderr, got: %q", stderr)
+	if !strings.Contains(stderr, ".md") {
+		t.Errorf("expected error referencing file in stderr, got: %q", stderr)
 	}
 }
 
@@ -1465,10 +1457,13 @@ func TestMarkdownASTPair_Basic(t *testing.T) {
 	_ = post
 }
 
-func TestJQFmtFunc_ParseFileFallback(t *testing.T) {
-	// jqFmtFunc falls back to ParseFile for multi-statement jq programs.
+func TestJQFormatStr_ParseFileFallback(t *testing.T) {
+	// FormatStr falls back to ParseFile for multi-statement jq programs.
 	// "def f: .;" is valid as a file but not as a single expression.
-	out := jqFmtFunc("def f: .; f", false)
+	out, err := jq.FormatStr("def f: .; f", false)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if out == "" {
 		t.Error("expected non-empty output for def+call jq program")
 	}
@@ -1601,4 +1596,3 @@ func runCLI(t *testing.T, stdinStr, argsStr string) (stdout, stderr string, code
 	code = run(strings.Fields(argsStr), stdinR, &outBuf, &errBuf)
 	return outBuf.String(), errBuf.String(), code
 }
-

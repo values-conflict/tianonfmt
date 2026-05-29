@@ -207,14 +207,17 @@ def build_command:
 
 			# TODO munge the image config here to remove any label that doesn't have a "." in the name (https://github.com/docker-library/official-images/pull/18692#issuecomment-2797149554; "thanks UBI/OpenShift/RedHat!")
 			# munge the index to what crane wants ("Error: layout contains 5 entries, consider --index")
-			@sh "jq \("
+			@sh "jq \(
+				"
 				.manifests |= (
 					unique_by([ .digest, .size, .mediaType ])
 					| if length != 1 then
 						error(\"unexpected number of manifests: \\(length)\")
 					else . end
 				)
-			" | unindent_and_decomment_jq(3)) temp/index.json > temp/index.json.new",
+			"
+				| unindent_and_decomment_jq(3)
+			) temp/index.json > temp/index.json.new",
 			"mv temp/index.json.new temp/index.json",
 
 			# possible improvements in buildkit/buildx that could help us:

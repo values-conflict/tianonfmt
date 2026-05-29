@@ -65,9 +65,9 @@ type elifAST struct {
 }
 
 type whileAST struct {
-	Type  string `json:"type"` // "while" or "until"
-	Cond  []any  `json:"cond"`
-	Do    []any  `json:"do"`
+	Type string `json:"type"` // "while" or "until"
+	Cond []any  `json:"cond"`
+	Do   []any  `json:"do"`
 }
 
 type forAST struct {
@@ -90,8 +90,8 @@ type cStyleLoopAST struct {
 }
 
 type caseAST struct {
-	Type  string       `json:"type"`
-	Word  string       `json:"word"`
+	Type  string        `json:"type"`
+	Word  string        `json:"word"`
 	Items []caseItemAST `json:"items"`
 }
 
