@@ -55,8 +55,8 @@ func TestFormat(t *testing.T) {
 func TestParseErrors(t *testing.T) {
 	testutil.Golden(t, "testdata/errors", "input.jq", []testutil.Case{
 		{Fn: func(src string) (string, error) {
-			_, err := jq.ParseFile(src)
-			return "", err
+			// Use Format (not bare ParseFile) so the Format error path is covered too.
+			return jq.Format(src)
 		}},
 	})
 }

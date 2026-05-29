@@ -55,8 +55,8 @@ func TestFormat(t *testing.T) {
 func TestParseErrors(t *testing.T) {
 	testutil.Golden(t, "testdata/errors", "input.dockerfile", []testutil.Case{
 		{Fn: func(src string) (string, error) {
-			_, err := dockerfile.Parse(src)
-			return "", err
+			// Use Format (not bare Parse) so the Format error path is covered too.
+			return dockerfile.Format(src)
 		}},
 	})
 }

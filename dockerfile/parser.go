@@ -212,7 +212,57 @@ func (p *parser) parseInstruction() (*Instruction, error) {
 	instr.Keyword = strings.ToUpper(kw)
 	instr.Args = args
 
+	if err := validateInstruction(instr); err != nil {
+		return nil, err
+	}
 	return instr, nil
+}
+
+// validateInstruction checks structural well-formedness for instructions whose
+// args are required or constrained by the Dockerfile spec.  It is called at
+// parse time so that callers never receive an AST containing instructions that
+// cannot be formatted back into valid Dockerfiles.
+//
+// TODO: validate ENV — detect the ambiguous mixed form "ENV KEY VALUE=something",
+// where the old space-separated syntax is used but the value contains "=", making
+// it look like a new-style "KEY=VALUE" pair to readers.  Surface as a lint violation
+// (not a parse error) since the form is syntactically valid; it just sets KEY to the
+// literal string "VALUE=something".  The fix the user wants is "ENV KEY=VALUE=something".
+//
+// TODO: validate COPY/ADD — require at least two path arguments (src + dest).
+//
+// TODO: validate ARG — verify whether bare "ARG" with no name is invalid per
+// spec before adding a parse error; the grammar says ARG requires a name but
+// this has not been confirmed against actual Docker behaviour.
+//
+// TODO: surface unknown instructions as lint violations rather than parse
+// errors, since BuildKit allows custom syntax via # syntax= directives and
+// future Docker releases add new instructions.  A lint check can warn without
+// blocking formatting of otherwise-valid files.
+func validateInstruction(instr *Instruction) error {
+	line := instr.StartLine
+	switch instr.Keyword {
+	case "FROM":
+		args := strings.TrimSpace(instr.Args)
+		// Strip --platform=P so we can inspect the image ref that follows.
+		if rest, ok := strings.CutPrefix(args, "--platform="); ok {
+			_, args, _ = strings.Cut(rest, " ")
+			args = strings.TrimSpace(args)
+		}
+		if args == "" {
+			return fmt.Errorf("dockerfile parse error at line %d: FROM requires an image reference", line)
+		}
+		// AS clause must be a single token — "FROM img AS a b" is malformed.
+		// Note: strings.Index looks for " AS " (spaces both sides), so "FROM img AS"
+		// with no trailing word produces no match and is handled by Docker as a bare ref.
+		if idx := strings.Index(strings.ToUpper(args), " AS "); idx >= 0 {
+			alias := strings.TrimSpace(args[idx+4:])
+			if strings.ContainsAny(alias, " \t") {
+				return fmt.Errorf("dockerfile parse error at line %d: FROM alias must be a single token, got %q", line, alias)
+			}
+		}
+	}
+	return nil
 }
 
 // splitKeyword splits a logical line into its keyword and the rest.

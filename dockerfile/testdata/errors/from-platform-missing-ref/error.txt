@@ -1,0 +1,1 @@
+dockerfile parse error at line 1: FROM requires an image reference
