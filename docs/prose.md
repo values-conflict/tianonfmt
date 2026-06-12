@@ -106,7 +106,7 @@ Exceptions: `!` appears for genuine emphasis (`# this script assumes gawk!`), an
 
 The near-absence of sentences in inline code comments is not accidental.  Sentences require capitals, periods, and complete grammatical structure -- all of which add visual noise and pressure to wrap.  The zero occurrences of double-space-after-period in corpus Go inline comments is not a gap in the data; it is the data: sentences do not appear there, so the question never arises.
 
-**Double space after sentence terminators** (`.`, `!`, `?`) applies to documentation prose and exported godoc, where sentences are unavoidable.  It does not apply to inline comments because inline comments should not contain sentences.
+**Double space after sentence terminators** (`.`, `!`, `?`) is universal across all prose -- markdown, documentation, exported godoc, wherever sentences appear.  It does not apply to inline comments because inline comments should not contain sentences.
 
 ### `TODO` format
 
@@ -480,9 +480,9 @@ Corpus ref: [`debuerreotype/README.md#L5`](https://github.com/debuerreotype/debu
 
 ### Dashes
 
-Unicode dashes never appear.  Both the em-dash (`—`) and en-dash (`–`) are replaced by ASCII equivalents:
+Unicode dashes never appear.  The em-dash (U+2014), en-dash (U+2013), and minus sign (U+2212) are all replaced by ASCII equivalents.  Two reasons -- they make Tianon irrationally angry: they are grep-hostile (you cannot `grep` for U+2014 from a terminal without copy-pasting the character) and visually indistinguishable from each other and from a regular hyphen at a glance.
 
-- **Em-dash → ` -- `** (space, double hyphen, space): used very liberally for clause breaks, asides, and pivots in running prose, and as a label-description separator in list items:
+- **Em-dash (U+2014) → ` -- `** (space, double hyphen, space): used very liberally for clause breaks, asides, and pivots in running prose, and as a label-description separator in list items:
 
   > "it's *technically* defensible but practically sloppy -- and the sloppiness matters"
 
@@ -491,9 +491,37 @@ Unicode dashes never appear.  Both the em-dash (`—`) and en-dash (`–`) are r
   - `swapaccount=1` -- enable "swap accounting" for containers
   ```
 
-- **En-dash → `-`** (single hyphen): used where a typographic en-dash would appear (eg. in ranges).
+- **En-dash (U+2013) → `-`** (single hyphen): used where a typographic en-dash would appear (eg, in ranges: `3-124`, `5.9-5.10`).
+
+- **Minus sign (U+2212) → `-`** (single hyphen): the typographic minus used in mathematical and set notation; visually identical to the en-dash at most font sizes, equally grep-hostile.
 
 Corpus refs: [`blog/_posts/2026-05-20-container-security.md#L6`](https://github.com/tianon/tianon.github.io/blob/70f318822f383612a86900e95689f72793b9b083/_posts/2026-05-20-container-security.md#L6), [`blog/_posts/2016-12-07-docker-setup.md#L106-L108`](https://github.com/tianon/tianon.github.io/blob/70f318822f383612a86900e95689f72793b9b083/_posts/2016-12-07-docker-setup.md#L106-L108).
+
+### Other Unicode characters
+
+Two distinct modes exist for thinking about non-ASCII characters in Tianon's writing.
+
+**Strict mode** -- emulating Tianon (generating content in his voice): avoid all non-ASCII except accented letters in proper nouns and quotes where the accent is part of the correct spelling (eg, `naïve`, copied from a reference rather than typed from scratch).  Tianon would never type `→`, `§`, or `≥` from scratch -- anything requiring a Unicode input method or character picker is off the table.  The zero-occurrence of these characters in the corpus confirms this.
+
+**Cute (or Lenient) mode** -- writing things Tianon will read (editing or reviewing documents): a curated set of Unicode characters is acceptable to leave in place.  These are characters that bring a small aesthetic pleasure and communicate clearly, even though Tianon would not generate them personally.  This distinction matters for linters and formatters: a Strict pass strips all of these; a Cute (or Lenient) pass leaves them.
+
+**The acceptable set (Cute/Lenient mode only):**
+
+- **Arrows:** `→` (U+2192), `←` (U+2190) -- used in flow descriptions, pseudocode, and table notation.
+- **Section sign:** `§` (U+00A7) -- used in cross-references (`§Section Name`); has nostalgic resonance (The Sims currency symbol).
+- **Mathematical operators:** `≥` (U+2265), `≤` (U+2264), `≠` (U+2260), `×` (U+00D7 times), `∈` (U+2208 element-of), `∪` (U+222A union) -- acceptable when used correctly in technical contexts.
+- **Unit symbol:** `µ` (U+00B5, mu) -- common in time units (`~10-50µs`).
+- **Accented letters:** é, à, ï, etc. -- correct spelling of proper nouns and non-English words; Tianon copy-pastes these.
+- **Emoji:** covered separately in *Emoji in comments* -- appear sparingly for humor/irony in code comments and commit messages; never in formal API documentation.
+
+**Explicitly excluded even in Cute/Lenient mode:**
+
+*(The code spans below intentionally show the characters being documented.  This subsection is the only place in this file where excluded characters appear -- their presence here is deliberate and should not be "fixed" by Unicode cleanup tools.)*
+
+- `↔` (U+2194, bidirectional arrow) -- font-dependent rendering makes it unreliable; same class of problem as `_` for italics
+- `──→` (U+2500 family, box-drawing) -- the line and arrowhead don't connect; there is a visible gap between them even in a monospace terminal font
+- `…` (U+2026, ellipsis) -- Tianon actually likes this character, but avoids it for the same font-dependency reason; always `...` (three ASCII dots) instead
+- `—` (U+2014, em-dash), `–` (U+2013, en-dash), `−` (U+2212, minus sign) -- see *Dashes* above; grep-hostile and visually indistinguishable from each other and from a regular hyphen
 
 ### Concrete specificity
 
@@ -546,5 +574,6 @@ Things that do not appear in Tianon's comments or documentation prose:
 - `s/he`, `they` (singular) or other gender-neutral contortions -- documentation addresses "you" directly or uses "we" for the project
 - Punctuation inside quotation marks -- terminators (`.`, `?`, `!`) always go *outside* the closing quote, contrary to American typographic convention: `"foo bar".` not `"foo bar."` -- this is the logical-quotation style; when a sentence ends with a quoted fragment and also ends with `?` or `!`, the terminator is typically spaced from the closing quote: `this question ends with a "quoted bit" ?` (space before the `?`)
 - Curly/typographic quotation marks -- always straight ASCII `"..."` and `'...'` in all files, not just markdown
-- Unicode em-dash `—` -- always ` -- ` (spaced double hyphen) instead; see *Dashes* above
-- Unicode en-dash `–` -- always `-` (single hyphen) instead; see *Dashes* above
+- Unicode em-dash (U+2014), en-dash (U+2013), and minus sign (U+2212) -- always ` -- `, `-`, and `-` respectively; see *Dashes* above
+- Unicode ellipsis (U+2026) -- always `...` (three ASCII dots); Tianon likes the character but avoids it for font-dependency reasons
+- Unicode bidirectional arrow (U+2194) and box-drawing sequences (U+2500 family) -- see *Other Unicode characters* above

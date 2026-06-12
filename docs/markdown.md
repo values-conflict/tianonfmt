@@ -16,9 +16,9 @@ The image READMEs in these directories are generated stubs that redirect to `doc
 
 The two most significant things `markdownfmt` does that Tianon finds annoying but lives with:
 - **Paragraph collapsing**: wrapped paragraphs are joined onto a single line (no line-length limit enforced in output)
-- **Whitespace normalisation**: all inter-word whitespace is collapsed to a single space, eliminating any two-spaces-after-period habit
+- **Whitespace normalisation**: all inter-word whitespace is collapsed to a single space, overriding the correct double-space-after-period style
 
-Tianon's additions to the fork are all bug fixes (escaped periods after links, empty-file handling, code-block newline trimming) -- none change the paragraph or whitespace behaviour.  The personal-project READMEs also use single spaces throughout, so these are constraints Tianon lives with across the board rather than preferences enforced elsewhere.
+Tianon's additions to the fork are all bug fixes (escaped periods after links, empty-file handling, code-block newline trimming) -- none change the paragraph or whitespace behaviour.  The personal-project READMEs therefore show single spaces throughout as an artifact of this normalisation -- double spaces are still the correct style, same as all prose; `markdownfmt` silently overrides them.  Preserving double spaces while correctly collapsing other inter-word whitespace has proven very difficult to implement -- multiple attempts at a reliable heuristic have all failed; this remains an open problem in the fork.
 
 **These DOI-processed files should not be taken as representative of Tianon's preferred markdown style.**
 

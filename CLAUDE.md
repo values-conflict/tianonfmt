@@ -273,6 +273,12 @@ A formatter change is not done until **all** of the following are true:
 
 If any of these is missing, the task is not done.  Finish all five before reporting completion.
 
+## Unicode in docs/
+
+This repo is sole-Tianon-authored and operates in **Cute/Lenient mode**: LLM-generated Unicode (arrows, math symbols, etc.) is acceptable in documentation here.  The constraint that applies is the Cute/Lenient acceptable set from `docs/prose.md`, not the Strict set.
+
+**Do not run Unicode cleanup scripts on `docs/prose.md`'s "Other Unicode characters" section.**  The "Explicitly excluded even in Cute/Lenient mode" subsection intentionally contains the excluded characters (`↔`, `──→`, `…`, `—`, `–`, `−`) in code spans as visual examples of what not to use.  These are the only permitted locations in the docs for these characters.  Any automated tool that strips non-allowable non-ASCII must exclude code spans inside that subsection, or the documentation will remove its own examples.
+
 ## LLM guidance
 
 - **No logging in library code.** Library packages (`jq/`, `shell/`, `dockerfile/`, `markdown/`, `template/`) must never write to stderr or stdout directly.  Return errors; let the caller (`cmd/`) decide how to surface them.  If a library function genuinely needs to produce output, accept an `io.Writer` parameter -- never write to `os.Stdout` or `os.Stderr` directly.
