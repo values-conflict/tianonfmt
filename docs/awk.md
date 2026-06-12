@@ -2,7 +2,7 @@
 
 Covers `.awk` files in the corpus.  The only significant AWK file is [`doi/bashbrew/scripts/jq-template.awk`](https://github.com/docker-library/bashbrew/blob/d662ff01570964b5f648df009c9269f388285692/scripts/jq-template.awk), which is the canonical processor for Tianon's jq-template Dockerfile format (see [jq-template.md](jq-template.md)).
 
-When Tianon writes complex AWK scripts, they often end up requiring gawk features — the `jq-template.awk` file itself says `# this script assumes gawk!`.  However, simpler scripts are written to work in `mawk` as well (mawk and BusyBox `awk` appear to be similar enough that targeting one usually means the other works too).  POSIX awk compatibility is less of a concern than BusyBox/mawk compatibility.
+When Tianon writes complex AWK scripts, they often end up requiring gawk features -- the `jq-template.awk` file itself says `# this script assumes gawk!`.  However, simpler scripts are written to work in `mawk` as well (mawk and BusyBox `awk` appear to be similar enough that targeting one usually means the other works too).  POSIX awk compatibility is less of a concern than BusyBox/mawk compatibility.
 
 ## Header comment
 
@@ -158,8 +158,8 @@ Corpus ref: [`doi/bashbrew/scripts/jq-template.awk#L124-L126`](https://github.co
 
 ## Notable omissions
 
-- `print` for output when precision is needed — always `printf` with explicit format
-- Associative array iteration with `for (key in arr)` — not needed in this script
-- Field separator (`FS`) modification — not used; the script operates on whole lines via `$0`
-- Multiple output files — only stdout and stderr
-- `getline` — not used; input flows through the normal record processing
+- `print` for output when precision is needed -- always `printf` with explicit format
+- Associative array iteration with `for (key in arr)` -- not needed in this script
+- Field separator (`FS`) modification -- not used; the script operates on whole lines via `$0`
+- Multiple output files -- only stdout and stderr
+- `getline` -- not used; input flows through the normal record processing

@@ -1,6 +1,6 @@
 # tianonfmt
 
-An opinionated formatter for jq, shell scripts, Dockerfiles (including `Dockerfile.template` files), and Markdown — enforcing my personal style conventions across my Docker Official Images work, personal tools, and infrastructure scripts.
+An opinionated formatter for jq, shell scripts, Dockerfiles (including `Dockerfile.template` files), and Markdown -- enforcing my personal style conventions across my Docker Official Images work, personal tools, and infrastructure scripts.
 
 ## Supported types
 
@@ -56,11 +56,11 @@ $ tianonfmt -t -d script.sh
 
 ## Why?
 
-Formatters are great — `gofmt` is the obvious example — but they only exist where someone bothered to write one, and they only enforce the conventions of whoever wrote them.  I have strong opinions about how my code should look, and I got tired of those opinions living only in my head (or surfacing only in code review comments).
+Formatters are great -- `gofmt` is the obvious example -- but they only exist where someone bothered to write one, and they only enforce the conventions of whoever wrote them.  I have strong opinions about how my code should look, and I got tired of those opinions living only in my head (or surfacing only in code review comments).
 
 `tianonfmt` makes "run the formatter" the answer to style questions.
 
-Style documentation lives in [`docs/`](docs/).  None of it is exhaustive, and some of it is probably wrong — but it's interesting.
+Style documentation lives in [`docs/`](docs/).  None of it is exhaustive, and some of it is probably wrong -- but it's interesting.
 
 ## Attribution
 

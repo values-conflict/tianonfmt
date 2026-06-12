@@ -1,6 +1,6 @@
 # YAML style
 
-Covers `.yml` and `.yaml` files in the corpus.  The `.yml` extension is always used — `.yaml` does not appear.
+Covers `.yml` and `.yaml` files in the corpus.  The `.yml` extension is always used -- `.yaml` does not appear.
 
 The corpus contains two distinct YAML contexts: **GitHub Actions workflows** (the majority) and **Docker Compose / Swarm stack files** (a small number).  Most of this document covers GitHub Actions.  Docker Compose files follow the same generic YAML conventions but may use additional constructs (like flow sequences) that do not appear in GHA workflows.
 
@@ -10,7 +10,7 @@ These apply regardless of the YAML file's purpose.
 
 ### Indentation
 
-**2 spaces per level.**  Tabs are forbidden by the YAML specification — this is the one format where hard tabs cannot be used.  2 spaces is the standard choice, not a preference.  See [universal.md](universal.md).
+**2 spaces per level.**  Tabs are forbidden by the YAML specification -- this is the one format where hard tabs cannot be used.  2 spaces is the standard choice, not a preference.  See [universal.md](universal.md).
 
 ### Quoting
 
@@ -21,7 +21,7 @@ These apply regardless of the YAML file's purpose.
 
 ### Comments
 
-Comments appear on their own lines, indented to match the surrounding context.  Inline comments are used sparingly.  `TODO` comments follow the same concrete style as code comments — see [prose.md](prose.md).
+Comments appear on their own lines, indented to match the surrounding context.  Inline comments are used sparingly.  `TODO` comments follow the same concrete style as code comments -- see [prose.md](prose.md).
 
 ## File structure and top-level key order
 
@@ -48,12 +48,12 @@ jobs:
   ...
 ```
 
-1. `name:` — always present, describes the workflow
-2. `on:` — triggers
-3. `defaults:` — default run shell (always present in action workflows)
-4. `concurrency:` — cancellation policy
-5. `permissions:` — minimal permissions declaration
-6. `jobs:` — job definitions
+1. `name:` -- always present, describes the workflow
+2. `on:` -- triggers
+3. `defaults:` -- default run shell (always present in action workflows)
+4. `concurrency:` -- cancellation policy
+5. `permissions:` -- minimal permissions declaration
+6. `jobs:` -- job definitions
 
 Not all files have all sections, but when they appear, this is the order.
 
@@ -69,7 +69,7 @@ defaults:
     shell: 'bash -Eeuo pipefail -x {0}'
 ```
 
-The value is single-quoted.  The `-x` flag (trace execution) is included — this means every `run:` step echoes its commands to the log.  This is deliberate: it makes CI logs self-documenting.
+The value is single-quoted.  The `-x` flag (trace execution) is included -- this means every `run:` step echoes its commands to the log.  This is deliberate: it makes CI logs self-documenting.
 
 The `{0}` placeholder is GitHub Actions syntax for the script file path.
 
@@ -90,7 +90,7 @@ on:
 
 - `pull_request:` and `push:` without sub-keys are fine as-is (empty mapping)
 - `schedule:` uses a single-item list with `cron:` (no quotes around the cron expression); the minute and hour values are deliberately off-round-numbers (e.g. `13 15` rather than `0 0`) to avoid the thundering-herd effect of every repository's scheduled job firing simultaneously, and sometimes chosen to land during the workday when the job result calls for human attention
-- `workflow_dispatch:` allows manual triggering — almost always included
+- `workflow_dispatch:` allows manual triggering -- almost always included
 
 When `push:` has a `branches-ignore:` filter, the branches are listed in block sequence:
 
@@ -145,7 +145,7 @@ jobs:
     runs-on: ubuntu-latest
 ```
 
-Note the **blank line after `jobs:`** — a visual separator before the first job definition.  This blank line appears consistently in multi-job workflow files.
+Note the **blank line after `jobs:`**: a visual separator before the first job definition.  This blank line appears consistently in multi-job workflow files.
 
 ### `runs-on`
 
@@ -174,9 +174,9 @@ Steps without a `name:` are common for short, self-explanatory commands:
 - run: git log --oneline
 ```
 
-**When to omit `name:`:** a step's `run:` stands as its own name when it is the kind of command a developer would type directly or see in a project `README` — a single, standard tool invocation with familiar flags.  When `run:` involves unusual flags, cross-module plumbing (`-C`, `../...`), or phrasing that would require a reader to pause and parse, add a `name:` that states what the step is actually doing.
+**When to omit `name:`:** a step's `run:` stands as its own name when it is the kind of command a developer would type directly or see in a project `README` -- a single, standard tool invocation with familiar flags.  When `run:` involves unusual flags, cross-module plumbing (`-C`, `../...`), or phrasing that would require a reader to pause and parse, add a `name:` that states what the step is actually doing.
 
-When using `name:`, the name is the exact thing being done — the command, the flag set, or the output artifact — not an abstract category:
+When using `name:`, the name is the exact thing being done -- the command, the flag set, or the output artifact -- not an abstract category:
 
 ```yaml
 # Good: exact command or flag set
@@ -223,7 +223,7 @@ When using `name:`, the name is the exact thing being done — the command, the 
 - run: git diff --exit-code
 ```
 
-### `uses:` — action references
+### `uses:` -- action references
 
 Action references always pin to a specific version tag (e.g., `@v6`), never `@main` or `@HEAD`:
 
@@ -247,17 +247,17 @@ Local actions (within the same repository) use relative paths:
 
 GitHub Actions expressions (`${{ }}`) inside `run:` blocks are **almost never correct** and should be avoided.  They create two compounding problems:
 
-**Security** — the expression value is interpolated directly into the shell command string before the shell sees it.  An attacker-controlled value (e.g. a PR branch name, a commit message, a label) containing shell metacharacters becomes a command injection vulnerability.  GitHub's own security hardening guide explicitly warns against this pattern.
+**Security**: the expression value is interpolated directly into the shell command string before the shell sees it.  An attacker-controlled value (e.g. a PR branch name, a commit message, a label) containing shell metacharacters becomes a command injection vulnerability.  GitHub's own security hardening guide explicitly warns against this pattern.
 
-**Shell quoting** — the expression value arrives as a raw string fragment embedded in YAML, then in shell.  Quoting it correctly for both layers simultaneously is error-prone and context-dependent.  There is no safe general solution.
+**Shell quoting**: the expression value arrives as a raw string fragment embedded in YAML, then in shell.  Quoting it correctly for both layers simultaneously is error-prone and context-dependent.  There is no safe general solution.
 
 The correct pattern is to pass any expression value through `env:` and reference it as a plain shell variable:
 
 ```yaml
-# Wrong — expression injected into shell:
+# Wrong -- expression injected into shell:
 - run: echo '${{ steps.build.outputs.digest }}'
 
-# Correct — value passed safely via environment:
+# Correct -- value passed safely via environment:
 - env:
     DIGEST: ${{ steps.build.outputs.digest }}
   run: echo "$DIGEST"
@@ -265,18 +265,18 @@ The correct pattern is to pass any expression value through `env:` and reference
 
 The runner assigns `env:` values before the shell starts, treating them as data rather than code.  Shell variables are never interpreted as commands.
 
-**When `${{ }}` IS appropriate** — outside of shell code, expressions are fine and expected: `runs-on:`, `if:`, `with:`, `env:` values at step/job level, `concurrency.group`, `strategy:` fields, `outputs:` at job level.  The rule applies specifically to the content of `run:` blocks and any other context where values are interpolated into shell source.
+**When `${{ }}` IS appropriate**: outside of shell code, expressions are fine and expected: `runs-on:`, `if:`, `with:`, `env:` values at step/job level, `concurrency.group`, `strategy:` fields, `outputs:` at job level.  The rule applies specifically to the content of `run:` blocks and any other context where values are interpolated into shell source.
 
-**The same principle applies to any action input that accepts code**, not just `run:`.  The most common case beyond `run:` is `actions/github-script`'s `script:` input, which accepts JavaScript.  The correct pattern is identical — pass via `env:`, read as `process.env.VAR`:
+**The same principle applies to any action input that accepts code**, not just `run:`.  The most common case beyond `run:` is `actions/github-script`'s `script:` input, which accepts JavaScript.  The correct pattern is identical -- pass via `env:`, read as `process.env.VAR`:
 
 ```yaml
-# Wrong — expression injected into JavaScript source:
+# Wrong -- expression injected into JavaScript source:
 - uses: actions/github-script@v8
   with:
     script: |
       const n = ${{ github.event.pull_request.number }};
 
-# Correct — value passed safely via environment:
+# Correct -- value passed safely via environment:
 - uses: actions/github-script@v8
   env:
     PR_NUMBER: ${{ github.event.pull_request.number }}
@@ -285,7 +285,7 @@ The runner assigns `env:` values before the shell starts, treating them as data 
       const n = Number(process.env.PR_NUMBER);
 ```
 
-Corpus ref (correct pattern): [`doi/official-images/.github/workflows/munge-pr.yml`](https://github.com/docker-library/official-images/blob/master/.github/workflows/munge-pr.yml) — `IMAGES: ${{ needs.gather.outputs.images }}` passed via `env:`, consumed as `process.env.IMAGES` inside the `script:` block.
+Corpus ref (correct pattern): [`doi/official-images/.github/workflows/munge-pr.yml`](https://github.com/docker-library/official-images/blob/master/.github/workflows/munge-pr.yml) -- `IMAGES: ${{ needs.gather.outputs.images }}` passed via `env:`, consumed as `process.env.IMAGES` inside the `script:` block.
 
 ### Single-line commands
 
@@ -308,7 +308,7 @@ Multi-line commands use the YAML literal block scalar `|`:
 ```
 
 The shell code inside `|` blocks follows the same conventions as standalone [bash scripts](bash.md):
-- 2-space YAML indentation is separate from the shell's tab indentation — the shell code inside a `run: |` block uses tabs for its own indentation, but the entire block is indented 4 spaces (2 for step list, 2 for the `run:` value)
+- 2-space YAML indentation is separate from the shell's tab indentation -- the shell code inside a `run: |` block uses tabs for its own indentation, but the entire block is indented 4 spaces (2 for step list, 2 for the `run:` value)
 - `if`, `for`, `case` structures follow [bash.md](bash.md) conventions exactly
 
 The folded block scalar `>` is **never used** for shell code.
@@ -339,7 +339,7 @@ The `EOF-$RANDOM-$RANDOM-$RANDOM` delimiter pattern is used for multi-line outpu
 
 Corpus ref: [`tianon-dockerfiles/.github/workflows/update.yml#L29-L48`](https://github.com/tianon/dockerfiles/blob/2118a1979eff7545e06570d1eefc6434d691e68d/.github/workflows/update.yml#L29-L48).
 
-## `with:` — action inputs
+## `with:` -- action inputs
 
 ```yaml
 - uses: actions/checkout@v6
@@ -361,7 +361,7 @@ strategy:
   fail-fast: false
 ```
 
-`fail-fast: false` appears consistently — Tianon prefers to see all jobs complete rather than cancelling on the first failure.
+`fail-fast: false` appears consistently -- Tianon prefers to see all jobs complete rather than cancelling on the first failure.
 
 `fail-fast: false` always comes **at the end** of the `strategy:` block, after `matrix:`. The matrix definition is the primary content; `fail-fast` is a modifier and reads naturally as a postscript.
 
@@ -382,7 +382,7 @@ strategy:
           build: './build.sh amd64'
 ```
 
-## `env:` — environment variables
+## `env:` -- environment variables
 
 At job or step level:
 
@@ -475,8 +475,8 @@ IDs are kebab-case, matching the step's logical purpose.
 
 ## Notable omissions
 
-- `.yaml` extension — always `.yml`
+- `.yaml` extension -- always `.yml`
 - `true` / `false` for booleans as strings (never `'true'` or `"true"`)
-- `null` values — absent keys are omitted rather than set to null
-- Tab indentation — YAML requires spaces; 2 spaces specifically
-- `on: push` triggering `main` branch specifically — all branches trigger unless filtered with `branches-ignore`
+- `null` values -- absent keys are omitted rather than set to null
+- Tab indentation -- YAML requires spaces; 2 spaces specifically
+- `on: push` triggering `main` branch specifically -- all branches trigger unless filtered with `branches-ignore`

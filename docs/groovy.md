@@ -4,7 +4,7 @@ Covers `.groovy` files and `Jenkinsfile*` files in the corpus.  Groovy appears p
 
 ## Indentation
 
-**Hard tabs, one per nesting level** — consistent with [universal.md](universal.md).
+**Hard tabs, one per nesting level**: consistent with [universal.md](universal.md).
 
 ## Pipeline style: scripted, not declarative
 
@@ -12,7 +12,7 @@ All pipelines use the **scripted pipeline** form (`node { }`, `stage { }`) rathe
 
 ## Brace placement and closure chaining
 
-Opening braces always go on the same line as the control structure or call.  When multiple wrappers nest immediately — because the inner wrapper is semantically inseparable from the outer — their opening braces chain on the same line and their closing braces pair at the end:
+Opening braces always go on the same line as the control structure or call.  When multiple wrappers nest immediately -- because the inner wrapper is semantically inseparable from the outer -- their opening braces chain on the same line and their closing braces pair at the end:
 
 ```groovy
 for (repo in repos) { withEnv(['repo=' + repo]) {
@@ -30,7 +30,7 @@ lock(label: 'repo-info-local', quantity: 1) { node('repo-info-local') {
 
 Three tiers of how often chaining occurs in practice:
 
-**Always chained** — `for` iteration immediately followed by `withEnv` is never split across lines; the loop variable needs to be injected before anything else can happen:
+**Always chained**: `for` iteration immediately followed by `withEnv` is never split across lines; the loop variable needs to be injected before anything else can happen:
 ```groovy
 for (def version in versions) { withEnv(['version=' + version]) {
     stage(version) {
@@ -39,16 +39,16 @@ for (def version in versions) { withEnv(['version=' + version]) {
 } }
 ```
 
-**Often chained** — `node(label)` immediately followed by another wrapper (`withEnv`, `dir`, etc.); `dir('...')` immediately followed by `stage('...')` or `deleteDir()`:
+**Often chained**: `node(label)` immediately followed by another wrapper (`withEnv`, `dir`, etc.); `dir('...')` immediately followed by `stage('...')` or `deleteDir()`:
 ```groovy
 dir('output') { stage('Archive') {
     archiveArtifacts '**'
 } }
 ```
 
-**Sometimes chained** — `withEnv([...])` followed by `stage(variant)` when iterating over variants; triple chains in loops (`for { stage { withEnv { } } }`).
+**Sometimes chained**: `withEnv([...])` followed by `stage(variant)` when iterating over variants; triple chains in loops (`for { stage { withEnv { } } }`).
 
-Note: `configure { it / 'properties' << 'ClassName' { } }` is a separate pattern for Groovy XML builder manipulation of Jenkins job configuration — not a pipeline closure chain.
+Note: `configure { it / 'properties' << 'ClassName' { } }` is a separate pattern for Groovy XML builder manipulation of Jenkins job configuration -- not a pipeline closure chain.
 
 Corpus refs: [`doi/oi-janky-groovy/multiarch/target-pipeline.groovy#L77-L87`](https://github.com/docker-library/oi-janky-groovy/blob/2aafbd86f9e793de0145bc33bc865ad8b6d8e88a/multiarch/target-pipeline.groovy#L77-L87), [`doi/oi-janky-groovy/multiarch/generate-pipeline.groovy`](https://github.com/docker-library/oi-janky-groovy/blob/2aafbd86f9e793de0145bc33bc865ad8b6d8e88a/multiarch/generate-pipeline.groovy).
 
@@ -56,7 +56,7 @@ Corpus refs: [`doi/oi-janky-groovy/multiarch/target-pipeline.groovy#L77-L87`](ht
 
 - **Single quotes** for simple string literals: `sh 'bashbrew fetch "$ACT_ON_IMAGE"'`
 - **Double quotes** for Groovy string interpolation with `${}`: `"docker-hub-${env.BASHBREW_ARCH}"`
-- **Triple single quotes** (`'''...'''`) for multi-line bash scripts — most common
+- **Triple single quotes** (`'''...'''`) for multi-line bash scripts -- most common
 - **Triple double quotes** (`"""..."""`) for multi-line strings requiring Groovy interpolation, primarily in generated JobDSL strings: `dsl += """..."""`
 
 Corpus ref: [`doi/oi-janky-groovy/docs/generate-pipeline.groovy#L25`](https://github.com/docker-library/oi-janky-groovy/blob/2aafbd86f9e793de0145bc33bc865ad8b6d8e88a/docs/generate-pipeline.groovy#L25).
@@ -72,7 +72,7 @@ sh(returnStdout: true, script: '''#!/usr/bin/env bash
 ''')
 ```
 
-The bash code inside triple-quoted strings is indented **one level deeper** than the `sh` call — the closing `'''` sits at the `sh`'s indentation level:
+The bash code inside triple-quoted strings is indented **one level deeper** than the `sh` call -- the closing `'''` sits at the `sh`'s indentation level:
 
 ```groovy
 stage('Build') {
@@ -127,11 +127,11 @@ Corpus ref: [`doi/oi-janky-groovy/multiarch/target-pipeline.groovy#L4-L10`](http
 
 - **`UPPERCASE`** for Jenkins environment variables accessed via `env.*`
 - **`camelCase`** for local Groovy variables (`def buildEnvs`, `def children`)
-- **Stage names** are title-case, kept to a single word when reasonably possible — the Jenkins pipeline view renders better with short names: `stage('Checkout')`, `stage('Meta')`, `stage('Deploy')`
+- **Stage names** are title-case, kept to a single word when reasonably possible -- the Jenkins pipeline view renders better with short names: `stage('Checkout')`, `stage('Meta')`, `stage('Deploy')`
 
 ## Comments
 
-`//` for all single-line comments.  Block comments (`/* */`) do not appear.  Inline comments follow the same voice conventions as [prose.md](prose.md) — lowercase first word, no terminal period:
+`//` for all single-line comments.  Block comments (`/* */`) do not appear.  Inline comments follow the same voice conventions as [prose.md](prose.md) -- lowercase first word, no terminal period:
 
 ```groovy
 quietPeriod: 15 * 60, // 15 minutes
@@ -140,7 +140,7 @@ cron('@daily'),        // check periodically, just in case
 
 ## Common wrappers
 
-**`withCredentials([...])`** — list format with each credential type on its own line, trailing comma:
+**`withCredentials([...])`**: list format with each credential type on its own line, trailing comma:
 
 ```groovy
 withCredentials([
@@ -161,7 +161,7 @@ withCredentials([
 
 ## Shell output capture
 
-`sh(returnStdout: true, script: '''...''').trim()` — `.trim()` is always chained to remove the trailing newline:
+`sh(returnStdout: true, script: '''...''').trim()` -- `.trim()` is always chained to remove the trailing newline:
 
 ```groovy
 env.TAGS = sh(returnStdout: true, script: '''#!/usr/bin/env bash
@@ -174,11 +174,11 @@ env.TAGS = sh(returnStdout: true, script: '''#!/usr/bin/env bash
 
 ## Logging
 
-`echo(...)` with parentheses for Jenkins console output — not `echo '...'`.
+`echo(...)` with parentheses for Jenkins console output -- not `echo '...'`.
 
 ## Notable omissions
 
-- Declarative pipeline syntax (`pipeline { }`, `agent { }`, `stages { }`) — always scripted
-- `agent` block — always `node`
-- `post { }` blocks — cleanup done inline
-- `options { }` blocks — pipeline properties set via `properties([...])` calls inline
+- Declarative pipeline syntax (`pipeline { }`, `agent { }`, `stages { }`) -- always scripted
+- `agent` block -- always `node`
+- `post { }` blocks -- cleanup done inline
+- `options { }` blocks -- pipeline properties set via `properties([...])` calls inline

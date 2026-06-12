@@ -2,8 +2,8 @@
 
 This document covers two closely related things:
 
-1. **Code comment conventions** — the mechanical rules for how comments are formatted across all languages
-2. **Writing voice** — the tone and style of the prose itself, whether in comments or documentation
+1. **Code comment conventions**: the mechanical rules for how comments are formatted across all languages
+2. **Writing voice**: the tone and style of the prose itself, whether in comments or documentation
 
 These are kept together because the same voice shows up in both: the person who writes `# TODO something less ... hanky?` in a shell script is the same person who writes "I've eventually grown to dislike every 'Docker DNS' project for one reason or another" in a README.
 
@@ -12,22 +12,22 @@ These are kept together because the same voice shows up in both: the person who 
 Several repos in the corpus are collaborative.  For code comment style, the mechanical patterns (capitalisation, punctuation, `TODO` format) are consistent enough across the corpus that they appear to reflect a house style Tianon established even in collaborative contexts.  For prose *voice*, the most reliable sources are repos where Tianon is clearly the primary or sole author:
 
 **High confidence (Tianon-authored):**
-- [`tianon-dockerfiles`](https://github.com/tianon/dockerfiles/tree/2118a1979eff7545e06570d1eefc6434d691e68d) — personal Dockerfiles
-- [`debuerreotype`](https://github.com/debuerreotype/debuerreotype/tree/3c3272fa743e0257ae64081987c500c2923ea963) — his project
-- [`gosu`](https://github.com/tianon/gosu/tree/3d395d499a92ffa47d70c79d24a738b85075f477) — his project
-- [`rawdns`](https://github.com/tianon/rawdns/tree/ea662544c8b03ef7133cc6fc75f63e107265b3f2) — his project
-- [`abstract-sockets`](https://github.com/tianon/abstract-sockets/tree/d08ca7040801fdde8c7ca0b1c844dbf28c2d1a1e) — his project
-- [`hocker`](https://github.com/infosiftr/hocker/tree/ff4d4df2370391ca582abc51a64022501d903577) — his project
-- [`fake-git`](https://github.com/tianon/fake-git/tree/4639d58ce5f6488e448a019acc2b5ffc55d0925f) — his project
-- [`debian-bin`](https://github.com/tianon/debian-bin/tree/d508ea34f15e88b8ac63d71ffb1938fccbc21206) — his personal scripts
-- [`actions/checkout/`](https://github.com/tianon/actions/blob/c109aa98a82622edf55e0e6380a1672368930b30/checkout/) — his action
-- [`blog`](https://github.com/tianon/tianon.github.io/tree/70f318822f383612a86900e95689f72793b9b083) — personal blog; the longest-form personal prose in the corpus
+- [`tianon-dockerfiles`](https://github.com/tianon/dockerfiles/tree/2118a1979eff7545e06570d1eefc6434d691e68d) -- personal Dockerfiles
+- [`debuerreotype`](https://github.com/debuerreotype/debuerreotype/tree/3c3272fa743e0257ae64081987c500c2923ea963) -- his project
+- [`gosu`](https://github.com/tianon/gosu/tree/3d395d499a92ffa47d70c79d24a738b85075f477) -- his project
+- [`rawdns`](https://github.com/tianon/rawdns/tree/ea662544c8b03ef7133cc6fc75f63e107265b3f2) -- his project
+- [`abstract-sockets`](https://github.com/tianon/abstract-sockets/tree/d08ca7040801fdde8c7ca0b1c844dbf28c2d1a1e) -- his project
+- [`hocker`](https://github.com/infosiftr/hocker/tree/ff4d4df2370391ca582abc51a64022501d903577) -- his project
+- [`fake-git`](https://github.com/tianon/fake-git/tree/4639d58ce5f6488e448a019acc2b5ffc55d0925f) -- his project
+- [`debian-bin`](https://github.com/tianon/debian-bin/tree/d508ea34f15e88b8ac63d71ffb1938fccbc21206) -- his personal scripts
+- [`actions/checkout/`](https://github.com/tianon/actions/blob/c109aa98a82622edf55e0e6380a1672368930b30/checkout/) -- his action
+- [`blog`](https://github.com/tianon/tianon.github.io/tree/70f318822f383612a86900e95689f72793b9b083) -- personal blog; the longest-form personal prose in the corpus
 
 **Mixed / collaborative** (commit counts as of 2026-04-24, at the corpus HEAD SHAs linked above):
-- [`doi/official-images`](https://github.com/docker-library/official-images) — heavily multi-contributor; Tianon is second-ranked author (~8,786 commits vs yosifkit's ~11,492); DOI image READMEs are generated stubs (see [markdown.md](markdown.md))
-- [`doi/bashbrew`](https://github.com/docker-library/bashbrew/tree/d662ff01570964b5f648df009c9269f388285692) — primarily Tianon (482 commits) with minor contributions from yosifkit, Joe Ferguson, and others
-- [`doi/perl-bashbrew`](https://github.com/docker-library/perl-bashbrew/tree/2ab6f478d8cf809b67ebd21930e84c51ad61dc7b) — primarily Tianon (43 commits) with 3 external commits
-- [`meta-scripts`](https://github.com/docker-library/meta-scripts/tree/205031aee2fdfbbd449038afd58f0f0a6915c217) — primarily Tianon (224 commits) with meaningful contributions from yosifkit, Laurent Goderre, Joseph Ferguson
+- [`doi/official-images`](https://github.com/docker-library/official-images) -- heavily multi-contributor; Tianon is second-ranked author (~8,786 commits vs yosifkit's ~11,492); DOI image READMEs are generated stubs (see [markdown.md](markdown.md))
+- [`doi/bashbrew`](https://github.com/docker-library/bashbrew/tree/d662ff01570964b5f648df009c9269f388285692) -- primarily Tianon (482 commits) with minor contributions from yosifkit, Joe Ferguson, and others
+- [`doi/perl-bashbrew`](https://github.com/docker-library/perl-bashbrew/tree/2ab6f478d8cf809b67ebd21930e84c51ad61dc7b) -- primarily Tianon (43 commits) with 3 external commits
+- [`meta-scripts`](https://github.com/docker-library/meta-scripts/tree/205031aee2fdfbbd449038afd58f0f0a6915c217) -- primarily Tianon (224 commits) with meaningful contributions from yosifkit, Laurent Goderre, Joseph Ferguson
 
 [`docker-moosefs`](https://github.com/tianon/docker-moosefs) (73 commits, solely Tianon-authored) can be treated as high-confidence.
 
@@ -73,7 +73,7 @@ func Lookup(ctx context.Context, ref Reference, opts *LookupOptions) ...
 
 Corpus refs: [`doi/bashbrew/scripts/jq-template.awk#L1`](https://github.com/docker-library/bashbrew/blob/d662ff01570964b5f648df009c9269f388285692/scripts/jq-template.awk#L1), [`meta-scripts/registry/lookup.go#L12`](https://github.com/docker-library/meta-scripts/blob/205031aee2fdfbbd449038afd58f0f0a6915c217/registry/lookup.go#L12), [`debian-bin/jq/deb822.jq#L3`](https://github.com/tianon/debian-bin/blob/d508ea34f15e88b8ac63d71ffb1938fccbc21206/jq/deb822.jq#L3), [`doi/perl-bashbrew/lib/Bashbrew.pm#L16`](https://github.com/docker-library/perl-bashbrew/blob/2ab6f478d8cf809b67ebd21930e84c51ad61dc7b/lib/Bashbrew.pm#L16).
 
-**List items follow the same lowercase rule.** Fragments are strongly preferred — a list item is almost always a short label, phrase, or clause, not a sentence.  The first word is lowercase.  If a list item is genuinely so large it requires one or more full, complete sentences to express, those sentences may begin with a capital, but that situation is the rare exception.
+**List items follow the same lowercase rule.** Fragments are strongly preferred -- a list item is almost always a short label, phrase, or clause, not a sentence.  The first word is lowercase.  If a list item is genuinely so large it requires one or more full, complete sentences to express, those sentences may begin with a capital, but that situation is the rare exception.
 
 ```go
 // good:
@@ -102,7 +102,7 @@ Comments do **not** end with a period, even when the comment is a complete sente
 # ignore malformed lines that miss a colon                 ← no period
 ```
 
-Exceptions: `!` appears for genuine emphasis (`# this script assumes gawk!`), and `?` appears in question-form `TODO`s and consideration comments.  A comment that is a verbatim quote or a genuinely complete and formal thought may start with a capital, but this is rare — most of Tianon's comments are fragments, not sentences.
+Exceptions: `!` appears for genuine emphasis (`# this script assumes gawk!`), and `?` appears in question-form `TODO`s and consideration comments.  A comment that is a verbatim quote or a genuinely complete and formal thought may start with a capital, but this is rare -- most of Tianon's comments are fragments, not sentences.
 
 The near-absence of sentences in inline code comments is not accidental.  Sentences require capitals, periods, and complete grammatical structure -- all of which add visual noise and pressure to wrap.  The zero occurrences of double-space-after-period in corpus Go inline comments is not a gap in the data; it is the data: sentences do not appear there, so the question never arises.
 
@@ -112,7 +112,7 @@ The near-absence of sentences in inline code comments is not accidental.  Senten
 
 `TODO` is always **all-caps** and is followed by a **concrete, specific description**.  Vague `TODO`s do not appear.
 
-In code comments (bash, jq, Go, etc.), `TODO` is unquoted — the comment syntax already marks the context.  In markdown prose, `TODO` is backticked: it is a programming convention appearing in natural language, so it follows the same rule that backticks any technical term (`--flag`, `$VARIABLE`, command names).  This is not consistently visible in the current corpus but is a stated preference.
+In code comments (bash, jq, Go, etc.), `TODO` is unquoted -- the comment syntax already marks the context.  In markdown prose, `TODO` is backticked: it is a programming convention appearing in natural language, so it follows the same rule that backticks any technical term (`--flag`, `$VARIABLE`, command names).  This is not consistently visible in the current corpus but is a stated preference.
 
 ```bash
 # TODO --pull flag
@@ -139,7 +139,7 @@ Patterns within `TODO` comments:
 - Question-form `TODO`s often end with `?`: `# TODO should we throw an error...?`
 - A concrete alternative or example may be included: `like "filter_inline_pgp_noise"`
 - Linked considerations are parenthesised: `(and/or make a dedicated Package for it?)`
-- Some `TODO`s in jq use a space before the `?`: `# TODO consider ... ?` — this is an idiosyncrasy of jq comment style
+- Some `TODO`s in jq use a space before the `?`: `# TODO consider ... ?` -- this is an idiosyncrasy of jq comment style
 
 Corpus refs: [`tianon-dockerfiles/buildkit/versions.sh#L17`](https://github.com/tianon/dockerfiles/blob/2118a1979eff7545e06570d1eefc6434d691e68d/buildkit/versions.sh#L17), [`debian-bin/jq/deb822.jq#L15`](https://github.com/tianon/debian-bin/blob/d508ea34f15e88b8ac63d71ffb1938fccbc21206/jq/deb822.jq#L15), [`meta-scripts/registry/lookup.go#L27-L28`](https://github.com/docker-library/meta-scripts/blob/205031aee2fdfbbd449038afd58f0f0a6915c217/registry/lookup.go#L27-L28), [`doi/perl-bashbrew/lib/Bashbrew.pm#L12`](https://github.com/docker-library/perl-bashbrew/blob/2ab6f478d8cf809b67ebd21930e84c51ad61dc7b/lib/Bashbrew.pm#L12).
 
@@ -281,13 +281,13 @@ Corpus ref: [`debian-bin/repo/buildd.sh`](https://github.com/tianon/debian-bin/b
 
 ### Intentional mid-sentence capitalisation
 
-Occasionally a common word is capitalised mid-sentence to elevate it from adjective or noun to concept — treating it as a proper noun signals "this is A Thing, not just a description".  The archetypal example is **Wrong** (capital W): when something is not merely incorrect but violates a principle, it is Wrong.
+Occasionally a common word is capitalised mid-sentence to elevate it from adjective or noun to concept -- treating it as a proper noun signals "this is A Thing, not just a description".  The archetypal example is **Wrong** (capital W): when something is not merely incorrect but violates a principle, it is Wrong.
 
 ```
 fail if any constructs remain that Tianon considers Wrong
 ```
 
-This device is used sparingly (overuse dilutes it) and only where the conceptual elevation genuinely adds meaning.  It is a **stated preference, not yet consistently observed in the corpus** — the corpus shows it primarily as proper nouns (Cloudflare, Gatekeeper, etc.) rather than as rhetorical elevation.
+This device is used sparingly (overuse dilutes it) and only where the conceptual elevation genuinely adds meaning.  It is a **stated preference, not yet consistently observed in the corpus**: the corpus shows it primarily as proper nouns (Cloudflare, Gatekeeper, etc.) rather than as rhetorical elevation.
 
 ### Asterisks for emphasis within comments
 
@@ -307,7 +307,7 @@ This appears in Go comments specifically, where the asterisks would not render a
 empty # tailing comma (sic)
 ```
 
-(Note: "tailing" rather than "trailing" — the `(sic)` acknowledges the typo is intentional.)
+(Note: "tailing" rather than "trailing" -- the `(sic)` acknowledges the typo is intentional.)
 
 Corpus ref: [`meta-scripts/oci.jq`](https://github.com/docker-library/meta-scripts/blob/205031aee2fdfbbd449038afd58f0f0a6915c217/oci.jq).
 
@@ -315,11 +315,11 @@ Corpus ref: [`meta-scripts/oci.jq`](https://github.com/docker-library/meta-scrip
 
 Emoji appear sparingly, reserved for genuine humor, irony, or self-aware moments:
 
-- 😂 — "I find this absurd": `# "riscv64" is not "risc, v64" 😂`
-- 😅 — "I acknowledge this is awkward/embarrassing": appears in YAML comments, shell error messages
-- 🙃 — upside-down smile, meaning "this is cursed": appears in YAML step names
-- 🙈 — "hear no evil", meaning "I'm choosing not to look at this problem": `"" # buildkit has to pull during build 🙈`
-- ❗ — strong emphasis for important warnings
+- 😂 -- "I find this absurd": `# "riscv64" is not "risc, v64" 😂`
+- 😅 -- "I acknowledge this is awkward/embarrassing": appears in YAML comments, shell error messages
+- 🙃 -- upside-down smile, meaning "this is cursed": appears in YAML step names
+- 🙈 -- "hear no evil", meaning "I'm choosing not to look at this problem": `"" # buildkit has to pull during build 🙈`
+- ❗ -- strong emphasis for important warnings
 
 Emoji never appear in formal API documentation (Go exported doc comments).
 
@@ -372,15 +372,15 @@ This appears in Go comments especially.  It reads as "and/or" or "or", depending
 
 ## Git commit messages
 
-Commit messages follow the standard imperative, sentence-case form — the same fragment style as code comments:
+Commit messages follow the standard imperative, sentence-case form -- the same fragment style as code comments:
 
 - No trailing period
 - Sentence case (first word capitalised)
 - Imperative mood: "Update", "Fix", "Add", "Remove", "Rename", "Handle", "Prepare"
-- Version bumps: **"Update NAME to VERSION"** — consistent across all automated and manual version updates
+- Version bumps: **"Update NAME to VERSION"**: consistent across all automated and manual version updates
 - Parenthetical context appended when needed: `"Handle the case where distro-info-data isn't already installed (bookworm/mips64le)"`
-- Emoji used sparingly to convey tone — frustration, irony, or wry commentary on external constraints: `"Update to actions/checkout@v4 🙃"` (the 🙃 here is disparagement of GitHub forcing version-pinning churn on users, not self-deprecation)
-- No GitHub issue, PR, or discussion references — neither full URLs nor `#NNN` shorthand; both forms generate notification spam on the referenced thread
+- Emoji used sparingly to convey tone -- frustration, irony, or wry commentary on external constraints: `"Update to actions/checkout@v4 🙃"` (the 🙃 here is disparagement of GitHub forcing version-pinning churn on users, not self-deprecation)
+- No GitHub issue, PR, or discussion references -- neither full URLs nor `#NNN` shorthand; both forms generate notification spam on the referenced thread
 
 Examples from the corpus:
 
@@ -400,12 +400,12 @@ Corpus refs: [`tianon-dockerfiles` log](https://github.com/tianon/dockerfiles/co
 
 Dates always use **ISO 8601** format.
 
-- Date only: `YYYY-MM-DD` — e.g. `2017-05-16`
-- Datetime with UTC timezone: `YYYY-MM-DDTHH:MM:SSZ` — e.g. `2017-01-01T00:00:00Z`
+- Date only: `YYYY-MM-DD` -- e.g. `2017-05-16`
+- Datetime with UTC timezone: `YYYY-MM-DDTHH:MM:SSZ` -- e.g. `2017-01-01T00:00:00Z`
 
 This applies in code, comments, documentation, and filenames.  Other formats (`MM/DD/YYYY`, `DD Mon YYYY`, "January 1st") do not appear.
 
-The `Z` suffix is always included for datetimes — bare local-time datetimes are not used.
+The `Z` suffix is always included for datetimes -- bare local-time datetimes are not used.
 
 Corpus refs: [`debuerreotype/README.md#L48`](https://github.com/debuerreotype/debuerreotype/blob/3c3272fa743e0257ae64081987c500c2923ea963/README.md#L48) (`2017-01-01T00:00:00Z`), [`fake-git/README.md#L18`](https://github.com/tianon/fake-git/blob/4639d58ce5f6488e448a019acc2b5ffc55d0925f/README.md#L18) (`1970-01-01T00:00:00Z`).
 
@@ -413,7 +413,7 @@ Corpus refs: [`debuerreotype/README.md#L48`](https://github.com/debuerreotype/de
 
 ### Register: informal technical
 
-The writing is simultaneously technically precise and conversationally informal.  It does not write up or down to the reader — it assumes technical sophistication while using casual vocabulary:
+The writing is simultaneously technically precise and conversationally informal.  It does not write up or down to the reader -- it assumes technical sophistication while using casual vocabulary:
 
 > "This is a simple tool grown out of the simple fact that `su` and `sudo` have very strange and often annoying TTY and signal-forwarding behavior."
 
@@ -441,7 +441,7 @@ A recurring pattern: a statement of fact followed by a wry implication or observ
 
 > "Once the user/group is processed, we switch to that user, then we `exec` the specified process and `gosu` itself is no longer resident or involved in the process lifecycle at all.  This avoids all the issues of signal passing and TTY, and punts them to the process invoking `gosu` and the process being invoked by `gosu`, where they belong."
 
-The phrase "where they belong" is the wry part — technically accurate but delivered with a shrug.
+The phrase "where they belong" is the wry part -- technically accurate but delivered with a shrug.
 
 > "The most important caveat here is that this is all *really* hacky..."
 > "don't expect it to work as-is!"
@@ -482,7 +482,7 @@ Corpus ref: [`debuerreotype/README.md#L5`](https://github.com/debuerreotype/debu
 
 Unicode dashes never appear.  Both the em-dash (`—`) and en-dash (`–`) are replaced by ASCII equivalents:
 
-- **Em-dash → ` -- `** (space, double hyphen, space): used very liberally for clause breaks, asides, and pivots in running prose, and as a label–description separator in list items:
+- **Em-dash → ` -- `** (space, double hyphen, space): used very liberally for clause breaks, asides, and pivots in running prose, and as a label-description separator in list items:
 
   > "it's *technically* defensible but practically sloppy -- and the sloppiness matters"
 
@@ -524,7 +524,7 @@ Corpus ref: [`debuerreotype/README.md#L12-L14`](https://github.com/debuerreotype
 
 ### `## Why?` section
 
-Nearly every personal project README has a `## Why?` or `## why` section explaining the motivation for the project's existence.  This is not boilerplate — each one articulates a genuine frustration or gap being filled.
+Nearly every personal project README has a `## Why?` or `## why` section explaining the motivation for the project's existence.  This is not boilerplate -- each one articulates a genuine frustration or gap being filled.
 
 Corpus refs: [`gosu/README.md#L37`](https://github.com/tianon/gosu/blob/3d395d499a92ffa47d70c79d24a738b85075f477/README.md#L37), [`rawdns/README.md#L44`](https://github.com/tianon/rawdns/blob/ea662544c8b03ef7133cc6fc75f63e107265b3f2/README.md#L44), [`hocker/README.md#L5`](https://github.com/infosiftr/hocker/blob/ff4d4df2370391ca582abc51a64022501d903577/README.md#L5).
 
@@ -538,13 +538,13 @@ Things that do not appear in Tianon's comments or documentation prose:
 - Period at the end of a comment line
 - Vague `TODO`s (`# TODO fix this`, `# TODO improve`)
 - `e.g.` or `i.e.` with periods -- `ie,` is Tianon's shorthand for `i.e.,` ("that is": a restatement, not an example); punctuationally informal but semantically correct in prose; in CLI usage blocks (`eg: ./gosu tianon bash`), `eg:` is correct and `ie:` would be wrong -- those lines are genuinely illustrative examples, not restatements; `eg,` does not appear in corpus prose (yet)
-- `etc.` with a period — always `etc` without
-- Passive voice in error messages (`"an error occurred"`) — always active and specific
-- Over-hedging in error messages (`"there may have been a problem"`) — states the problem directly
+- `etc.` with a period -- always `etc` without
+- Passive voice in error messages (`"an error occurred"`) -- always active and specific
+- Over-hedging in error messages (`"there may have been a problem"`) -- states the problem directly
 - Marketing language or superlatives in documentation
 - Formal register / corporate tone
-- `s/he`, `they` (singular) or other gender-neutral contortions — documentation addresses "you" directly or uses "we" for the project
-- Punctuation inside quotation marks — terminators (`.`, `?`, `!`) always go *outside* the closing quote, contrary to American typographic convention: `"foo bar".` not `"foo bar."` — this is the logical-quotation style; when a sentence ends with a quoted fragment and also ends with `?` or `!`, the terminator is typically spaced from the closing quote: `this question ends with a "quoted bit" ?` (space before the `?`)
-- Curly/typographic quotation marks — always straight ASCII `"..."` and `'...'` in all files, not just markdown
-- Unicode em-dash `—` — always ` -- ` (spaced double hyphen) instead; see *Dashes* above
-- Unicode en-dash `–` — always `-` (single hyphen) instead; see *Dashes* above
+- `s/he`, `they` (singular) or other gender-neutral contortions -- documentation addresses "you" directly or uses "we" for the project
+- Punctuation inside quotation marks -- terminators (`.`, `?`, `!`) always go *outside* the closing quote, contrary to American typographic convention: `"foo bar".` not `"foo bar."` -- this is the logical-quotation style; when a sentence ends with a quoted fragment and also ends with `?` or `!`, the terminator is typically spaced from the closing quote: `this question ends with a "quoted bit" ?` (space before the `?`)
+- Curly/typographic quotation marks -- always straight ASCII `"..."` and `'...'` in all files, not just markdown
+- Unicode em-dash `—` -- always ` -- ` (spaced double hyphen) instead; see *Dashes* above
+- Unicode en-dash `–` -- always `-` (single hyphen) instead; see *Dashes* above

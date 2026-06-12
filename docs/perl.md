@@ -10,7 +10,7 @@ Covers Perl scripts (`.pl`) and modules (`.pm`) in the corpus.  The corpus has a
 #!/usr/bin/env perl
 ```
 
-Same pattern as [bash.md](bash.md) — always `env`-based, never a direct `/usr/bin/perl` path.
+Same pattern as [bash.md](bash.md) -- always `env`-based, never a direct `/usr/bin/perl` path.
 
 Corpus ref: [`doi/perl-bashbrew/bin/put-multiarch.pl#L1`](https://github.com/docker-library/perl-bashbrew/blob/2ab6f478d8cf809b67ebd21930e84c51ad61dc7b/bin/put-multiarch.pl#L1).
 
@@ -202,10 +202,10 @@ Corpus ref: [`doi/perl-bashbrew/bin/put-multiarch.pl#L33`](https://github.com/do
 
 ## Notable omissions
 
-- `use strict; use warnings;` — replaced by `use Mojo::Base -strict`
-- `use feature 'signatures';` — implied by `-signatures` in `Mojo::Base`
-- Indirect object syntax (`new Foo ...`) — method call syntax (`Foo->new(...)`) is used
-- `local $/` without a scope guard — used carefully in specific contexts
-- `chomp` in a loop — used once at the end of captured output, not repeatedly
+- `use strict; use warnings;` -- replaced by `use Mojo::Base -strict`
+- `use feature 'signatures';` -- implied by `-signatures` in `Mojo::Base`
+- Indirect object syntax (`new Foo ...`) -- method call syntax (`Foo->new(...)`) is used
+- `local $/` without a scope guard -- used carefully in specific contexts
+- `chomp` in a loop -- used once at the end of captured output, not repeatedly
 - Regex without `/x` for patterns longer than ~20 characters
 - `die` with a trailing newline (that would suppress `at file line N` info)

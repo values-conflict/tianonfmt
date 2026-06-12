@@ -1,6 +1,6 @@
 # Go style
 
-Covers Go source files (`.go`) in the corpus.  `gofmt` handles all mechanical formatting — tabs, brace placement, line length, import grouping, etc. — so this document focuses only on conventions that are **beyond what `gofmt` enforces**.
+Covers Go source files (`.go`) in the corpus.  `gofmt` handles all mechanical formatting -- tabs, brace placement, line length, import grouping, etc. -- so this document focuses only on conventions that are **beyond what `gofmt` enforces**.
 
 ## Import grouping
 
@@ -29,7 +29,7 @@ Corpus ref: [`meta-scripts/registry/lookup.go#L3-L10`](https://github.com/docker
 
 ## Comments
 
-**Exported symbols have doc comments** in the standard Go style (sentence starting with the symbol name).  The doc comment is dense and complete — it references related types using the `[TypeName]` link syntax.  Doc comments are never wrapped across multiple lines; write one long line.  `go doc`, godoc, and IDEs all join continuation lines anyway, so wrapped and unwrapped source produce identical rendered output -- and unwrapped source produces cleaner diffs:
+**Exported symbols have doc comments** in the standard Go style (sentence starting with the symbol name).  The doc comment is dense and complete -- it references related types using the `[TypeName]` link syntax.  Doc comments are never wrapped across multiple lines; write one long line.  `go doc`, godoc, and IDEs all join continuation lines anyway, so wrapped and unwrapped source produce identical rendered output -- and unwrapped source produces cleaner diffs:
 
 ```go
 // a wrapper around [ociregistry.Interface.GetManifest] (and `GetTag`, `GetBlob`, and the `Resolve*` versions of the above) that accepts a [Reference] and always returns a [ociregistry.BlobReader] (in the case of a HEAD request, it will be a zero-length reader with just a valid descriptor)
@@ -114,7 +114,7 @@ if err != nil {
 
 Error messages are lowercase (Go convention: error strings should not be capitalised or end with punctuation).
 
-The format of error strings: `"context: description"` — the context identifies the operation, then a colon, then what failed.
+The format of error strings: `"context: description"` -- the context identifies the operation, then a colon, then what failed.
 
 Corpus ref: [`meta-scripts/registry/lookup.go#L33-L36`](https://github.com/docker-library/meta-scripts/blob/205031aee2fdfbbd449038afd58f0f0a6915c217/registry/lookup.go#L33-L36).
 
@@ -134,7 +134,7 @@ Corpus ref: [`meta-scripts/registry/lookup.go#L43-L46`](https://github.com/docke
 
 ## Generics
 
-Generics appear when they solve a specific, well-motivated problem — not for abstraction's sake.  The type parameter is constrained only as tightly as necessary (often unconstrained `any`), and the motivating issue or design decision is cited directly:
+Generics appear when they solve a specific, well-motivated problem -- not for abstraction's sake.  The type parameter is constrained only as tightly as necessary (often unconstrained `any`), and the motivating issue or design decision is cited directly:
 
 ```go
 // https://github.com/golang/go/issues/27179
@@ -156,10 +156,10 @@ Complex packages have a doc comment at the top of a relevant file explaining the
 
 ## Notable omissions
 
-- `gofmt` is assumed — no non-gofmt formatting ever appears
-- Named return values — not used; return values are unnamed
-- `panic` for error handling — `panic` is used only for programmer errors (nil pointer dereference guards, etc.), never for runtime errors
-- `interface{}` / `any` used sparingly — typed interfaces are preferred
-- Global mutable state — avoided; state is passed explicitly or contained in structs
-- `init()` functions — not observed in corpus
-- Build tags / build constraints — not observed in corpus (though they would follow standard Go conventions)
+- `gofmt` is assumed -- no non-gofmt formatting ever appears
+- Named return values -- not used; return values are unnamed
+- `panic` for error handling -- `panic` is used only for programmer errors (nil pointer dereference guards, etc.), never for runtime errors
+- `interface{}` / `any` used sparingly -- typed interfaces are preferred
+- Global mutable state -- avoided; state is passed explicitly or contained in structs
+- `init()` functions -- not observed in corpus
+- Build tags / build constraints -- not observed in corpus (though they would follow standard Go conventions)

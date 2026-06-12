@@ -1,6 +1,6 @@
 # Bash / shell script style
 
-Covers standalone `.sh` files and executable scripts identified by a bash or sh shebang.  For jq expressions that appear inside these scripts, see [jq-sh.md](jq-sh.md).  For shell code embedded in Dockerfile `RUN` instructions, see [dockerfile.md §RUN shell style](dockerfile.md#run-shell-style) — that context has different conventions.
+Covers standalone `.sh` files and executable scripts identified by a bash or sh shebang.  For jq expressions that appear inside these scripts, see [jq-sh.md](jq-sh.md).  For shell code embedded in Dockerfile `RUN` instructions, see [dockerfile.md §RUN shell style](dockerfile.md#run-shell-style) -- that context has different conventions.
 
 See [universal.md](universal.md) for the general indentation and inline-vs-multiline principles.
 
@@ -28,10 +28,10 @@ set -Eeuo pipefail
 
 The four core flags appear in this exact order, combined into a single argument.  Breaking them out (`set -E -e -u -o pipefail`) is never done.
 
-- `-E` — ERR trap is inherited by shell functions and subshells
-- `-e` — exit immediately on non-zero exit status
-- `-u` — treat unset variables as an error
-- `-o pipefail` — a pipeline fails if any command in it fails
+- `-E` -- ERR trap is inherited by shell functions and subshells
+- `-e` -- exit immediately on non-zero exit status
+- `-u` -- treat unset variables as an error
+- `-o pipefail` -- a pipeline fails if any command in it fails
 
 When a whole script should run with xtrace (debug output), `-x` is appended as a **separate trailing argument** after the canonical cluster, never embedded inside it:
 
@@ -39,7 +39,7 @@ When a whole script should run with xtrace (debug output), `-x` is appended as a
 set -Eeuo pipefail -x
 ```
 
-Other extra flags follow the same rule — `set -Eeuo pipefail` is the fixed canonical block; anything outside it goes as a separate `-<flag>` or `-o <option>` arg.
+Other extra flags follow the same rule -- `set -Eeuo pipefail` is the fixed canonical block; anything outside it goes as a separate `-<flag>` or `-o <option>` arg.
 
 When tracing is needed for only a specific block (e.g. to suppress trace around credential material), `set +x` / `set -x` pairs isolate that block:
 
@@ -55,11 +55,11 @@ Corpus ref: [`actions/checkout/checkout.sh#L1-L2`](https://github.com/tianon/act
 
 When needed, `shopt` calls appear near the top of the script, immediately after `set`:
 
-- `shopt -s dotglob` — include dotfiles in glob patterns
-- `shopt -s nullglob` — return empty list (not the literal pattern) when a glob matches nothing
-- `shopt -s globstar` — enable `**` for recursive glob matching across directory levels
+- `shopt -s dotglob` -- include dotfiles in glob patterns
+- `shopt -s nullglob` -- return empty list (not the literal pattern) when a glob matches nothing
+- `shopt -s globstar` -- enable `**` for recursive glob matching across directory levels
 
-These appear near the top because they change the semantics of glob expansion throughout the entire script.  If a glob option is truly necessary, it must apply consistently — having different glob behavior in different places is already a footgun for unexpected behavior.  Placing them at the top makes the script's behavior uniform and makes it clear to readers that globs behave non-standardly.
+These appear near the top because they change the semantics of glob expansion throughout the entire script.  If a glob option is truly necessary, it must apply consistently -- having different glob behavior in different places is already a footgun for unexpected behavior.  Placing them at the top makes the script's behavior uniform and makes it clear to readers that globs behave non-standardly.
 
 `globstar` specifically enables the `**/` pattern for recursive directory traversal without `find`, which avoids `find`'s notoriously awkward output-feeding behaviour.  Combined with an array, this is the idiomatic pattern:
 
@@ -68,7 +68,7 @@ shopt -s globstar
 files=( **/**.go go.mod go.sum )
 ```
 
-Inside a loop, `for f; do` (without `in`) iterates the script's own positional arguments — equivalent to `for f in "$@"; do` but idiomatic shorthand:
+Inside a loop, `for f; do` (without `in`) iterates the script's own positional arguments -- equivalent to `for f in "$@"; do` but idiomatic shorthand:
 
 ```bash
 shopt -s globstar
@@ -96,31 +96,31 @@ Corpus refs: [`home/git-config.d/common`](https://github.com/tianon/home/blob/72
 
 ## POSIX compatibility as a design goal
 
-Tianon's Bash scripts are consciously written so that they remain **mostly reasonable to read and write as POSIX shell** without requiring a style change.  This is an explicit goal — the control structures, quoting conventions, and general idioms are chosen to be familiar to anyone reading plain `sh`.
+Tianon's Bash scripts are consciously written so that they remain **mostly reasonable to read and write as POSIX shell** without requiring a style change.  This is an explicit goal -- the control structures, quoting conventions, and general idioms are chosen to be familiar to anyone reading plain `sh`.
 
 When "POSIX shell" is the target, that means **BusyBox `sh`** in practice (Alpine, Docker scratch-adjacent images), and occasionally Debian's `dash`.  `local` is not technically POSIX but is supported by both BusyBox and dash, which is why it is used freely even in nominally-POSIX contexts.
 
-The POSIX specification itself supports tabs as the canonical shell indentation character.  The `<<-` heredoc operator strips *leading tab characters* specifically — from [POSIX.1-2024 §2.7.4](https://pubs.opengroup.org/onlinepubs/9799919799/utilities/V3_chap02.html#tag_19_07_04):
+The POSIX specification itself supports tabs as the canonical shell indentation character.  The `<<-` heredoc operator strips *leading tab characters* specifically -- from [POSIX.1-2024 §2.7.4](https://pubs.opengroup.org/onlinepubs/9799919799/utilities/V3_chap02.html#tag_19_07_04):
 
-> If the redirection operator is `<<-`, all leading `<tab>` characters shall be stripped from input lines… and from the line containing the trailing delimiter.
+> If the redirection operator is `<<-`, all leading `<tab>` characters shall be stripped from input lines... and from the line containing the trailing delimiter.
 
 This operator exists precisely so that heredoc content can be indented with the surrounding code.  It would serve no purpose if shell scripts were indented with spaces.  The spec is effectively endorsing tabs as the canonical indentation character.  See also [universal.md](universal.md) for the general principle.
 
 The Bash-specific features that *are* used deliberately:
 
-- **Arrays** (`variants=( ... )`, `${array[@]}`) — considered worth the Bash dependency
-- **`$BASH_SOURCE`** — required for correct self-location when a script may be `source`d
-- **`set -Eeuo pipefail`** — `-E` and `-o pipefail` are Bash extensions; `-E` in particular makes trap inheritance reliable
-- **Here-strings** (`<<<`) — always written **cuddled** with the following word: `<<<"$var"` not `<<< "$var"`.  The content is semantically attached to the operator with no separation.
-- **`shopt`** — for `dotglob`, `nullglob`, etc. when needed
-- **`local`** — used freely (supported by BusyBox and dash; see above)
+- **Arrays** (`variants=( ... )`, `${array[@]}`) -- considered worth the Bash dependency
+- **`$BASH_SOURCE`**: required for correct self-location when a script may be `source`d
+- **`set -Eeuo pipefail`**: `-E` and `-o pipefail` are Bash extensions; `-E` in particular makes trap inheritance reliable
+- **Here-strings** (`<<<`) -- always written **cuddled** with the following word: `<<<"$var"` not `<<< "$var"`.  The content is semantically attached to the operator with no separation.
+- **`shopt`**: for `dotglob`, `nullglob`, etc. when needed
+- **`local`**: used freely (supported by BusyBox and dash; see above)
 
 Features *avoided* even in Bash contexts, to preserve POSIX readability:
 
-- `[[ ]]` — appears occasionally but `[ ]` is strongly preferred; `case` is used as the POSIX alternative for pattern matching (see below)
-- `$'...'` quoting — used only for embedding literal escape sequences (`$'\n'`, `$'\t'`), not as a general quoting form
+- `[[ ]]` -- appears occasionally but `[ ]` is strongly preferred; `case` is used as the POSIX alternative for pattern matching (see below)
+- `$'...'` quoting -- used only for embedding literal escape sequences (`$'\n'`, `$'\t'`), not as a general quoting form
 
-When a script genuinely requires Bash features, Bash is explicitly installed even in minimal-shell environments like Alpine — but this is a conscious tradeoff, not a default.
+When a script genuinely requires Bash features, Bash is explicitly installed even in minimal-shell environments like Alpine -- but this is a conscious tradeoff, not a default.
 
 ---
 
@@ -155,7 +155,7 @@ suite="trixie"
 dir="$(dirname "$BASH_SOURCE")"
 ```
 
-The distinction is not simply "exported vs local" — `dpkgArch` is exported but stays camelCase because it is a script-specific variable, not a conventional environment variable name.
+The distinction is not simply "exported vs local" -- `dpkgArch` is exported but stays camelCase because it is a script-specific variable, not a conventional environment variable name.
 
 ### Variable quoting
 
@@ -167,14 +167,14 @@ cp "$src" "$dst"
 [ "$#" -eq 0 ]
 ```
 
-Parameter expansion syntax uses the full `${var}` form when adjacent content appears on either side of the variable within the same string — this makes the variable name visually distinct even when syntax highlighting is inconsistent.  Simple standalone references use `$var` or `"$var"` without braces.
+Parameter expansion syntax uses the full `${var}` form when adjacent content appears on either side of the variable within the same string -- this makes the variable name visually distinct even when syntax highlighting is inconsistent.  Simple standalone references use `$var` or `"$var"` without braces.
 
 ```bash
-# braces: variable is embedded in a larger string — $foo might be easy to miss
+# braces: variable is embedded in a larger string -- $foo might be easy to miss
 local nextPage="https://hub.docker.com/v2/repositories/${repo}/tags/?page_size=100"
 buildArgs+=( "--arch=${ARCH}" )
 
-# no braces: variable stands alone — the $ is right at the boundary
+# no braces: variable stands alone -- the $ is right at the boundary
 perm=$(stat -c %a "$_file")
 cp "$src" "$dst"
 ```
@@ -198,7 +198,7 @@ cd "$(dirname "$(readlink -f "$BASH_SOURCE")")"
 
 ### Script self-location
 
-To find the directory a script lives in, `$BASH_SOURCE` is used — never `$0`:
+To find the directory a script lives in, `$BASH_SOURCE` is used -- never `$0`:
 
 ```bash
 dir="$(readlink -ve "$BASH_SOURCE")"
@@ -207,7 +207,7 @@ dir="$(dirname "$dir")"
 
 `readlink -ve` is preferred over `realpath` because it is more portable and gives a clearer error if the path does not exist.
 
-`$0` is acceptable in pure POSIX shell scripts and in usage/help text at the top level of a Bash script — it more closely reflects what the user actually typed.  `$BASH_SOURCE` is preferred everywhere else in Bash because it remains correct when the script is `source`d.
+`$0` is acceptable in pure POSIX shell scripts and in usage/help text at the top level of a Bash script -- it more closely reflects what the user actually typed.  `$BASH_SOURCE` is preferred everywhere else in Bash because it remains correct when the script is `source`d.
 
 Corpus refs: [`tianon-dockerfiles/buildkit/versions.sh#L6-L7`](https://github.com/tianon/dockerfiles/blob/2118a1979eff7545e06570d1eefc6434d691e68d/buildkit/versions.sh#L6-L7), [`debian-bin/repo/buildd.sh#L90`](https://github.com/tianon/debian-bin/blob/d508ea34f15e88b8ac63d71ffb1938fccbc21206/repo/buildd.sh#L90).
 
@@ -252,15 +252,15 @@ for suite in \
 	"$debian" \
 	bookworm \
 ; do
-	…
+	...
 done
 ```
 
-The `; then` / `; do` is semantically equivalent to a newline before `then` / `do`, and the trailing `\` on the last item is technically redundant — the sole purpose of both is to let every item line look identical, making additions and reorderings diff-clean.
+The `; then` / `; do` is semantically equivalent to a newline before `then` / `do`, and the trailing `\` on the last item is technically redundant -- the sole purpose of both is to let every item line look identical, making additions and reorderings diff-clean.
 
 `fi` and `done` are always on their own line at the same indentation as the keyword.
 
-POSIX `[ ]` test brackets are used; `[[ ]]` bash-specific tests appear but are not preferred — `case` is usually the POSIX-compatible alternative for pattern matching.
+POSIX `[ ]` test brackets are used; `[[ ]]` bash-specific tests appear but are not preferred -- `case` is usually the POSIX-compatible alternative for pattern matching.
 
 Corpus refs: [`debian-bin/repo/buildd.sh#L35-L55`](https://github.com/tianon/debian-bin/blob/d508ea34f15e88b8ac63d71ffb1938fccbc21206/repo/buildd.sh#L35-L55), [`debian-bin/repo/buildd.sh#L115-L126`](https://github.com/tianon/debian-bin/blob/d508ea34f15e88b8ac63d71ffb1938fccbc21206/repo/buildd.sh#L115-L126).
 
@@ -360,7 +360,7 @@ variants=(
 )
 ```
 
-**Inline arrays always have spaces inside the parentheses** — `( elements )`, never `(elements)`.  Empty arrays are `()` with no spaces.  The formatter enforces this automatically:
+**Inline arrays always have spaces inside the parentheses**: `( elements )`, never `(elements)`.  Empty arrays are `()` with no spaces.  The formatter enforces this automatically:
 
 ```bash
 args=( --tab -L "$dir" --from-file "$t" )   # spaces inside
@@ -383,10 +383,10 @@ declare -A files=(
 
 **`<<-` is always used** in preference to `<<`; the `-` variant strips leading tab characters from body lines and the delimiter line, allowing heredoc content to be indented naturally with the surrounding code.  The single exception: `<<` is used when the body itself must emit lines with leading tabs (rare).  `--tidy` automatically upgrades `<<` → `<<-` when safe, and flags the remaining cases.
 
-The **delimiter is always cuddled** with the operator — no space: `<<-'EOH'` not `<<- 'EOH'`.  The formatter enforces this.
+The **delimiter is always cuddled** with the operator -- no space: `<<-'EOH'` not `<<- 'EOH'`.  The formatter enforces this.
 
 The delimiter form follows the body's expansion needs:
-- **Single-quoted** (`<<-'EOF'`) when the body is literal (no `$`, `` ` ``, `\`) — the formatter upgrades unquoted delimiters to single-quoted when the body is fully literal.
+- **Single-quoted** (`<<-'EOF'`) when the body is literal (no `$`, `` ` ``, `\`) -- the formatter upgrades unquoted delimiters to single-quoted when the body is fully literal.
 - **Unquoted** (`<<-EOF`) when variable or command substitution is needed.
 
 ```bash
@@ -399,7 +399,7 @@ EOH
 
 ```bash
 cat <<-'EOH'
-	Tags: ${tags[*]}   # literal — no expansion
+	Tags: ${tags[*]}   # literal -- no expansion
 EOH
 ```
 
@@ -432,7 +432,7 @@ urls="$(
 )"
 ```
 
-Multi-line pipelines most commonly appear inside a `$(…)` capture, though they do appear outside one when the output flows directly to stdout or a redirect.
+Multi-line pipelines most commonly appear inside a `$(...)` capture, though they do appear outside one when the output flows directly to stdout or a redirect.
 
 One reason to prefer a capture over an inline pipeline is `set -e` behaviour: when `foo | bar` runs and `foo` fails, `bar` still executes and its secondary error (`bar: unexpected EOF`, etc.) can obscure the real failure.  A capture makes each step's failure independently visible.  This motivates a broader pattern: capture output into a variable first, then feed subsequent commands via here-string:
 
@@ -478,7 +478,7 @@ arch="$1"; shift
 foo() {
 	local dist="$1"; shift
 	local suite="$1"; shift
-	…
+	...
 }
 ```
 
@@ -494,7 +494,7 @@ Corpus refs: [`tianon-dockerfiles/.libs/deb-repo.sh#L22-L26`](https://github.com
 
 ### Error handling
 
-**Cleanup via trap** — the standard pattern for temporary directories:
+**Cleanup via trap**: the standard pattern for temporary directories:
 
 ```bash
 dir="$(mktemp -d -t "$prog.XXXXXX")"
@@ -506,7 +506,7 @@ trap "$exitTrap" EXIT
 
 Corpus ref: [`debian-bin/repo/buildd.sh#L86-L88`](https://github.com/tianon/debian-bin/blob/d508ea34f15e88b8ac63d71ffb1938fccbc21206/repo/buildd.sh#L86-L88).
 
-**Subshell error isolation** — `( ... ) || ...` isolates a block so errors inside don't propagate:
+**Subshell error isolation**: `( ... ) || ...` isolates a block so errors inside don't propagate:
 
 ```bash
 if ! (
@@ -527,7 +527,7 @@ Corpus ref: [`debian-bin/repo/incoming.sh#L44-L53`](https://github.com/tianon/de
 
 Output redirections use a space between the operator and the file: `> /dev/null`, `>> log`.
 
-File-descriptor-prefixed redirections are **cuddled** — no space between the fd number and the operator: `2>/dev/null`, `2>>log`, not `2> /dev/null`.
+File-descriptor-prefixed redirections are **cuddled**: no space between the fd number and the operator: `2>/dev/null`, `2>>log`, not `2> /dev/null`.
 
 ```bash
 if command -v apk > /dev/null && tryArch="$(apk --print-arch 2>/dev/null)"; then
@@ -539,7 +539,7 @@ The distinction: a bare `>` is always a redirect; a digit immediately before `>`
 
 Corpus refs: [`tianon-dockerfiles/.libs/deb-repo.sh#L22-L25`](https://github.com/tianon/dockerfiles/blob/2118a1979eff7545e06570d1eefc6434d691e68d/.libs/deb-repo.sh#L22-L25), [`home/bashrc.d/prompt.sh#L50`](https://github.com/tianon/home/blob/5bc25cdb0f8d5d745eb1f89d84bd78c4f13d0fb0/bashrc.d/prompt.sh#L50).
 
-**Suppressing `-x` trace around sensitive values** — when `bash -x` trace output would expose credential material, `set +x` / `set -x` pairs isolate the sensitive commands:
+**Suppressing `-x` trace around sensitive values**: when `bash -x` trace output would expose credential material, `set +x` / `set -x` pairs isolate the sensitive commands:
 
 ```bash
 set +x # TODO
@@ -549,7 +549,7 @@ git config --local "http.$host/.extraheader" "Authorization: Basic $b64token"
 set -x # TODO
 ```
 
-The `# TODO` comments are an acknowledgement that the overall design should eventually not require this workaround — not a directive to fix the surrounding code.  See also [groovy.md §Suppressing trace for sensitive operations](groovy.md#suppressing-trace-for-sensitive-operations) for the same pattern in Jenkins pipeline shell blocks.
+The `# TODO` comments are an acknowledgement that the overall design should eventually not require this workaround -- not a directive to fix the surrounding code.  See also [groovy.md §Suppressing trace for sensitive operations](groovy.md#suppressing-trace-for-sensitive-operations) for the same pattern in Jenkins pipeline shell blocks.
 
 Corpus ref: [`actions/checkout/checkout.sh#L47-L51`](https://github.com/tianon/actions/blob/c109aa98a82622edf55e0e6380a1672368930b30/checkout/checkout.sh#L47-L51).
 
@@ -568,15 +568,15 @@ Corpus refs: [`debian-bin/repo/buildd.sh#L91-L92`](https://github.com/tianon/deb
 
 ---
 
-## `(( ))` arithmetic — use with caution
+## `(( ))` arithmetic -- use with caution
 
 Arithmetic compound commands interact poorly with `set -e` because their exit status reflects the *arithmetic result* (zero = failure, non-zero = success), not whether the operation succeeded:
 
 ```bash
 var=0
-(( var++ ))   # exits 1 — post-increment returns the OLD value (0); set -e aborts
-(( var++ ))   # exits 0 — returns old value (1); fine
-(( var = 0 )) # exits 1 — assigning zero is "false"; set -e aborts
+(( var++ ))   # exits 1 -- post-increment returns the OLD value (0); set -e aborts
+(( var++ ))   # exits 0 -- returns old value (1); fine
+(( var = 0 )) # exits 1 -- assigning zero is "false"; set -e aborts
 ```
 
 The classic footgun is incrementing a counter that starts at zero: `(( failures++ ))` aborts the script the first time it runs.  The corpus handles this explicitly with `|| :`:
@@ -587,8 +587,8 @@ The classic footgun is incrementing a counter that starts at zero: `(( failures+
 
 Safe alternatives that avoid the issue entirely:
 
-- `(( ++var ))` — pre-increment returns the *new* value (truthy when starting from 0)
-- `(( var += 1 ))` — addition also returns the new value
+- `(( ++var ))` -- pre-increment returns the *new* value (truthy when starting from 0)
+- `(( var += 1 ))` -- addition also returns the new value
 
 Corpus ref: [`debian-bin/repo/buildd.sh#L124`](https://github.com/tianon/debian-bin/blob/d508ea34f15e88b8ac63d71ffb1938fccbc21206/repo/buildd.sh#L124).
 
@@ -610,14 +610,14 @@ These differ in 32-bit-userspace-on-64-bit-kernel configurations and similar set
 
 Use the appropriate userspace-aware tool instead, in preference order:
 
-- **Alpine**: `apk --print-arch` → outputs `x86_64`, `aarch64`, `armv7`, …
-  (`apk --print-architecture` is **not** a valid flag and silently falls through — use `--print-arch`)
-- **Debian/Ubuntu**: `dpkg --print-architecture` → outputs `amd64`, `arm64`, `armhf`, …
-- **RPM-based**: `rpm --query --queryformat='%{ARCH}' rpm` → outputs `x86_64`, `aarch64`, …
+- **Alpine**: `apk --print-arch` → outputs `x86_64`, `aarch64`, `armv7`, ...
+  (`apk --print-architecture` is **not** a valid flag and silently falls through -- use `--print-arch`)
+- **Debian/Ubuntu**: `dpkg --print-architecture` → outputs `amd64`, `arm64`, `armhf`, ...
+- **RPM-based**: `rpm --query --queryformat='%{ARCH}' rpm` → outputs `x86_64`, `aarch64`, ...
 - **Last resort**: `uname -m` with an explicit `>&2` warning that a better tool was not found
 
 `dpkg` uses Debian naming (`amd64`, `arm64`, `armhf`); `apk` uses musl/Alpine naming (`x86_64`, `aarch64`, `armv7`).
-These are **not interchangeable** — always write `case` patterns that match the specific tool's output format.
+These are **not interchangeable**: always write `case` patterns that match the specific tool's output format.
 
 Use `arch` as the generic normalized variable.  Tool-specific variables (`dpkgArch` for `dpkg --print-architecture`, `apkArch` for `apk --print-arch`) are only used when the raw tool output is needed directly; `arch` holds the result once it has been selected and normalized.
 
@@ -652,7 +652,7 @@ Corpus ref: [`docker-library/bashbrew/scripts/bashbrew-host-arch.sh`](https://gi
 
 ### Trailing-comment escape hatch
 
-When a command has a trailing inline comment that signals a **platform-specific or portability-related** flag constraint, the formatter suppresses all flag normalization for every command on that source line — in both format and tidy mode.
+When a command has a trailing inline comment that signals a **platform-specific or portability-related** flag constraint, the formatter suppresses all flag normalization for every command on that source line -- in both format and tidy mode.
 
 ```bash
 sha256sum -c - <<<"${sha256} *${file}" # these flags have to be silly for macOS's sake (it has no GNU coreutils)
@@ -664,11 +664,11 @@ Without the comments, the formatter would expand `-c` → `--check` and (in tidy
 **What counts as a matching comment:** the formatter checks the comment text for two signals:
 
 1. **Platform/tooling keywords** (case-insensitive): `macos`, `darwin`, `bsd`, `coreutils`, `gnu`, `busybox`, `alpine`, `musl`, `posix`, `portable`, `portability`
-2. **A long-form flag reference** — `--word` (two or more lowercase letters after `--`) signals an explicit short-vs-long comparison (e.g. `# -f instead of --canonicalize`).  A bare `--` used as an em-dash does not match.
+2. **A long-form flag reference**: `--word` (two or more lowercase letters after `--`) signals an explicit short-vs-long comparison (e.g. `# -f instead of --canonicalize`).  A bare `--` used as an em-dash does not match.
 
 A comment like `# check mode` that merely describes the command's purpose does **not** match and does not suppress normalization.
 
-**Scope:** the guard applies to every command on the same source line as the outer statement — including commands nested inside `$(…)` on that line (e.g. `gitDir="$(readlink -f …)" # -f not --canonicalize for macOS` protects the inner `readlink`).
+**Scope:** the guard applies to every command on the same source line as the outer statement -- including commands nested inside `$(...)` on that line (e.g. `gitDir="$(readlink -f ...)" # -f not --canonicalize for macOS` protects the inner `readlink`).
 
 ---
 
@@ -676,30 +676,30 @@ A comment like `# check mode` that merely describes the command's purpose does *
 
 Things Tianon **never** does in standalone shell scripts:
 
-- `#!/bin/bash` or `#!/bin/sh` shebang (always `#!/usr/bin/env bash`) — `--tidy` fixes this automatically
-- `set -e` alone (bare minimum with no `-u`) — `--tidy` auto-normalises any `set` command that touches error-handling flags: bash scripts get `set -Eeuo pipefail`; POSIX/sh scripts get `set -eu`.  Long-form equivalents (`-o errexit`, `-o nounset`, `-o errtrace`) are collapsed to their short forms.  Extra flags outside the `{E,e,u,o,pipefail}` core are preserved: at the top level they become separate trailing args (`set -Eeuo pipefail -x`); inside a block they are embedded in the cluster (`\tset -ex` → `\tset -Eeuxo pipefail`).  `--tidy` also flags the bare `set -e` form in its lint check.
-- `which` to locate commands (`command -v` is the POSIX-correct alternative; Tianon even aliases `which='command -v'` in his own bashrc) — `--tidy` fixes flag-free `which cmd` calls automatically
-- `echo -e` for escape sequences — `printf` handles escapes portably; `echo -e` is not POSIX; `--tidy` flags this
-- `echo -n` for output without a trailing newline — use `printf '%s'` instead; `--tidy` flags this
-- Backtick command substitution — always `$(...)` style; `--tidy` converts `` `cmd` `` → `$(cmd)` automatically
-- The `function` keyword — always `name() { ... }` style; `--tidy` removes `function` automatically
-- `[ ]` tests with `==` (uses `=` for POSIX string comparison) — `--tidy` converts `[ ... == ... ]` → `[ ... = ... ]` automatically
-- `"${FOO}"` or bare `${FOO}` when the variable is the sole content and has no special operator — `--tidy` strips the braces to `"$FOO"` / `$FOO`; braces that are genuinely needed (adjacent string content, modifiers, array indexing, etc.) are always preserved
-- Arithmetic with `let` or `$((var = expr))` assignment — use `$((...))` or `var=$((expr))`; `--tidy` flags `let`
-- `declare -i` for integer-type variables — use untyped variables; `--tidy` flags this
-- `&&` or `||` at the *end* of a continuation line (always at the start of the next line) — the formatter enforces this automatically via `BinaryNextLine` mode
-- `sha256sum` (and `sha512sum`, `sha1sum`) short flags — all short forms (`-c`, `-b`, `-t`, `-w`, `-z`) are always expanded to their long equivalents even in format (non-tidy) mode, because the long forms are used throughout the corpus.  Additionally, `--tidy` adds `--strict` whenever `--check` is present — `--check` without `--strict` silently passes over malformed checksum lines.  (Use the trailing-comment escape hatch when a platform constraint requires the short form; see [§Trailing-comment escape hatch](#trailing-comment-escape-hatch).)
-- `curl` without `--fail` / `-f` — every `curl` call must have `-f` so that HTTP errors (4xx/5xx) are treated as failures; `--tidy` adds it automatically and folds it into the canonical combined idiom (`-f` + `-sSL` → `-fsSL`; `-f` + `-sS` → `-fsS` when not following redirects)
-- `curl --show-error` / `-S` without `--silent` / `-s` — `--show-error` without `--silent` is a no-op (stderr output is already shown by default); both format and tidy add the missing `-s` automatically.  Conversely, `--silent` alone suppresses stderr with no way to see curl errors; `--tidy` adds the missing `-S` (this is a larger semantic change, so only `--tidy` does it).  Both are normalised to their short combined form (`-sS`) in either mode.
-- `curl --fail`, `curl --silent`, `curl --show-error`, `curl --location`, `curl --output` in long form — `--tidy` normalises all four to their short canonical equivalents and merges them into the combined idiom (`--fail --silent --location` → `-fsSL`)
-- `gpg` without `--batch` — every `gpg`/`gpg2` call must have `--batch` as its first argument to suppress interactive prompts; `--tidy` adds and positions it automatically
+- `#!/bin/bash` or `#!/bin/sh` shebang (always `#!/usr/bin/env bash`) -- `--tidy` fixes this automatically
+- `set -e` alone (bare minimum with no `-u`) -- `--tidy` auto-normalises any `set` command that touches error-handling flags: bash scripts get `set -Eeuo pipefail`; POSIX/sh scripts get `set -eu`.  Long-form equivalents (`-o errexit`, `-o nounset`, `-o errtrace`) are collapsed to their short forms.  Extra flags outside the `{E,e,u,o,pipefail}` core are preserved: at the top level they become separate trailing args (`set -Eeuo pipefail -x`); inside a block they are embedded in the cluster (`\tset -ex` → `\tset -Eeuxo pipefail`).  `--tidy` also flags the bare `set -e` form in its lint check.
+- `which` to locate commands (`command -v` is the POSIX-correct alternative; Tianon even aliases `which='command -v'` in his own bashrc) -- `--tidy` fixes flag-free `which cmd` calls automatically
+- `echo -e` for escape sequences -- `printf` handles escapes portably; `echo -e` is not POSIX; `--tidy` flags this
+- `echo -n` for output without a trailing newline -- use `printf '%s'` instead; `--tidy` flags this
+- Backtick command substitution -- always `$(...)` style; `--tidy` converts `` `cmd` `` → `$(cmd)` automatically
+- The `function` keyword -- always `name() { ... }` style; `--tidy` removes `function` automatically
+- `[ ]` tests with `==` (uses `=` for POSIX string comparison) -- `--tidy` converts `[ ... == ... ]` → `[ ... = ... ]` automatically
+- `"${FOO}"` or bare `${FOO}` when the variable is the sole content and has no special operator -- `--tidy` strips the braces to `"$FOO"` / `$FOO`; braces that are genuinely needed (adjacent string content, modifiers, array indexing, etc.) are always preserved
+- Arithmetic with `let` or `$((var = expr))` assignment -- use `$((...))` or `var=$((expr))`; `--tidy` flags `let`
+- `declare -i` for integer-type variables -- use untyped variables; `--tidy` flags this
+- `&&` or `||` at the *end* of a continuation line (always at the start of the next line) -- the formatter enforces this automatically via `BinaryNextLine` mode
+- `sha256sum` (and `sha512sum`, `sha1sum`) short flags -- all short forms (`-c`, `-b`, `-t`, `-w`, `-z`) are always expanded to their long equivalents even in format (non-tidy) mode, because the long forms are used throughout the corpus.  Additionally, `--tidy` adds `--strict` whenever `--check` is present -- `--check` without `--strict` silently passes over malformed checksum lines.  (Use the trailing-comment escape hatch when a platform constraint requires the short form; see [§Trailing-comment escape hatch](#trailing-comment-escape-hatch).)
+- `curl` without `--fail` / `-f` -- every `curl` call must have `-f` so that HTTP errors (4xx/5xx) are treated as failures; `--tidy` adds it automatically and folds it into the canonical combined idiom (`-f` + `-sSL` → `-fsSL`; `-f` + `-sS` → `-fsS` when not following redirects)
+- `curl --show-error` / `-S` without `--silent` / `-s` -- `--show-error` without `--silent` is a no-op (stderr output is already shown by default); both format and tidy add the missing `-s` automatically.  Conversely, `--silent` alone suppresses stderr with no way to see curl errors; `--tidy` adds the missing `-S` (this is a larger semantic change, so only `--tidy` does it).  Both are normalised to their short combined form (`-sS`) in either mode.
+- `curl --fail`, `curl --silent`, `curl --show-error`, `curl --location`, `curl --output` in long form -- `--tidy` normalises all four to their short canonical equivalents and merges them into the combined idiom (`--fail --silent --location` → `-fsSL`)
+- `gpg` without `--batch` -- every `gpg`/`gpg2` call must have `--batch` as its first argument to suppress interactive prompts; `--tidy` adds and positions it automatically
 
 **Things that appear less often than you might expect:**
 
-- `printf` for simple string output — `echo` is used for straightforward messages; `printf` appears when the format string needs escape sequences (`\n`, `\t`, `%q`) or when generating content to pipe to another command
-- `$'...'` quoting — used specifically for embedding literal escape sequences (`IFS=$'\n'`, `cut -d$'\t' -f1`, multi-line GUI dialog strings); not as a general quoting form
-- `|| true` as a no-op — `|| :` is idiomatic; `|| true` appears in scripts shared with audiences less familiar with `:` being equivalent to `true`
-- `[[ ]]` test brackets — `[ ]` strongly preferred; `[[ ]]` appears occasionally for pattern matching (`[[ "$x" == */ ]]`) where `[ ]` cannot be used, but `case` is usually the POSIX-compatible alternative:
+- `printf` for simple string output -- `echo` is used for straightforward messages; `printf` appears when the format string needs escape sequences (`\n`, `\t`, `%q`) or when generating content to pipe to another command
+- `$'...'` quoting -- used specifically for embedding literal escape sequences (`IFS=$'\n'`, `cut -d$'\t' -f1`, multi-line GUI dialog strings); not as a general quoting form
+- `|| true` as a no-op -- `|| :` is idiomatic; `|| true` appears in scripts shared with audiences less familiar with `:` being equivalent to `true`
+- `[[ ]]` test brackets -- `[ ]` strongly preferred; `[[ ]]` appears occasionally for pattern matching (`[[ "$x" == */ ]]`) where `[ ]` cannot be used, but `case` is usually the POSIX-compatible alternative:
   ```bash
   case "$suite" in
       */security | */updates) ... ;;

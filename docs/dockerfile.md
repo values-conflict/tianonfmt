@@ -1,6 +1,6 @@
 # Dockerfile style
 
-Covers `Dockerfile` and `Dockerfile.*` files (excluding `Dockerfile.template` files — those are a separate format, see [jq-template.md](jq-template.md)).
+Covers `Dockerfile` and `Dockerfile.*` files (excluding `Dockerfile.template` files -- those are a separate format, see [jq-template.md](jq-template.md)).
 
 ## Instruction keywords
 
@@ -66,7 +66,7 @@ ENV HOME /home/steam
 
 The `ENV key value` form (space separator, no `=`) is used.  The `key=value` form with `=` is not used for single-value ENV.
 
-**Community divergence note**: The `ENV KEY=VALUE` form is the default in virtually every non-Tianon Dockerfile (it mirrors shell assignment syntax and is accepted by all Docker versions).  `tianonfmt` normalises it to `ENV KEY VALUE` automatically as a formatting rule — no flag needed, it happens on every format pass.
+**Community divergence note**: The `ENV KEY=VALUE` form is the default in virtually every non-Tianon Dockerfile (it mirrors shell assignment syntax and is accepted by all Docker versions).  `tianonfmt` normalises it to `ENV KEY VALUE` automatically as a formatting rule -- no flag needed, it happens on every format pass.
 
 Multi-value `ENV` uses the continuation form:
 
@@ -80,7 +80,7 @@ ENV QEMU_KEYS \
 
 Corpus refs: [`tianon-dockerfiles/steam/Dockerfile#L19-L20`](https://github.com/tianon/dockerfiles/blob/2118a1979eff7545e06570d1eefc6434d691e68d/steam/Dockerfile#L19-L20), [`docker-qemu/10.1/Dockerfile#L69-L72`](https://github.com/tianon/docker-qemu/blob/3ce36843e253ddb7f63a39a6d0a27a7a46762e8b/10.1/Dockerfile#L69-L72).
 
-## `RUN` — general structure
+## `RUN` -- general structure
 
 Every non-trivial `RUN` instruction begins with `set -eux; \` as its first command:
 
@@ -91,13 +91,13 @@ RUN set -eux; \
 	rm -rf /var/lib/apt/lists/*
 ```
 
-Some simpler scripts use `set -ex` (without `-u`).  In Dockerfiles specifically — unlike standalone shell scripts — `set -eux` is the norm, not `set -Eeuo pipefail`, because Docker's default shell is `/bin/sh` (not bash), and `-E`, `-o pipefail` are bash-specific.
+Some simpler scripts use `set -ex` (without `-u`).  In Dockerfiles specifically -- unlike standalone shell scripts -- `set -eux` is the norm, not `set -Eeuo pipefail`, because Docker's default shell is `/bin/sh` (not bash), and `-E`, `-o pipefail` are bash-specific.
 
-**Community divergence note**: The majority of Docker Official Image Dockerfiles (those not authored by Tianon) use `&&` chains without `set -eux` — this is the default community convention.  `tianonfmt --tidy` normalises those chains to Tianon's `set -eux; \` form.  The `&&`-chain style is Wrong in Tianon's opinion but widespread, which is why it is a `--tidy` target rather than a formatting error.
+**Community divergence note**: The majority of Docker Official Image Dockerfiles (those not authored by Tianon) use `&&` chains without `set -eux` -- this is the default community convention.  `tianonfmt --tidy` normalises those chains to Tianon's `set -eux; \` form.  The `&&`-chain style is Wrong in Tianon's opinion but widespread, which is why it is a `--tidy` target rather than a formatting error.
 
 Corpus refs: [`debuerreotype/Dockerfile#L14`](https://github.com/debuerreotype/debuerreotype/blob/3c3272fa743e0257ae64081987c500c2923ea963/Dockerfile#L14), [`tianon-dockerfiles/steam/Dockerfile#L3`](https://github.com/tianon/dockerfiles/blob/2118a1979eff7545e06570d1eefc6434d691e68d/steam/Dockerfile#L3).
 
-## RUN — continuation line indentation
+## RUN -- continuation line indentation
 
 Continuation lines within a `RUN` instruction are indented with **one tab**:
 
@@ -127,20 +127,20 @@ Corpus refs: [`tianon-dockerfiles/steam/Dockerfile#L3-L16`](https://github.com/t
 
 ## RUN shell style
 
-The shell code inside `RUN` instructions is **POSIX sh**, not Bash — Docker's default `/bin/sh` is BusyBox `sh` on Alpine and `dash` on Debian-based images.  Bash-specific features (`[[ ]]`, arrays, `$'...'`, process substitution, here-strings `<<<`, etc.) do not appear inside Dockerfiles unless Bash has been explicitly installed and invoked with `SHELL ["/bin/bash", "-c"]`.  See [bash.md §POSIX compatibility as a design goal](bash.md#posix-compatibility-as-a-design-goal) for the broader context of how this shapes the shell style.
+The shell code inside `RUN` instructions is **POSIX sh**, not Bash -- Docker's default `/bin/sh` is BusyBox `sh` on Alpine and `dash` on Debian-based images.  Bash-specific features (`[[ ]]`, arrays, `$'...'`, process substitution, here-strings `<<<`, etc.) do not appear inside Dockerfiles unless Bash has been explicitly installed and invoked with `SHELL ["/bin/bash", "-c"]`.  See [bash.md §POSIX compatibility as a design goal](bash.md#posix-compatibility-as-a-design-goal) for the broader context of how this shapes the shell style.
 
 The POSIX sh style conventions that apply:
-- `if condition; then ... fi` — `then` on same line
-- `case ... in ... esac` — same structure as in [bash.md](bash.md)
-- `for x in ...; do ... done` — `do` on same line
+- `if condition; then ... fi` -- `then` on same line
+- `case ... in ... esac` -- same structure as in [bash.md](bash.md)
+- `for x in ...; do ... done` -- `do` on same line
 - `$()` for command substitution (not backticks)
-- `"$var"` — variables always quoted
+- `"$var"` -- variables always quoted
 
 These are the same conventions as [bash.md](bash.md), with the added constraint of POSIX compatibility.
 
-## RUN — inline comments
+## RUN -- inline comments
 
-Within a `RUN` continuation block, comments appear at **column 0** — no leading whitespace, regardless of the surrounding indentation:
+Within a `RUN` continuation block, comments appear at **column 0**: no leading whitespace, regardless of the surrounding indentation:
 
 ```dockerfile
 RUN set -eux; \
@@ -158,7 +158,7 @@ This is a deliberate style choice: inline comments are not part of the shell cod
 
 Corpus refs: [`tianon-dockerfiles/steam/Dockerfile#L6-L14`](https://github.com/tianon/dockerfiles/blob/2118a1979eff7545e06570d1eefc6434d691e68d/steam/Dockerfile#L6-L14), [`debuerreotype/Dockerfile#L23-L24`](https://github.com/debuerreotype/debuerreotype/blob/3c3272fa743e0257ae64081987c500c2923ea963/Dockerfile#L23-L24).
 
-## RUN — blank continuation lines
+## RUN -- blank continuation lines
 
 A lone `\` (backslash on a line by itself) is used as a visual separator within a long `RUN` block:
 
@@ -201,7 +201,7 @@ CMD ["bash", "-c", "..."]
 
 The combinatory behaviour of mixing exec-form and shell-form `CMD`/`ENTRYPOINT` is too difficult to reason about.  If a script's worth of shell is needed, the right answer is a dedicated shell `ENTRYPOINT` script rather than shell-form `CMD`.
 
-**`--tidy` normalisation**: shell-form `CMD`/`ENTRYPOINT` that contain no shell features (`$`, `|`, `;`, `&`, `*`, `?`, quotes, …) are automatically converted to exec form by whitespace-splitting:
+**`--tidy` normalisation**: shell-form `CMD`/`ENTRYPOINT` that contain no shell features (`$`, `|`, `;`, `&`, `*`, `?`, quotes, ...) are automatically converted to exec form by whitespace-splitting:
 
 ```dockerfile
 # Before --tidy:
@@ -248,20 +248,20 @@ Parser directives (`# syntax=`, `# escape=`) appear at the very top before any o
 
 ## Generated vs hand-authored Dockerfiles
 
-Generated Dockerfiles (produced from `Dockerfile.template` sources) carry the generated-file header and are structurally identical to hand-authored ones — the template system produces the same style.
+Generated Dockerfiles (produced from `Dockerfile.template` sources) carry the generated-file header and are structurally identical to hand-authored ones -- the template system produces the same style.
 
 ## Notable omissions
 
-- `set -Eeuo pipefail` inside `RUN` — the simpler `set -eux` is used (POSIX sh, no `-E` or pipefail); `--tidy` normalises any `set` variant to `set -eux` automatically
-- `apt-get install` without `-y` and `--no-install-recommends` — both flags are mandatory in every corpus `apt-get install` call; `--tidy` flags missing flags
-- `MAINTAINER` — deprecated instruction; `--tidy` flags it
-- `HEALTHCHECK CMD ...` — never used; `HEALTHCHECK NONE` (disabling an inherited check) is acceptable; `--tidy` flags CMD form
-- `ONBUILD` — never used; `--tidy` flags it
-- `LABEL` — never used in normal Dockerfiles; `--tidy` flags it.  Exception: `moby.buildkit.frontend.*` labels required by the BuildKit frontend protocol are whitelisted — Tianon uses these in his BuildKit-specific Dockerfiles because BuildKit itself requires them.
-- Heredoc syntax inside `RUN` — not used (only `\` continuation style)
-- `ARG` before `FROM` for multi-stage builds — not seen in corpus
-- `LABEL` instructions — not common in corpus Dockerfiles
-- `HEALTHCHECK` with complex checks — only `HEALTHCHECK NONE` or simple forms
-- `USER` before `RUN` — user is set in the image build process, not as a Dockerfile instruction, in most corpus examples
-- JSON array form for `ENV` — always uses the space-separated `key value` form
-- Multi-value `ENV` with `=` signs — not used (`ENV KEY VALUE` not `ENV KEY=VALUE`)
+- `set -Eeuo pipefail` inside `RUN` -- the simpler `set -eux` is used (POSIX sh, no `-E` or pipefail); `--tidy` normalises any `set` variant to `set -eux` automatically
+- `apt-get install` without `-y` and `--no-install-recommends` -- both flags are mandatory in every corpus `apt-get install` call; `--tidy` flags missing flags
+- `MAINTAINER` -- deprecated instruction; `--tidy` flags it
+- `HEALTHCHECK CMD ...` -- never used; `HEALTHCHECK NONE` (disabling an inherited check) is acceptable; `--tidy` flags CMD form
+- `ONBUILD` -- never used; `--tidy` flags it
+- `LABEL` -- never used in normal Dockerfiles; `--tidy` flags it.  Exception: `moby.buildkit.frontend.*` labels required by the BuildKit frontend protocol are whitelisted -- Tianon uses these in his BuildKit-specific Dockerfiles because BuildKit itself requires them.
+- Heredoc syntax inside `RUN` -- not used (only `\` continuation style)
+- `ARG` before `FROM` for multi-stage builds -- not seen in corpus
+- `LABEL` instructions -- not common in corpus Dockerfiles
+- `HEALTHCHECK` with complex checks -- only `HEALTHCHECK NONE` or simple forms
+- `USER` before `RUN` -- user is set in the image build process, not as a Dockerfile instruction, in most corpus examples
+- JSON array form for `ENV` -- always uses the space-separated `key value` form
+- Multi-value `ENV` with `=` signs -- not used (`ENV KEY VALUE` not `ENV KEY=VALUE`)

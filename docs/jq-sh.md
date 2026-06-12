@@ -34,15 +34,15 @@ jq <<<"$input" [flags...] 'expression'
 **Long-form flags are preferred** (`--raw-output` over `-r`, `--compact-output` over `-c`, etc.).  Short forms appear frequently in the corpus due to muscle memory, but long-form is the stated preference and should be used in new code.
 
 Common flags and their long forms:
-- `--raw-output` / `-r` — raw string output (no quotes)
-- `--compact-output` / `-c` — compact JSON output
-- `--slurp` / `-s` — slurp all inputs into an array
-- `--null-input` / `-n` — no input (use `null` as input)
-- `--sort-keys` / `-S` — sort object keys
-- `--exit-status` / `-e` — exit non-zero if last value is false or null
-- `--arg name value` — bind shell variable as jq string
-- `--argjson name value` — bind shell variable as jq value (parsed JSON)
-- `--from-file filename` / `-f filename` — load jq program from a file
+- `--raw-output` / `-r` -- raw string output (no quotes)
+- `--compact-output` / `-c` -- compact JSON output
+- `--slurp` / `-s` -- slurp all inputs into an array
+- `--null-input` / `-n` -- no input (use `null` as input)
+- `--sort-keys` / `-S` -- sort object keys
+- `--exit-status` / `-e` -- exit non-zero if last value is false or null
+- `--arg name value` -- bind shell variable as jq string
+- `--argjson name value` -- bind shell variable as jq value (parsed JSON)
+- `--from-file filename` / `-f filename` -- load jq program from a file
 
 Multiple flags are written separately (never combined like `-rc`):
 
@@ -61,7 +61,7 @@ jq expressions passed as shell arguments use **single quotes**:
 jq <<<"$json" '.version |= split(":")[1]'
 ```
 
-Single quotes are used because the jq expression often contains `$`, `"`, or `\` characters that would be interpreted by the shell inside double quotes.  The only exception is when the expression itself needs to reference a shell variable directly (rare — the preferred approach is always `--arg` or `--argjson`).
+Single quotes are used because the jq expression often contains `$`, `"`, or `\` characters that would be interpreted by the shell inside double quotes.  The only exception is when the expression itself needs to reference a shell variable directly (rare -- the preferred approach is always `--arg` or `--argjson`).
 
 ## Passing shell variables to jq
 
@@ -72,14 +72,14 @@ Shell variables are **never interpolated directly** into the jq expression strin
 - `env.VARNAME` reads a shell environment variable directly inside jq (for `export`ed variables)
 
 ```bash
-# correct — using --arg:
+# correct -- using --arg:
 jq <<<"$json" --arg go "$go" '.versions[$go]'
 
-# correct — using env (for exported variables):
+# correct -- using env (for exported variables):
 export variant
 jq -n 'if env.variant == "" then . else .[env.variant] end'
 
-# never — direct interpolation:
+# never -- direct interpolation:
 jq <<<"$json" ".versions[\"$go\"]"   # wrong
 ```
 
@@ -94,7 +94,7 @@ commit="$(jq <<<"$bk" -r '.commit // .version')"
 jq <<<"$json" '.version |= split(":")[1]' > versions.json
 ```
 
-No special formatting rules apply to single-line jq expressions — they are written compactly.
+No special formatting rules apply to single-line jq expressions -- they are written compactly.
 
 ## Multi-line expressions
 
@@ -175,7 +175,7 @@ eval "items=( $shell )"
 
 `@sh` in jq produces shell-quoted strings safe to `eval`.  `@json` converts values to their JSON string representation before shell-quoting.
 
-The formatter also quotes bare `eval $(...)` to `eval "$(...)"`  — unquoted command substitution in `eval` is almost never correct and causes word-splitting on the output.
+The formatter also quotes bare `eval $(...)` to `eval "$(...)"`  -- unquoted command substitution in `eval` is almost never correct and causes word-splitting on the output.
 
 Corpus ref: [`debian-bin/repo/buildd.sh#L91-L92`](https://github.com/tianon/debian-bin/blob/d508ea34f15e88b8ac63d71ffb1938fccbc21206/repo/buildd.sh#L91-L92).
 
@@ -217,7 +217,7 @@ Corpus ref: [`tianon-dockerfiles/.github/workflows/update.yml#L31-L47`](https://
 When `tianonfmt` formats a shell script, it also reformats any jq expressions it finds inside `jq '...'` invocations:
 
 - **Single-line expressions** are kept on one line and formatted compactly (e.g. quoted object keys are unquoted: `'{"foo": .bar}'` → `'{foo: .bar}'`).
-- **Multi-line expressions** (opening `'` followed by a newline) are reformatted using the same rules as standalone `.jq` files, then re-indented to the correct depth.  The indentation is computed from the shell nesting depth of the `jq` call — a call at the top level gets 1-tab content; inside a `for`/`if`/`while` body it gets 2-tab content; etc.  The existing indentation in the source is **not** preserved — it is replaced with the correct depth-based indentation regardless of what was there.
+- **Multi-line expressions** (opening `'` followed by a newline) are reformatted using the same rules as standalone `.jq` files, then re-indented to the correct depth.  The indentation is computed from the shell nesting depth of the `jq` call -- a call at the top level gets 1-tab content; inside a `for`/`if`/`while` body it gets 2-tab content; etc.  The existing indentation in the source is **not** preserved -- it is replaced with the correct depth-based indentation regardless of what was there.
 - If a jq expression cannot be parsed (e.g. it uses unknown syntax), it is left unchanged.
 
 **`--tidy` additionally normalises short jq flags to their long-form equivalents**: `jq -r` → `jq --raw-output`, `jq -c` → `jq --compact-output`, `jq -n` → `jq --null-input`, etc.  (See docs/bash.md for the full flag normalisation rules.)
@@ -228,9 +228,9 @@ Detection heuristic: the formatter recognises `jq '...'` calls where the last no
 
 Things Tianon **never** does when embedding jq in shell:
 
-- `echo "$var" | jq` — always uses `<<<` here-string
-- Double-quoted jq expressions — always single-quoted (or `-f file`)
-- Directly interpolating shell variables into the expression string — always uses `--arg`/`--argjson`
+- `echo "$var" | jq` -- always uses `<<<` here-string
+- Double-quoted jq expressions -- always single-quoted (or `-f file`)
+- Directly interpolating shell variables into the expression string -- always uses `--arg`/`--argjson`
 - Flags after the expression: the expression is always last
 - `-e` flag except when actually checking exit status
 - `jq .` on its own without at least either input or flags (i.e., always provides the expression)

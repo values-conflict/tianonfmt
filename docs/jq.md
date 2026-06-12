@@ -10,7 +10,7 @@ Corpus refs: [`debian-bin/jq/deb822.jq`](https://github.com/tianon/debian-bin/bl
 
 ## Pipe `|` placement
 
-In standalone jq files, `|` goes at the **start** of the continuation line, not at the end of the previous one.  This matches the convention in [shell scripts](bash.md) — both use leading operators on continuation lines.
+In standalone jq files, `|` goes at the **start** of the continuation line, not at the end of the previous one.  This matches the convention in [shell scripts](bash.md) -- both use leading operators on continuation lines.
 
 ```jq
 del(.out)
@@ -63,7 +63,7 @@ foreach (
 
 Short comma sequences that fit on one line stay inline: `"linux", "windows", "freebsd"`.
 
-The trailing-comma preference (see [universal.md](universal.md)) means that when a comma sequence is multi-line, all elements including the last should ideally carry a trailing comma.  Since jq's comma operator is semantic (not decorative), the `empty` element is used as a no-op last entry to allow this — `empty` generates nothing but lets every real element end with `,`:
+The trailing-comma preference (see [universal.md](universal.md)) means that when a comma sequence is multi-line, all elements including the last should ideally carry a trailing comma.  Since jq's comma operator is semantic (not decorative), the `empty` element is used as a no-op last entry to allow this -- `empty` generates nothing but lets every real element end with `,`:
 
 ```jq
 (
@@ -95,16 +95,16 @@ env.version
 )
 ```
 
-This rule applies to any comma chain in any context — `IN(...)`, `path(...)`, array literals, bare generators — as long as all items are simple.  Chains with complex items (field accesses, pipelines, calls) are not affected.  Five items or fewer always stay inline.  The expansion is idempotent: re-formatting a chain that already ends with `empty` does not add another one.
+This rule applies to any comma chain in any context -- `IN(...)`, `path(...)`, array literals, bare generators -- as long as all items are simple.  Chains with complex items (field accesses, pipelines, calls) are not affected.  Five items or fewer always stay inline.  The expansion is idempotent: re-formatting a chain that already ends with `empty` does not add another one.
 
-**Comma continuation indentation — pipe context.**  When a multi-line comma expression appears as the body of a `| ` pipe step or `as $x |` binding, the continuation elements (second and later) are indented **one extra level** relative to the first element, to distinguish them visually from the next pipe step:
+**Comma continuation indentation -- pipe context.**  When a multi-line comma expression appears as the body of a `| ` pipe step or `as $x |` binding, the continuation elements (second and later) are indented **one extra level** relative to the first element, to distinguish them visually from the next pipe step:
 
 ```jq
 # correct:
 | @sh "docker pull \($ref)",
     @sh "docker tag \($ref) \(.key)"
 
-# wrong — continuation at same level as pipe:
+# wrong -- continuation at same level as pipe:
 | @sh "docker pull \($ref)",
 @sh "docker tag \($ref) \(.key)"
 ```
@@ -115,7 +115,7 @@ Corpus ref: [`meta-scripts/meta.jq`](https://github.com/docker-library/meta-scri
 
 Corpus ref: [`tianon-dockerfiles/scratch/multiarch.jq#L6-L20`](https://github.com/tianon/dockerfiles/blob/2118a1979eff7545e06570d1eefc6434d691e68d/scratch/multiarch.jq#L6-L20).
 
-## `def` — function definitions
+## `def` -- function definitions
 
 Top-level function definitions always use multi-line layout.  The body is indented one tab from the `def` line, and the closing `;` is at the same indentation as `def`:
 
@@ -179,7 +179,7 @@ else
 end
 ```
 
-**Cuddled-paren branch form.**  When a branch body is an explicit paren expression — `if COND then (EXPR) else ... end` — the opening `(` is written on the same line as the keyword it follows, and the closing `)` appears immediately before the next keyword:
+**Cuddled-paren branch form.**  When a branch body is an explicit paren expression -- `if COND then (EXPR) else ... end` -- the opening `(` is written on the same line as the keyword it follows, and the closing `)` appears immediately before the next keyword:
 
 ```jq
 if env.variant == "native" then (
@@ -219,12 +219,12 @@ then
 end
 ```
 
-The distinguishing trigger is whether the condition itself would need a newline to render — if it renders on a single line, `if CONDITION then` stays compact.  This is the same "fits inline?" heuristic used everywhere else.  The same rule applies to `elif`.
+The distinguishing trigger is whether the condition itself would need a newline to render -- if it renders on a single line, `if CONDITION then` stays compact.  This is the same "fits inline?" heuristic used everywhere else.  The same rule applies to `elif`.
 
-**When `then` is multi-line, `else` must also be multi-line.**  If the `then` body spans multiple lines (e.g. because it has a leading comment before its value, producing a comment line + value line), the `else` branch must also be fully multi-line — not the short `else VALUE end` form.  The reason is visual symmetry: once the `then` body fills more than one line, collapsing the `else` onto a single line looks inconsistent:
+**When `then` is multi-line, `else` must also be multi-line.**  If the `then` body spans multiple lines (e.g. because it has a leading comment before its value, producing a comment line + value line), the `else` branch must also be fully multi-line -- not the short `else VALUE end` form.  The reason is visual symmetry: once the `then` body fills more than one line, collapsing the `else` onto a single line looks inconsistent:
 
 ```jq
-# correct — then body has comment+value spanning two lines, else is multi-line too:
+# correct -- then body has comment+value spanning two lines, else is multi-line too:
 if $arch | startswith("windows-") then
 	# https://github.com/...
 	"classic"
@@ -232,7 +232,7 @@ else
 	"buildkit"
 end
 
-# wrong — then spans two lines but else is crammed onto one:
+# wrong -- then spans two lines but else is crammed onto one:
 if $arch | startswith("windows-") then
 	# https://github.com/...
 	"classic"
@@ -301,13 +301,13 @@ Corpus ref: [`debian-bin/jq/dpkg-version.jq#L38`](https://github.com/tianon/debi
 
 ## Function calls
 
-A function call whose single argument is a simple expression (a variable, a field access, or another call — not a pipeline or compound expression) stays on one line:
+A function call whose single argument is a simple expression (a variable, a field access, or another call -- not a pipeline or compound expression) stays on one line:
 
 ```jq
 # correct:
 build_annotations(git_build_url)
 
-# wrong — single simple arg does not get a line break:
+# wrong -- single simple arg does not get a line break:
 build_annotations(git_build_url
 )
 ```
@@ -343,7 +343,7 @@ Object key syntax:
 - **Unquoted identifiers** when the key is a valid jq identifier (`[a-zA-Z_][a-zA-Z0-9_]*`): `os`, `architecture`
 - **Quoted strings** when the key contains special characters: `"os.version"`, `"armel | armhf"`
 - **Computed keys** with `(expr)`: `{ (env.key): value }`
-- **Variable shorthand** `{ $foo }` for `{ foo: $foo }` — seen in test data
+- **Variable shorthand** `{ $foo }` for `{ foo: $foo }` -- seen in test data
 
 The formatter automatically converts `{"foo": .}` → `{foo: .}` when the key is a valid unquoted identifier.  Keys with dots, hyphens, or other special characters are always kept quoted.
 
@@ -372,10 +372,10 @@ The **trailing-comma hack** using `empty` as a "null" last element appears often
 ]
 ```
 
-**Never compact a multi-line array.**  If an array was written with elements on separate lines, the formatter must not collapse it to a single line, even if the result would fit within the threshold.  The author's choice to use multi-line format is intentional — it signals that each element is meaningful and should be visually distinct.  In particular, any array ending with `empty` (the trailing-comma idiom) must always be multi-line since `empty` is a sentinel value that makes no sense on a line by itself:
+**Never compact a multi-line array.**  If an array was written with elements on separate lines, the formatter must not collapse it to a single line, even if the result would fit within the threshold.  The author's choice to use multi-line format is intentional -- it signals that each element is meaningful and should be visually distinct.  In particular, any array ending with `empty` (the trailing-comma idiom) must always be multi-line since `empty` is a sentinel value that makes no sense on a line by itself:
 
 ```jq
-# always wrong — do not compact:
+# always wrong -- do not compact:
 [@sh "crane push temp \(.img)", "rm -rf temp", empty] | join("\n")
 
 # correct:
@@ -391,7 +391,7 @@ The **trailing-comma hack** using `empty` as a "null" last element appears often
 
 Corpus ref: [`meta-scripts/oci.jq`](https://github.com/docker-library/meta-scripts/blob/205031aee2fdfbbd449038afd58f0f0a6915c217/oci.jq).
 
-## Object literals — blank lines preserved
+## Object literals -- blank lines preserved
 
 **Blank lines inside object literals are preserved.**  Authors use blank lines to separate logical groups of fields and these must not be removed:
 
@@ -439,7 +439,7 @@ One blank line separates top-level `def` blocks from each other and from surroun
 
 ## File endings
 
-Every formatted jq file ends with **exactly one newline** — the final `;` of the last `def` (or the last line of the main expression) is followed by `\n` and nothing else.  Two trailing newlines is always a bug.
+Every formatted jq file ends with **exactly one newline**: the final `;` of the last `def` (or the last line of the main expression) is followed by `\n` and nothing else.  Two trailing newlines is always a bug.
 
 ## Comments
 
@@ -468,7 +468,7 @@ Comment blocks at the top of `.jq` files describe the module's purpose, expected
 	first(...)
 )
 
-# wrong — comment moved inside brackets:
+# wrong -- comment moved inside brackets:
 "org.opencontainers.image.version": (
 	first(.source.arches[.build.arch # value of the first image tag
 	].tags[])
@@ -482,7 +482,7 @@ Comment blocks at the top of `.jq` files describe the module's purpose, expected
 # trim out comment lines and unnecessary indentation
 gsub("(?m)^(...)"; "\(.extra // "")")
 
-# wrong — comment moved inside the argument list:
+# wrong -- comment moved inside the argument list:
 gsub(
 	# trim out comment lines and unnecessary indentation
 	"(?m)^(...)";
@@ -501,7 +501,7 @@ gsub(
 	# TODO add more arches?
 }
 
-# wrong — comment before last field or moved outside:
+# wrong -- comment before last field or moved outside:
 {
 	amd64: "ovmf",
 	arm64: "qemu-efi-aarch64",
@@ -519,7 +519,7 @@ gsub(
     # TODO maybe we should prefer the longest non-latest tag?
 ),
 
-# wrong — comment discarded or moved:
+# wrong -- comment discarded or moved:
 (
     first(...)
     | sub("^.*:"; "")
@@ -560,9 +560,9 @@ String interpolation `\(.expr)` is used freely.  The interpolated expression is 
 
 Long interpolated expressions are never broken across lines within a string literal.
 
-**Formatter behavior:** the formatter parses and re-formats the jq expression inside every `\(...)` block, applying the same indentation and style rules recursively.  A multi-line object or pipe chain inside `\(...)` is re-indented to match the surrounding jq nesting depth.  An invalid jq expression inside `\(...)` causes a parse error for the whole file — it is not silently preserved verbatim.
+**Formatter behavior:** the formatter parses and re-formats the jq expression inside every `\(...)` block, applying the same indentation and style rules recursively.  A multi-line object or pipe chain inside `\(...)` is re-indented to match the surrounding jq nesting depth.  An invalid jq expression inside `\(...)` causes a parse error for the whole file -- it is not silently preserved verbatim.
 
-**Layout rule for multi-line `\(...)`:** when the inner expression produces multi-line output, the formatter uses block-style layout — `\(` on the current line, content indented one level deeper, `)` closing at the original depth:
+**Layout rule for multi-line `\(...)`:** when the inner expression produces multi-line output, the formatter uses block-style layout -- `\(` on the current line, content indented one level deeper, `)` closing at the original depth:
 
 ```jq
 @sh "tool --data \(
@@ -577,7 +577,7 @@ Long interpolated expressions are never broken across lines within a string lite
 
 When the inner expression fits on one line it stays inline: `"\($n)"`.
 
-**Note:** jq does **not** allow bare `|` pipes inside object field values — `{key: a | b}` is a syntax error; use `{key: (a | b)}` instead.
+**Note:** jq does **not** allow bare `|` pipes inside object field values -- `{key: a | b}` is a syntax error; use `{key: (a | b)}` instead.
 
 ## Path expressions
 
@@ -601,11 +601,11 @@ Things Tianon **never** does in standalone `.jq` files:
 - `function` keyword (not valid jq, but worth noting for clarity)
 - Semi-colons at the end of `def` bodies on the same line as the body when the body is multi-line
 - `if` without `end` (the `end` is never omitted, even when following `else`)
-- `reduce`/`foreach` written on a single line when the expression is non-trivial — short expressions that fit comfortably on one line do appear: `reduce .[] as $a ([]; if IN(.[]; $a) then . else . += [$a] end)`
-- Empty `[]` — uses `[]`, not `[ ]`; only non-empty inline arrays have inner spaces
-- `null` in place of `empty` for "nothing" in generators — `empty` is preferred
-- `not` written as `== false` (always `| not`) — note: `| not` also matches `null`, so the two are not always equivalent; `--tidy` flags `== false`
-- Positive boolean checks written as `== true` — use the expression directly; `--tidy` flags `== true`
-- `!= false` (truthy check) — use the expression directly; `--tidy` flags it
-- `!= true` (negation) — use `| not`; `--tidy` flags it
-- Quoted object keys for plain identifiers: `{"foo": .}` should be `{foo: .}` — the formatter enforces this automatically
+- `reduce`/`foreach` written on a single line when the expression is non-trivial -- short expressions that fit comfortably on one line do appear: `reduce .[] as $a ([]; if IN(.[]; $a) then . else . += [$a] end)`
+- Empty `[]` -- uses `[]`, not `[ ]`; only non-empty inline arrays have inner spaces
+- `null` in place of `empty` for "nothing" in generators -- `empty` is preferred
+- `not` written as `== false` (always `| not`) -- note: `| not` also matches `null`, so the two are not always equivalent; `--tidy` flags `== false`
+- Positive boolean checks written as `== true` -- use the expression directly; `--tidy` flags `== true`
+- `!= false` (truthy check) -- use the expression directly; `--tidy` flags it
+- `!= true` (negation) -- use `| not`; `--tidy` flags it
+- Quoted object keys for plain identifiers: `{"foo": .}` should be `{foo: .}` -- the formatter enforces this automatically

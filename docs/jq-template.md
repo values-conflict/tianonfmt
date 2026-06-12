@@ -2,7 +2,7 @@
 
 Files named `Dockerfile.template` (or occasionally `Dockerfile.bookworm`, `Dockerfile.rc`, etc. that contain `{{ }}` markers) use Tianon's jq-template format.  The canonical processor is [`doi/bashbrew/scripts/jq-template.awk`](https://github.com/docker-library/bashbrew/blob/d662ff01570964b5f648df009c9269f388285692/scripts/jq-template.awk).
 
-These files are **not** pure Dockerfiles — they are generators that produce Dockerfiles when evaluated.  The formatter must handle them differently from plain Dockerfiles.  See [dockerfile.md](dockerfile.md) for the Dockerfile rules that apply to the *output* (and to the non-template portions of the input).
+These files are **not** pure Dockerfiles -- they are generators that produce Dockerfiles when evaluated.  The formatter must handle them differently from plain Dockerfiles.  See [dockerfile.md](dockerfile.md) for the Dockerfile rules that apply to the *output* (and to the non-template portions of the input).
 
 ## The `{{ }}` delimiter
 
@@ -37,7 +37,7 @@ Corpus refs: [`docker-qemu/Dockerfile.template#L76-L77`](https://github.com/tian
 
 ### Block expressions
 
-When a `{{ }}` block occupies its own line (or lines), the jq content is formatted according to [jq.md](jq.md) rules — tabs, pipe at start of continuation lines, etc.:
+When a `{{ }}` block occupies its own line (or lines), the jq content is formatted according to [jq.md](jq.md) rules -- tabs, pipe at start of continuation lines, etc.:
 
 ```dockerfile
 {{ def firmware_packages: {
@@ -99,11 +99,11 @@ The **cuddled short-else** form (`) else VALUE end` on one line, ≤ 30 chars) p
 {{ ) else "" end -}}
 ```
 
-**Whole-program assembly.**  The formatter collects consecutive `{{ }}` blocks that together form a single jq expression (detected by tracking bracket depth — a group ends when depth returns to 0), assembles them into one jq program, formats it as a whole, and splits the result back into per-block pieces.  This ensures that fragment blocks like `) else (` and `[\n...\n| (` receive contextually correct indentation rather than being preserved verbatim.
+**Whole-program assembly.**  The formatter collects consecutive `{{ }}` blocks that together form a single jq expression (detected by tracking bracket depth -- a group ends when depth returns to 0), assembles them into one jq program, formats it as a whole, and splits the result back into per-block pieces.  This ensures that fragment blocks like `) else (` and `[\n...\n| (` receive contextually correct indentation rather than being preserved verbatim.
 
-Within a group, blocks that can be formatted as **standalone jq expressions** (such as `.key` or `.value` appearing at depth > 0 between structural fragments) are formatted *individually* — they are not included in the assembled program.  Their output is a single-line `{{ expr }}` block, with the depth-context leading tabs stripped.
+Within a group, blocks that can be formatted as **standalone jq expressions** (such as `.key` or `.value` appearing at depth > 0 between structural fragments) are formatted *individually* -- they are not included in the assembled program.  Their output is a single-line `{{ expr }}` block, with the depth-context leading tabs stripped.
 
-Some groups contain **multiple independent jq expressions** inside the same bracket context — for example, two separate `if-then-else` blocks both inside the same outer `else (...)`.  This mirrors how `jq-template.awk` works: its `append()` function (line 43) uses `\n+ ` (string concatenation) to join adjacent sub-expressions at the same depth level.  The formatter does the same: it inserts `+ "SENTINEL" +` between the sub-expressions so the assembled program is valid jq and the sub-expressions produce their outputs concatenated.
+Some groups contain **multiple independent jq expressions** inside the same bracket context -- for example, two separate `if-then-else` blocks both inside the same outer `else (...)`.  This mirrors how `jq-template.awk` works: its `append()` function (line 43) uses `\n+ ` (string concatenation) to join adjacent sub-expressions at the same depth level.  The formatter does the same: it inserts `+ "SENTINEL" +` between the sub-expressions so the assembled program is valid jq and the sub-expressions produce their outputs concatenated.
 
 Corpus ref: [`docker-qemu/Dockerfile.template#L32-L63`](https://github.com/tianon/docker-qemu/blob/3ce36843e253ddb7f63a39a6d0a27a7a46762e8b/Dockerfile.template#L32-L63).
 
@@ -136,7 +136,7 @@ A `def` block always uses `-}}` and appears before the first non-def content.
 {{ if env.variant == "native" then ( -}}
 ```
 
-The variable is always read through `env.VARNAME`.  `--arg` is not an option here — the template processor (`jq-template.awk`) constructs and runs the jq invocation internally; there is no mechanism for the template author to add flags to that invocation.
+The variable is always read through `env.VARNAME`.  `--arg` is not an option here -- the template processor (`jq-template.awk`) constructs and runs the jq invocation internally; there is no mechanism for the template author to add flags to that invocation.
 
 Corpus refs: [`docker-qemu/Dockerfile.template#L32`](https://github.com/tianon/docker-qemu/blob/3ce36843e253ddb7f63a39a6d0a27a7a46762e8b/Dockerfile.template#L32), [`docker-qemu/Dockerfile.template#L124`](https://github.com/tianon/docker-qemu/blob/3ce36843e253ddb7f63a39a6d0a27a7a46762e8b/Dockerfile.template#L124).
 
@@ -144,11 +144,11 @@ Corpus refs: [`docker-qemu/Dockerfile.template#L32`](https://github.com/tianon/d
 
 Pure-comment blocks (every non-empty line is a `#` comment) are always normalised to a canonical form regardless of how they appear in the source:
 
-- **Single comment line** — collapsed to one inline line:
+- **Single comment line**: collapsed to one inline line:
   ```dockerfile
   {{ # this is a comment -}}
   ```
-- **Multiple comment lines** — kept multi-line with one tab of indentation per line:
+- **Multiple comment lines**: kept multi-line with one tab of indentation per line:
   ```dockerfile
   {{
   	# first comment
@@ -158,7 +158,7 @@ Pure-comment blocks (every non-empty line is a `#` comment) are always normalise
 
 The closing marker (`-}}` or `}}`) is placed at the same indentation level as the `{{` opener.  Source that has inconsistent spacing (e.g. `{{# no space -}}` or extra indentation) is normalised on the first format pass.
 
-A block that *begins* with a comment line but also contains expression content is **not** a pure-comment block — it is formatted as a regular expression block with the comment preserved inside the jq expression.
+A block that *begins* with a comment line but also contains expression content is **not** a pure-comment block -- it is formatted as a regular expression block with the comment preserved inside the jq expression.
 
 ## Dockerfile content between blocks
 
@@ -193,7 +193,7 @@ This header is emitted by the `apply-templates.sh` script (using a `generated_wa
 
 ## Detection heuristic
 
-A file is a jq template if it contains both `{{` and `}}`.  The file extension `Dockerfile.template` is the clearest signal, but the `{{ }}` content is the definitive marker — plain Dockerfiles never contain `{{`.
+A file is a jq template if it contains both `{{` and `}}`.  The file extension `Dockerfile.template` is the clearest signal, but the `{{ }}` content is the definitive marker -- plain Dockerfiles never contain `{{`.
 
 ## Style summary: template jq vs standalone jq
 
@@ -209,6 +209,6 @@ The jq inside `{{ }}` blocks follows [jq.md](jq.md) style exactly when multi-lin
 
 ## Notable omissions
 
-- `{{ expr }}` blocks are **never** used with newlines inside for inline expressions — if a block needs to be multi-line, it is a block expression, not an inline one
-- The closing marker is always `-}}` for block expressions (to suppress whitespace) — `}}` without `-` is only used for inline expressions that are genuinely producing inline output
+- `{{ expr }}` blocks are **never** used with newlines inside for inline expressions -- if a block needs to be multi-line, it is a block expression, not an inline one
+- The closing marker is always `-}}` for block expressions (to suppress whitespace) -- `}}` without `-` is only used for inline expressions that are genuinely producing inline output
 - The template format does not support `//=` assignment or other jq update operators at the top level (since the generated program is an expression, not a filter pipeline with side effects against the input)

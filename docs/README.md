@@ -2,7 +2,7 @@
 
 This directory documents the formatting conventions Tianon uses for each file type found in the corpus.  These files are the authoritative reference for what `tianonfmt` should produce.
 
-The documentation is deliberately exhaustive — it captures not only what Tianon *does* do, but also notable things he *doesn't* do, since both kinds of patterns are valuable when building or auditing a formatter.
+The documentation is deliberately exhaustive -- it captures not only what Tianon *does* do, but also notable things he *doesn't* do, since both kinds of patterns are valuable when building or auditing a formatter.
 
 ## File index
 
@@ -12,7 +12,7 @@ The documentation is deliberately exhaustive — it captures not only what Tiano
 | [bash.md](bash.md) | Standalone Bash/shell scripts (`.sh` files and shebang-identified scripts) |
 | [jq.md](jq.md) | Standalone jq source files (`.jq`) |
 | [jq-sh.md](jq-sh.md) | jq expressions embedded inside shell scripts (`jq '...'` invocations) |
-| [jq-template.md](jq-template.md) | `Dockerfile.template` files — Tianon's jq-template format |
+| [jq-template.md](jq-template.md) | `Dockerfile.template` files -- Tianon's jq-template format |
 | [dockerfile.md](dockerfile.md) | Plain `Dockerfile` and `Dockerfile.*` files |
 | [yaml.md](yaml.md) | YAML files, primarily GitHub Actions workflows |
 | [json.md](json.md) | JSON data files (`versions.json`, etc.) |
@@ -30,9 +30,9 @@ Cross-language principles are documented in [universal.md](universal.md).  The s
 
 - **Hard tabs for indentation everywhere the format permits.**  YAML is the only forced exception (spec forbids tabs); Python is also an exception (ecosystem forbids tabs).  JSON uses tabs via `jq --tab`.
 
-- **No trailing whitespace** on any line, in any file type — with one exception: markdown uses two trailing spaces as a semantic soft line break (`<br>`), so trailing whitespace on continuation lines within list items is intentional and meaningful.
+- **No trailing whitespace** on any line, in any file type -- with one exception: markdown uses two trailing spaces as a semantic soft line break (`<br>`), so trailing whitespace on continuation lines within list items is intentional and meaningful.
 
-- **Files end with a single newline** — no blank line at the end, no missing terminator.
+- **Files end with a single newline**: no blank line at the end, no missing terminator.
 
 - **Comments are always meaningful.**  Tianon writes comments that explain *why* something is done, not *what* the code does.  `TODO` comments are common and concrete.
 
