@@ -308,7 +308,7 @@ Multi-line commands use the YAML literal block scalar `|`:
 ```
 
 The shell code inside `|` blocks follows the same conventions as standalone [bash scripts](bash.md):
-- 2-space YAML indentation is separate from the shell's tab indentation -- the shell code inside a `run: |` block uses tabs for its own indentation, but the entire block is indented 4 spaces (2 for step list, 2 for the `run:` value)
+- Indentation is 2 spaces throughout -- the YAML block indentation carries into the shell content; no tabs appear anywhere in `.yml` files
 - `if`, `for`, `case` structures follow [bash.md](bash.md) conventions exactly
 
 The folded block scalar `>` is **never used** for shell code.
