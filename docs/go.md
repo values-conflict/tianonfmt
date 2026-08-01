@@ -29,7 +29,7 @@ Corpus ref: [`meta-scripts/registry/lookup.go#L3-L10`](https://github.com/docker
 
 ## Comments
 
-**Exported symbols have doc comments** in the standard Go style (sentence starting with the symbol name).  The doc comment is dense and complete -- it references related types using the `[TypeName]` link syntax.  Doc comments are never wrapped across multiple lines; write one long line.  `go doc`, godoc, and IDEs all join continuation lines anyway, so wrapped and unwrapped source produce identical rendered output -- and unwrapped source produces cleaner diffs:
+**Exported symbols have doc comments** in the standard Go style (sentence starting with the symbol name).  The doc comment is dense and complete -- it references related types using the `[TypeName]` link syntax.  Doc comments should be unwrapped (one long line) except when it looks or flows nicely to wrap at sentence boundaries.  `go doc`, godoc, and IDEs all join continuation lines anyway, so wrapped and unwrapped source produce identical rendered output -- and unwrapped source produces cleaner diffs.
 
 ```go
 // a wrapper around [ociregistry.Interface.GetManifest] (and `GetTag`, `GetBlob`, and the `Resolve*` versions of the above) that accepts a [Reference] and always returns a [ociregistry.BlobReader] (in the case of a HEAD request, it will be a zero-length reader with just a valid descriptor)
@@ -38,7 +38,14 @@ func Lookup(ctx context.Context, ref Reference, opts *LookupOptions) (ociregistr
 
 Corpus ref: [`meta-scripts/registry/lookup.go#L31-L32`](https://github.com/docker-library/meta-scripts/blob/205031aee2fdfbbd449038afd58f0f0a6915c217/registry/lookup.go#L31-L32).
 
-**Unexported functions and types** may or may not have doc comments.  When they do, the same style applies.
+**Unexported functions and types** may also have doc comments.  When they do, they follow the same conventions as exported symbols except the opening sentence starts with the lowercase symbol name (following godoc's own convention for unexported symbols):
+
+```go
+// frobFunction implements frobbing.  This is a frobnicator.
+func frobFunction() {
+```
+
+**Struct field comments** are an exception to the unwrapping rule: they should be hard-wrapped because godoc renders struct field comments verbatim (continuation lines are not joined).
 
 **Inline `// TODO` comments** are concrete and specific:
 
