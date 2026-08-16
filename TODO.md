@@ -5,3 +5,7 @@
 
 - godoc comment wrapping -- for exported doc comments, we should figure out / consider sentence wrapping (https://github.com/jbeda/mdreflow), and for inline struct comments we should hard-wrap/reflow at 80 columns (since they render verbatim in the godoc web view)
   - maybe for *all* markdown we should lean into sentence-per-line too?
+
+- would it be too much scope creep to add a minifier mode?  (using our AST parsers to then remove anything that's "fluff")
+  - we could then use this to find edge cases in how we choose to render things
+  - however often our choices are based on "leave it how it was" so that's not exactly perfect
