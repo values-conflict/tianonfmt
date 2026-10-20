@@ -478,6 +478,25 @@ Parenthetical asides are extremely common in prose, adding context, nuance, or c
 
 Corpus ref: [`debuerreotype/README.md#L5`](https://github.com/debuerreotype/debuerreotype/blob/3c3272fa743e0257ae64081987c500c2923ea963/README.md#L5), [`gosu/README.md#L21`](https://github.com/tianon/gosu/blob/3d395d499a92ffa47d70c79d24a738b85075f477/README.md#L21).
 
+### Serial (Oxford) comma
+
+A list of three or more items always takes a comma before the final "and" or "or": `X, Y, and Z`, never `X, Y and Z`.  This applies to prose and code comments alike, and to items of any kind (plain words, backticked identifiers, quoted values, or whole clauses).  A pair takes no comma (`X and Y`).
+
+> "...the version include all three of `MAJOR`, `MINOR`, and `PATCH` explicitly"
+> "...the CVE history backs it up -- CVE-2019-5736, CVE-2022-0492, and CVE-2024-21626 all happened in..."
+
+```bash
+# (we don't support any of "alpha", "m68k", or "sparc"; see http://archive.debian.org/debian/dists/slink/ -- ...)
+```
+
+```go
+// SetupUser changes the groups, gid, and uid for the user inside the container
+```
+
+The few serial lists without the final comma anywhere in the corpus are third-party text (vendored upstream READMEs, boilerplate codes of conduct), not Tianon's own writing.
+
+Corpus refs: [`fake-git/README.md#L11`](https://github.com/tianon/fake-git/blob/4639d58ce5f6488e448a019acc2b5ffc55d0925f/README.md#L11), [`blog/_posts/2026-05-20-container-security.md#L8`](https://github.com/tianon/tianon.github.io/blob/70f318822f383612a86900e95689f72793b9b083/_posts/2026-05-20-container-security.md#L8), [`debuerreotype/scripts/.dpkg-arch.sh#L27`](https://github.com/debuerreotype/debuerreotype/blob/3c3272fa743e0257ae64081987c500c2923ea963/scripts/.dpkg-arch.sh#L27), [`gosu/setup-user.go#L14`](https://github.com/tianon/gosu/blob/3d395d499a92ffa47d70c79d24a738b85075f477/setup-user.go#L14).
+
 ### Dashes
 
 Unicode dashes never appear.  The em-dash (U+2014), en-dash (U+2013), and minus sign (U+2212) are all replaced by ASCII equivalents.  Two reasons -- they make Tianon irrationally angry: they are grep-hostile (you cannot `grep` for U+2014 from a terminal without copy-pasting the character) and visually indistinguishable from each other and from a regular hyphen at a glance.
