@@ -131,3 +131,5 @@
 - would it be too much scope creep to add a minifier mode?  (using our AST parsers to then remove anything that's "fluff")
   - we could then use this to find edge cases in how we choose to render things
   - however often our choices are based on "leave it how it was" so that's not exactly perfect
+
+- docs/prose.md: are there more symbols like `±` that are acceptable / in our categories but not listed? (see 6007f7d24e6e54c57273aadde71a23809699f5b6)
