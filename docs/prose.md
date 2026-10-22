@@ -528,7 +528,7 @@ Two distinct modes exist for thinking about non-ASCII characters in Tianon's wri
 
 - **Arrows:** `→` (U+2192), `←` (U+2190) -- used in flow descriptions, pseudocode, and table notation.
 - **Section sign:** `§` (U+00A7) -- used in cross-references (`§Section Name`); has nostalgic resonance (The Sims currency symbol).
-- **Mathematical operators:** `≥` (U+2265), `≤` (U+2264), `≠` (U+2260), `×` (U+00D7 times), `∈` (U+2208 element-of), `∪` (U+222A union) -- acceptable when used correctly in technical contexts.
+- **Mathematical operators:** `≥` (U+2265), `≤` (U+2264), `≠` (U+2260), `×` (U+00D7 times), `±` (U+00B1), `∈` (U+2208 element-of), `∪` (U+222A union) -- acceptable when used correctly in technical contexts.
 - **Unit symbol:** `µ` (U+00B5, mu) -- common in time units (`~10-50µs`).
 - **Accented letters:** é, à, ï, etc. -- correct spelling of proper nouns and non-English words; Tianon copy-pastes these.
 - **Emoji:** covered separately in *Emoji in comments* -- appear sparingly for humor/irony in code comments and commit messages; never in formal API documentation.
